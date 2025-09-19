@@ -3,13 +3,18 @@ package com.star.schedule.ui.layouts
 import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,7 +22,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 // 定义一节课的时间范围
@@ -91,83 +98,95 @@ fun buildCourseBlocks(courses: List<Course>): List<CourseBlock> {
 @Composable
 fun ScheduleScreen(
     courses: List<Course>,
-    lessonTimes: List<LessonTime>
+    lessonTimes: List<LessonTime>,
+    cellHeight: Dp = 70.dp,
+    cellPadding: Dp = 2.dp
 ) {
     val daysOfWeek = listOf("一", "二", "三", "四", "五", "六", "日")
     val courseBlocks = buildCourseBlocks(courses)
-    val cellHeight = 70.dp
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // 星期标题行
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.weight(1f).padding(4.dp)) // 左上角空白
-            daysOfWeek.forEach {
-                Text(
-                    text = "周$it",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val totalWidth = maxWidth
+        val leftColumnWidth = totalWidth / 8  // 左侧节次列宽
+        val dayColumnWidth = (totalWidth - leftColumnWidth) / 7  // 每天宽度
+        val headerHeight = cellHeight // 顶部标题行高度
 
-        // 每一行表示一节课
-        lessonTimes.forEach { lesson ->
-            Row(modifier = Modifier.fillMaxWidth()) {
-                // 左边显示节次和时间
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(4.dp)
-                ) {
-                    Text("第${lesson.period}节", style = MaterialTheme.typography.labelMedium)
-                    Text("${lesson.startTime}\n${lesson.endTime}", style = MaterialTheme.typography.bodySmall)
+        // 背景网格和标题
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 星期标题行
+            Row(modifier = Modifier.height(headerHeight).fillMaxWidth()) {
+                Box(modifier = Modifier.width(leftColumnWidth)) // 左上角空白
+                daysOfWeek.forEach { day ->
+                    Box(
+                        modifier = Modifier
+                            .width(dayColumnWidth)
+                            .padding(cellPadding)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("周$day", textAlign = TextAlign.Center)
+                    }
                 }
+            }
 
-                // 右边 7 列
-                for (day in 1..7) {
-                    // 检查是否有 block 从这一节课开始
-                    val block = courseBlocks.find {
-                        it.dayOfWeek == day && it.startPeriod == lesson.period
+            // 每节课行
+            lessonTimes.forEach { lesson ->
+                Row(modifier = Modifier.height(cellHeight).fillMaxWidth()) {
+                    // 左侧节次列
+                    Column(
+                        modifier = Modifier.width(leftColumnWidth),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("第${lesson.period}节", textAlign = TextAlign.Center)
+                        Text("${lesson.startTime}\n${lesson.endTime}", textAlign = TextAlign.Center)
                     }
-                    // 如果某个 block 覆盖了这个格子，但不是起点，就跳过
-                    val covered = courseBlocks.any {
-                        it.dayOfWeek == day &&
-                                it.startPeriod < lesson.period &&
-                                it.endPeriod >= lesson.period
-                    }
-                    if (covered) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    } else if (block != null) {
-                        // 合并高度 = 节次数量 * cellHeight
-                        val span = block.endPeriod - block.startPeriod + 1
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(4.dp)
-                                .height(cellHeight * span)
-                                .clip(MaterialTheme.shapes.medium)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(block.course.name, style = MaterialTheme.typography.bodyMedium)
-                                Text(block.course.location, style = MaterialTheme.typography.bodySmall)
-                            }
+
+                    // 7列课程网格占位
+                    for (day in 1..7) {
+                        val isOccupied = courseBlocks.any { block ->
+                            block.dayOfWeek == day &&
+                                    block.startPeriod <= lesson.period &&
+                                    block.endPeriod >= lesson.period
                         }
-                    } else {
-                        // 空白格
+
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(4.dp)
+                                .width(dayColumnWidth)
                                 .height(cellHeight)
-                                .clip(MaterialTheme.shapes.small)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(cellPadding)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(
+                                    if (isOccupied) Color.Transparent
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
                         )
                     }
                 }
             }
         }
+
+        // 课程块 Overlay，覆盖在网格上
+        courseBlocks.forEach { block ->
+            val span = block.endPeriod - block.startPeriod + 1
+            Box(
+                modifier = Modifier
+                    .absoluteOffset(
+                        x = leftColumnWidth + dayColumnWidth * (block.dayOfWeek - 1) + cellPadding,
+                        y = headerHeight + cellHeight * (block.startPeriod - 1) + cellPadding
+                    )
+                    .width(dayColumnWidth - cellPadding * 2)
+                    .height(cellHeight * span - cellPadding * 2)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(block.course.name, style = MaterialTheme.typography.bodyMedium)
+                    Text(block.course.location, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
     }
 }
+
