@@ -1,0 +1,29 @@
+// DatabaseProvider.kt
+package com.star.schedule.db
+
+import android.content.Context
+import androidx.room.Room
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+object DatabaseProvider {
+    lateinit var db: AppDatabase
+        private set
+
+    fun init(context: Context) {
+        if (!::db.isInitialized) {
+            db = Room.databaseBuilder(
+                context.applicationContext,
+                AppDatabase::class.java,
+                "schedule.db"
+            )
+                .build()
+            CoroutineScope(Dispatchers.IO).launch {
+                db.scheduleDao().initializeDefaultTimetable()
+            }
+        }
+    }
+
+    fun dao(): ScheduleDao = db.scheduleDao()
+}

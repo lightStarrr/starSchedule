@@ -7,13 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,12 +31,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.star.schedule.db.CourseEntity
+import com.star.schedule.db.LessonTimeEntity
+import com.star.schedule.db.ScheduleDao
+import kotlinx.coroutines.flow.emptyFlow
+import java.time.LocalDate
 
 // 定义一节课的时间范围
 data class LessonTime(
@@ -62,28 +65,43 @@ data class CourseBlock(
 
 
 @Composable
-fun DateRange(content: Activity){
-    val courses = listOf(
-        Course("高等数学", "教学楼A101", dayOfWeek = 1, periods = listOf(1, 2)),
-        Course("大学英语", "教学楼B202", dayOfWeek = 3, periods = listOf(3, 4)),
-        Course("操作系统", "实验楼C303", dayOfWeek = 5, periods = listOf(1, 2, 3))
-    )
+fun DateRange(content: Activity, dao: ScheduleDao) {
+    // 当前课表ID
+    val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable").collectAsState(initial = null)
+    val timetableId = currentTimetableIdPref?.toLongOrNull()
 
-    val lessonTimes = listOf(
-        LessonTime(1, "08:00", "08:45"),
-        LessonTime(2, "08:55", "09:40"),
-        LessonTime(3, "10:00", "10:45"),
-        LessonTime(4, "10:55", "11:40"),
-        LessonTime(5, "14:00", "14:45"),
-        LessonTime(6, "14:55", "15:40")
-    )
+    // 当前周的课程
+    val today = LocalDate.now()
+    val courses by if (timetableId != null) {
+        dao.getCoursesForDateFlow(timetableId, today).collectAsState(initial = emptyList())
+    } else emptyList<CourseEntity>().let { mutableStateOf(it) }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ){
-        ScheduleScreen(courses, lessonTimes)
+    // 当前课表的作息时间
+    val lessonTimes by if (timetableId != null) {
+        dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
+    } else emptyList<LessonTimeEntity>().let { mutableStateOf(it) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        ScheduleScreen(
+            courses = courses.map { entity ->
+                Course(
+                    name = entity.name,
+                    location = entity.location,
+                    dayOfWeek = entity.dayOfWeek,
+                    periods = entity.periods
+                )
+            },
+            lessonTimes = lessonTimes.map { entity ->
+                LessonTime(
+                    period = entity.period,
+                    startTime = entity.startTime,
+                    endTime = entity.endTime
+                )
+            }
+        )
     }
 }
+
 
 fun buildCourseBlocks(courses: List<Course>): List<CourseBlock> {
     val blocks = mutableListOf<CourseBlock>()
@@ -110,7 +128,7 @@ fun buildCourseBlocks(courses: List<Course>): List<CourseBlock> {
 fun ScheduleScreen(
     courses: List<Course>,
     lessonTimes: List<LessonTime>,
-    cellHeight: Dp = 120.dp,
+    cellHeight: Dp = 60.dp,
     cellPadding: Dp = 2.dp
 ) {
     val daysOfWeek = listOf("一", "二", "三", "四", "五", "六", "日")
@@ -119,8 +137,8 @@ fun ScheduleScreen(
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val totalWidth = maxWidth
-        val leftColumnWidth = 35.dp  // 左侧节次列宽
-        val dayColumnWidth = (totalWidth - leftColumnWidth - 5.dp) / (daysOfWeek.lastIndex + 1)  // 每天宽度
+        val leftColumnWidth = 35.dp
+        val dayColumnWidth = (totalWidth - leftColumnWidth - 5.dp) / (daysOfWeek.lastIndex + 1)
 
         // 使用 remember + mutableStateOf 保存标题高度
         val density = LocalDensity.current
@@ -158,7 +176,9 @@ fun ScheduleScreen(
 
                 // 每节课行
                 lessonTimes.forEach { lesson ->
-                    Row(modifier = Modifier.height(cellHeight).fillMaxWidth()) {
+                    Row(modifier = Modifier
+                        .height(cellHeight)
+                        .fillMaxWidth()) {
                         // 左侧节次列
                         Column(
                             modifier = Modifier
@@ -217,13 +237,20 @@ fun ScheduleScreen(
                         .width(dayColumnWidth - cellPadding * 2)
                         .height(cellHeight * span - cellPadding * 2)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .padding(4.dp),
-                    contentAlignment = Alignment.TopCenter
+                        .background(MaterialTheme.colorScheme.secondary)
+                        .padding(4.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(block.course.name, style = MaterialTheme.typography.bodySmall)
-                        Text(block.course.location, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = block.course.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
+                        Text(
+                            text = block.course.location,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
                     }
                 }
             }

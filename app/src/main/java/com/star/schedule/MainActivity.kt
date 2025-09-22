@@ -15,6 +15,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -29,13 +30,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.ui.layouts.DateRange
 import com.star.schedule.ui.layouts.Settings
+import com.star.schedule.ui.layouts.TimetableSettings
 import com.star.schedule.ui.theme.StarScheduleTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DatabaseProvider.init(this)
         enableEdgeToEdge()
         setContent {
             StarScheduleTheme {
@@ -48,6 +54,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun Layout(content: Activity) {
     var selectedItem by remember { mutableIntStateOf(0) }
+    val haptic = LocalHapticFeedback.current
+    val dao = DatabaseProvider.dao()
 
     data class ItemData(
         val name: String,
@@ -56,9 +64,9 @@ fun Layout(content: Activity) {
 
     val items = listOf(
         ItemData("日程", Icons.Rounded.DateRange),
-        ItemData("设置", Icons.Rounded.Settings)
+        ItemData("课表设置", Icons.Rounded.CalendarMonth),
+                ItemData("设置", Icons.Rounded.Settings)
     )
-
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -72,7 +80,10 @@ fun Layout(content: Activity) {
                         },
                         label = { Text(item.name) },
                         selected = selectedItem == index,
-                        onClick = { selectedItem = index }
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            selectedItem = index
+                        }
                     )
                 }
             }
@@ -84,7 +95,6 @@ fun Layout(content: Activity) {
             modifier = Modifier.padding(innerPadding),
             transitionSpec = {
                 if (targetState > initialState) {
-                    // 从右往左切
                     (slideInHorizontally(
                         animationSpec = tween(300),
                         initialOffsetX = { it / 5 }
@@ -104,13 +114,22 @@ fun Layout(content: Activity) {
                                 targetOffsetX = { it / 5 }
                             ) + fadeOut(tween(300)))
                 }
-            }
-            ,
-                    label = "pageAnimation"
+            },
+            label = "pageAnimation"
         ) { page ->
             when (page) {
-                0 -> DateRange(content)
-                1 -> Settings(content)
+                0 -> DateRange(
+                    content = content,
+                    dao = dao
+                )
+                1 -> TimetableSettings(
+                    content = content,
+                    dao = dao
+                )
+                2 -> Settings(
+                    content = content,
+                    dao = dao
+                )
             }
         }
     }
