@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.androidx.room.ktx) {
         exclude(group = "com.intellij", module = "annotations")
     }
+    implementation(libs.wheelpickercompose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

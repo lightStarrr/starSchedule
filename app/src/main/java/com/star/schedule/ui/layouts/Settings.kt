@@ -1,44 +1,97 @@
 package com.star.schedule.ui.layouts
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.media.MediaPlayer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.star.schedule.R
 import com.star.schedule.db.ScheduleDao
+import com.star.schedule.notification.UnifiedNotificationManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Settings(content: Activity, dao: ScheduleDao) {
-    var notificationsEnabled by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    var clickCount by remember { mutableStateOf(0) }
+    var clickCount by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     var resetJob by remember { mutableStateOf<Job?>(null) }
+    
+    // 统一通知管理器
+    val notificationManager = remember { UnifiedNotificationManager(content) }
+    
+    // 权限申请器
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                // 权限获得后，发送测试通知
+                notificationManager.sendTestNotification()
+            }
+        }
+    )
 
-    // ---------- 所有课表 ----------
+    // 所有课表
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
     val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable").collectAsState(initial = null)
 
-    // ---------- 当前课表ID ----------
+    // 当前课表ID
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
+    
+    // 课前提醒开关状态
+    var reminderEnabled by remember { mutableStateOf(false) }
 
-    var menuExpanded by remember { mutableStateOf(false) }
+    // 控制 BottomSheet 显示
+    var showTimetableSheet by remember { mutableStateOf(false) }
+    
+    // 权限申请辅助函数
+    fun requestNotificationPermissionIfNeeded(onPermissionGranted: () -> Unit) {
+        when (ContextCompat.checkSelfPermission(content, Manifest.permission.POST_NOTIFICATIONS)) {
+            PackageManager.PERMISSION_GRANTED -> {
+                onPermissionGranted()
+            }
+            else -> {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
-    // ---------- 保证 currentTimetableId 与 preference 和 timetables 同步 ----------
+    // 保证 currentTimetableId 与 preference 和 timetables 同步
     LaunchedEffect(timetables, currentTimetableIdPref) {
-        currentTimetableId = currentTimetableIdPref?.toLongOrNull()
+        val newTimetableId = currentTimetableIdPref?.toLongOrNull()
+        
+        // 如果课表切换了，需要关闭之前课表的提醒
+        if (currentTimetableId != null && newTimetableId != currentTimetableId) {
+            // 课表切换时自动关闭提醒
+            notificationManager.disableReminders()
+            reminderEnabled = false
+        }
+        
+        currentTimetableId = newTimetableId
+        
+        // 检查当前课表是否启用了提醒
+        reminderEnabled = if (newTimetableId != null) {
+            notificationManager.isReminderEnabledForTimetableSync(newTimetableId)
+        } else {
+            false
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -48,52 +101,113 @@ fun Settings(content: Activity, dao: ScheduleDao) {
             modifier = Modifier.padding(16.dp)
         )
 
-        // ---------- 当前课表切换 ----------
-        Box {
-            OutlinedButton(
-                onClick = { menuExpanded = true },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-            ) {
-                val currentName = timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择"
-                Text("当前课表: $currentName")
-            }
+        // 当前课表切换
+        OutlinedButton(
+            onClick = { showTimetableSheet = true },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        ) {
+            val currentName = timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择"
+            Text("当前课表: $currentName")
+        }
 
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
+        // 课表选择 BottomSheet
+        if (showTimetableSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showTimetableSheet = false }
             ) {
-                timetables.forEach { timetable ->
-                    DropdownMenuItem(
-                        text = { Text(timetable.name) },
-                        onClick = {
-                            currentTimetableId = timetable.id
-                            scope.launch { dao.setPreference("current_timetable", timetable.id.toString()) }
-                            menuExpanded = false
-                        }
-                    )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .navigationBarsPadding()
+                ) {
+                    item {
+                        Text(
+                            text = "选择课表",
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                    
+                    items(timetables) { timetable ->
+                        ListItem(
+                            headlineContent = { Text(timetable.name) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    scope.launch { 
+                                        dao.setPreference("current_timetable", timetable.id.toString())
+                                    }
+                                    showTimetableSheet = false
+                                }
+                        )
+                    }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
             }
         }
 
         Spacer(Modifier.height(8.dp))
-        Divider()
+        HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
-        // ---------- 通知开关 ----------
+        // 课前15分钟提醒开关
         ListItem(
-            headlineContent = { Text("通知") },
-            supportingContent = { Text("开启后会在课程前10分钟发送通知") },
-            leadingContent = { Icon(Icons.Rounded.Notifications, contentDescription = null) },
+            headlineContent = { Text("课前提醒") },
+            supportingContent = { 
+                val currentName = timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择课表"
+                Text("为当前课表（$currentName）开启课前15分钟提醒（自动选择通知类型）")
+            },
+            leadingContent = { 
+                Icon(
+                    if (reminderEnabled) Icons.Rounded.NotificationsActive else Icons.Rounded.Notifications, 
+                    contentDescription = null
+                ) 
+            },
             trailingContent = {
                 Switch(
-                    checked = notificationsEnabled,
-                    onCheckedChange = { notificationsEnabled = it }
+                    checked = reminderEnabled,
+                    enabled = currentTimetableId != null,
+                    onCheckedChange = { enabled ->
+                        if (enabled && currentTimetableId != null) {
+                            requestNotificationPermissionIfNeeded {
+                                scope.launch {
+                                    notificationManager.enableRemindersForTimetable(currentTimetableId!!)
+                                    reminderEnabled = true
+                                    notificationManager.logNotificationStatus()
+                                }
+                            }
+                        } else {
+                            scope.launch {
+                                notificationManager.disableReminders()
+                                reminderEnabled = false
+                            }
+                        }
+                    }
                 )
             }
         )
 
-        Divider()
+        ListItem(
+            headlineContent = { Text("通知测试") },
+            supportingContent = { Text("测试通知功能（自动选择普通通知或魅族实况通知）") },
+            leadingContent = { Icon(Icons.Rounded.PhoneAndroid, contentDescription = null) },
+            modifier = Modifier.clickable {
+                scope.launch {
+                    if (notificationManager.hasNotificationPermission()) {
+                        notificationManager.sendTestNotification()
+                        notificationManager.logNotificationStatus()
+                    } else {
+                        requestNotificationPermissionIfNeeded {
+                            notificationManager.sendTestNotification()
+                        }
+                    }
+                }
+            }
+        )
 
-        // ---------- 关于应用彩蛋 ----------
         ListItem(
             headlineContent = { Text("关于应用") },
             supportingContent = { Text("版本 " + content.packageManager.getPackageInfo(content.packageName, 0).versionName) },

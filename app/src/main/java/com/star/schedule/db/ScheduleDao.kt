@@ -90,6 +90,71 @@ interface ScheduleDao {
     @Delete
     suspend fun deleteLessonTime(lessonTime: LessonTimeEntity)
 
+    // 新增：根据时间自动重新排序课时
+    @Transaction
+    suspend fun updateLessonTimeWithAutoSort(lessonTime: LessonTimeEntity) {
+        // 更新当前课时
+        updateLessonTime(lessonTime)
+        
+        // 获取同一课表的所有课时
+        val lessonTimes = getLessonTimesFlow(lessonTime.timetableId).firstOrNull() ?: return
+        
+        // 按开始时间排序
+        val sortedByTime = lessonTimes.sortedBy { it.startTime }
+        
+        // 更新所有课时的节次以匹配时间顺序
+        sortedByTime.forEachIndexed { index, lesson ->
+            val newPeriod = index + 1
+            if (lesson.period != newPeriod) {
+                updateLessonTime(lesson.copy(period = newPeriod))
+            }
+        }
+    }
+
+    // 新增：插入课时并自动排序
+    @Transaction
+    suspend fun insertLessonTimeWithAutoSort(lessonTime: LessonTimeEntity): Long {
+        // 先插入课时
+        val id = insertLessonTime(lessonTime)
+        
+        // 获取同一课表的所有课时
+        val lessonTimes = getLessonTimesFlow(lessonTime.timetableId).firstOrNull() ?: return id
+        
+        // 按开始时间排序
+        val sortedByTime = lessonTimes.sortedBy { it.startTime }
+        
+        // 更新所有课时的节次以匹配时间顺序
+        sortedByTime.forEachIndexed { index, lesson ->
+            val newPeriod = index + 1
+            if (lesson.period != newPeriod) {
+                updateLessonTime(lesson.copy(period = newPeriod))
+            }
+        }
+        
+        return id
+    }
+
+    // 新增：删除课时并自动排序
+    @Transaction
+    suspend fun deleteLessonTimeWithAutoSort(lessonTime: LessonTimeEntity) {
+        // 删除课时
+        deleteLessonTime(lessonTime)
+        
+        // 获取同一课表的所有课时
+        val lessonTimes = getLessonTimesFlow(lessonTime.timetableId).firstOrNull() ?: return
+        
+        // 按开始时间排序
+        val sortedByTime = lessonTimes.sortedBy { it.startTime }
+        
+        // 更新所有课时的节次以匹配时间顺序
+        sortedByTime.forEachIndexed { index, lesson ->
+            val newPeriod = index + 1
+            if (lesson.period != newPeriod) {
+                updateLessonTime(lesson.copy(period = newPeriod))
+            }
+        }
+    }
+
     // ------------------ 课程 ------------------
     @Query("SELECT * FROM course WHERE timetableId = :timetableId ORDER BY dayOfWeek ASC")
     fun getCoursesFlow(timetableId: Long): Flow<List<CourseEntity>>
@@ -101,7 +166,14 @@ interface ScheduleDao {
         val coursesFlow = getCoursesFlow(timetableId)
 
         return combine(timetableFlow, coursesFlow) { timetable, courses ->
-            val startDate = timetable?.startDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
+            val startDate = timetable?.startDate?.let { dateStr ->
+                try {
+                    LocalDate.parse(dateStr)
+                } catch (e: Exception) {
+                    // 日期解析失败时使用当前日期
+                    LocalDate.now()
+                }
+            } ?: LocalDate.now()
             val weekNumber = date?.getWeekOfSemester(startDate) ?: 0
             if (weekNumber == 0) courses else courses.filter { it.weeks.contains(weekNumber) }
         }
