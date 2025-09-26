@@ -251,6 +251,25 @@ fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         )
 
         ListItem(
+            headlineContent = { Text("上课提醒测试") },
+            supportingContent = { Text("测试上课前提醒逻辑，10秒后推送测试通知") },
+            leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
+            modifier = Modifier.clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                scope.launch {
+                    if (notificationManager.hasNotificationPermission()) {
+                        notificationManager.scheduleTestReminder()
+                        notificationManager.logNotificationStatus()
+                    } else {
+                        requestNotificationPermissionIfNeeded {
+                            notificationManager.scheduleTestReminder()
+                        }
+                    }
+                }
+            }
+        )
+
+        ListItem(
             headlineContent = { Text("关于应用") },
             supportingContent = {
                 Text(

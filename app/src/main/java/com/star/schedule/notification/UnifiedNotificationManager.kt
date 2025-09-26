@@ -28,6 +28,7 @@ import com.star.schedule.R
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.LessonTimeEntity
+import com.star.schedule.db.NotificationManagerProvider
 import com.star.schedule.db.ReminderEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +40,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-class UnifiedNotificationManager(private val context: Context) {
+class UnifiedNotificationManager(private val context: Context) : NotificationManagerProvider {
 
     private val notificationManager = context.getSystemService<NotificationManager>()!!
     private val alarmManager = context.getSystemService<AlarmManager>()!!
@@ -227,7 +228,7 @@ class UnifiedNotificationManager(private val context: Context) {
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-    suspend fun enableRemindersForTimetable(timetableId: Long) {
+    override suspend fun enableRemindersForTimetable(timetableId: Long) {
         val dao = DatabaseProvider.dao()
         dao.setPreference(PREF_REMINDER_ENABLED_TIMETABLE, timetableId.toString())
 
@@ -377,6 +378,66 @@ class UnifiedNotificationManager(private val context: Context) {
             startTime = "08:00",
             minutesBefore = 15
         )
+    }
+
+    fun scheduleTestReminder() {
+        if (!hasNotificationPermission()) return
+        
+        val intent = Intent(context, CourseReminderReceiver::class.java).apply {
+            putExtra("course_name", "上课提醒测试")
+            putExtra("course_location", "测试教室B203")
+            putExtra("course_time", "当前时间")
+        }
+
+        val requestCode = "test_reminder_${System.currentTimeMillis()}".hashCode().and(0x7FFFFFFF)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // 设置1分钟后的提醒
+        val triggerTime = System.currentTimeMillis() + 10 * 1000L // 1分钟后
+
+        try {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+                
+                CoroutineScope(Dispatchers.Main).launch {
+                    Toast.makeText(
+                        context,
+                        "测试提醒已设置，将在10秒后推送通知",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } else {
+                // 如果无法设置精确闹钟，引导用户开启权限
+                val settingsIntent = Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(settingsIntent)
+                CoroutineScope(Dispatchers.Main).launch {
+                    Toast.makeText(
+                        context,
+                        "请允许应用使用精确闹钟，然后重试",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        } catch (e: SecurityException) {
+            CoroutineScope(Dispatchers.Main).launch {
+                Toast.makeText(
+                    context,
+                    "无法设置提醒，请检查系统设置",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     // 保留 logNotificationStatus

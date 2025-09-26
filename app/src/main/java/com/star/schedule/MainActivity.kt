@@ -58,6 +58,9 @@ fun Layout(content: Activity) {
     val haptic = LocalHapticFeedback.current
     val dao = DatabaseProvider.dao()
     val notificationManager = UnifiedNotificationManager(content)
+    
+    // 注入 notificationManager 到 dao 中
+    dao.notificationManager = notificationManager
 
     data class ItemData(
         val name: String,

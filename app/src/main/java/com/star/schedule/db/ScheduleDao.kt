@@ -139,6 +139,7 @@ abstract class ScheduleDao {
     // ------------------ 自动排序和提醒 ------------------
     private suspend fun checkAndEnableReminders(timetableId: Long) {
         val currentId = getPreferenceFlow("current_timetable").firstOrNull()?.toLongOrNull()
+        android.util.Log.d("ScheduleDao", "checkAndEnableReminders: timetableId=$timetableId, currentId=$currentId, notificationManager=$notificationManager")
         if (currentId == timetableId) {
             notificationManager?.enableRemindersForTimetable(currentId)
         }
