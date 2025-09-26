@@ -2,8 +2,10 @@ package com.star.schedule.ui.layouts
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsActive
@@ -51,6 +54,7 @@ import com.star.schedule.notification.UnifiedNotificationManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,7 +132,9 @@ fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
         // 当前课表切换
         OutlinedButton(
-            onClick = { showTimetableSheet = true },
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                showTimetableSheet = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -203,6 +209,7 @@ fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     checked = reminderEnabled,
                     enabled = currentTimetableId != null,
                     onCheckedChange = { enabled ->
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         if (enabled && currentTimetableId != null) {
                             requestNotificationPermissionIfNeeded {
                                 scope.launch {
@@ -229,6 +236,7 @@ fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             supportingContent = { Text("测试通知功能（自动选择普通通知或魅族实况通知）") },
             leadingContent = { Icon(Icons.Rounded.PhoneAndroid, contentDescription = null) },
             modifier = Modifier.clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                 scope.launch {
                     if (notificationManager.hasNotificationPermission()) {
                         notificationManager.sendTestNotification()
@@ -269,6 +277,18 @@ fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         clickCount = 0
                     }
                 }
+            }
+        )
+
+        ListItem(
+            headlineContent = { Text("Github") },
+            supportingContent = { Text("https://github.com/lightStarrr/starSchedule") },
+            leadingContent = { Icon(Icons.Rounded.Code, contentDescription = null) },
+            modifier = Modifier.clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                val intent =
+                    Intent(Intent.ACTION_VIEW, "https://github.com/lightStarrr/starSchedule".toUri())
+                content.startActivity(intent)
             }
         )
     }

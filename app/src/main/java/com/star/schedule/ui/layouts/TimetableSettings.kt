@@ -50,6 +50,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
@@ -66,6 +68,7 @@ import java.time.ZoneId
 fun TimetableSettings(content: Activity, dao: ScheduleDao) {
     val scope = rememberCoroutineScope()
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
+    val haptic = LocalHapticFeedback.current
 
     // BottomSheet 状态管理
     var showAddLessonSheet by remember { mutableStateOf(false) }
@@ -115,7 +118,9 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showTimetableDetailSheet = timetable },
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        showTimetableDetailSheet = timetable },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
