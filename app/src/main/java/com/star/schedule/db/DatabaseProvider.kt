@@ -17,7 +17,7 @@ object DatabaseProvider {
                 AppDatabase::class.java,
                 "schedule.db"
             )
-                .fallbackToDestructiveMigration() // ⚡️ 如果没正式发布，推荐加这个
+                .fallbackToDestructiveMigration(false) // ⚡️ 如果没正式发布，推荐加这个
                 .build()
 
             CoroutineScope(Dispatchers.IO).launch {
