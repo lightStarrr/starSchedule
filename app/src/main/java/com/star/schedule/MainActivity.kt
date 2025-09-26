@@ -24,6 +24,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.layouts.DateRange
@@ -61,6 +65,13 @@ fun Layout(content: Activity) {
     
     // 注入 notificationManager 到 dao 中
     dao.notificationManager = notificationManager
+    
+    // 在应用启动时初始化提醒系统
+    LaunchedEffect(Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            notificationManager.initializeOnAppStart()
+        }
+    }
 
     data class ItemData(
         val name: String,

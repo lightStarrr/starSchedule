@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 精确闹钟权限（Android 12+ 必须） -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- 接收开机广播权限 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
@@ -31,7 +34,27 @@
         <receiver
             android:name=".notification.CourseReminderReceiver"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="false" />
+
+        <!-- 系统启动广播接收器 -->
+        <receiver
+            android:name=".notification.BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 定期更新广播接收器 -->
+        <receiver
+            android:name=".notification.DailyUpdateReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>
