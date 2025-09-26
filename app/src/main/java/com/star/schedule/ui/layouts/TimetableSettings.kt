@@ -40,10 +40,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,9 +57,9 @@ import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
 import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +93,7 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
             Button(
                 onClick = {
                     scope.launch {
-                        dao.insertTimetable(
+                        dao.insertTimetableWithReminders(
                             TimetableEntity(
                                 name = "新建课表",
                                 showWeekend = true,
@@ -127,7 +125,13 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(timetable.name, style = MaterialTheme.typography.titleMedium)
-                        IconButton(onClick = { scope.launch { dao.deleteTimetable(timetable) } }) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                dao.deleteTimetableWithReminders(
+                                    timetable
+                                )
+                            }
+                        }) {
                             Icon(Icons.Rounded.Delete, contentDescription = "删除课表")
                         }
                     }
@@ -195,14 +199,16 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
 @Composable
 fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: ScheduleDao) {
     // 获取当前课表的所有课程时间，用于重叠检测
-    val lessonTimes by dao.getLessonTimesFlow(lesson.timetableId).collectAsState(initial = emptyList())
-    val sortedLessonTimes = lessonTimes.filter { it.id != lesson.id }.sortedBy { it.period } // 排除当前正在编辑的课程时间
-    
+    val lessonTimes by dao.getLessonTimesFlow(lesson.timetableId)
+        .collectAsState(initial = emptyList())
+    val sortedLessonTimes =
+        lessonTimes.filter { it.id != lesson.id }.sortedBy { it.period } // 排除当前正在编辑的课程时间
+
     var startTime by remember { mutableStateOf(lesson.startTime) }
     var endTime by remember { mutableStateOf(lesson.endTime) }
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    
+
     // 时间选择器状态
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
@@ -222,7 +228,7 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            
+
             // 错误信息显示
             if (errorMessage.isNotEmpty()) {
                 Card(
@@ -240,10 +246,10 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            
+
             OutlinedTextField(
                 value = startTime,
-                onValueChange = { 
+                onValueChange = {
                     startTime = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -264,12 +270,12 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
                     { Text("点击选择课程开始时间") }
                 }
             )
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = endTime,
-                onValueChange = { 
+                onValueChange = {
                     endTime = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -290,9 +296,9 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
                     { Text("点击选择课程结束时间") }
                 }
             )
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -301,24 +307,29 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     // 数据验证
-                    val validationResult = ValidationUtils.LessonTimeValidation.validateTimeFormat(startTime, "开始时间")
+                    val validationResult = ValidationUtils.LessonTimeValidation.validateTimeFormat(
+                        startTime,
+                        "开始时间"
+                    )
                     if (!validationResult.isValid) {
                         errorMessage = validationResult.errorMessage
                         return@Button
                     }
-                    
-                    val validationResult2 = ValidationUtils.LessonTimeValidation.validateTimeFormat(endTime, "结束时间")
+
+                    val validationResult2 =
+                        ValidationUtils.LessonTimeValidation.validateTimeFormat(endTime, "结束时间")
                     if (!validationResult2.isValid) {
                         errorMessage = validationResult2.errorMessage
                         return@Button
                     }
-                    
-                    val timeRangeResult = ValidationUtils.LessonTimeValidation.validateTimeRange(startTime, endTime)
+
+                    val timeRangeResult =
+                        ValidationUtils.LessonTimeValidation.validateTimeRange(startTime, endTime)
                     if (!timeRangeResult.isValid) {
                         errorMessage = timeRangeResult.errorMessage
                         return@Button
                     }
-                    
+
                     // 检查时间重叠
                     val newStartTime = startTime
                     val newEndTime = endTime
@@ -326,42 +337,49 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
                         // 检查时间是否重叠
                         (newStartTime < l.endTime && newEndTime > l.startTime)
                     }
-                    
+
                     if (hasOverlap) {
                         errorMessage = "时间重叠：与现有课程时间冲突"
                         return@Button
                     }
-                    
+
                     // 验证通过，保存数据（节次将自动分配）
-                    scope.launch { 
-                        dao.updateLessonTimeWithAutoSort(lesson.copy(startTime = startTime, endTime = endTime)) 
+                    scope.launch {
+                        dao.insertOrUpdateLessonTimeAutoSort(
+                            lesson.copy(
+                                startTime = startTime,
+                                endTime = endTime
+                            )
+                        )
                     }
                     onDismiss()
                 }) { Text("保存") }
             }
-            
+
             Spacer(Modifier.height(16.dp))
         }
     }
-    
+
     // 时间选择器
     if (showStartTimePicker) {
         TimePickerDialog(
             onDismiss = { showStartTimePicker = false },
             onConfirm = { hour, minute ->
-                startTime = java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
+                startTime =
+                    java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
                 showStartTimePicker = false
             },
             initialHour = startTime.split(":")[0].toIntOrNull() ?: 8,
             initialMinute = startTime.split(":")[1].toIntOrNull() ?: 0
         )
     }
-    
+
     if (showEndTimePicker) {
         TimePickerDialog(
             onDismiss = { showEndTimePicker = false },
             onConfirm = { hour, minute ->
-                endTime = java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
+                endTime =
+                    java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
                 showEndTimePicker = false
             },
             initialHour = endTime.split(":")[0].toIntOrNull() ?: 8,
@@ -377,7 +395,7 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(course.timetableId).collectAsState(initial = emptyList())
     val filteredCourses = courses.filter { it.id != course.id } // 排除当前正在编辑的课程
-    
+
     var name by remember { mutableStateOf(course.name) }
     var location by remember { mutableStateOf(course.location) }
     var dayOfWeek by remember { mutableStateOf(course.dayOfWeek.toString()) }
@@ -401,7 +419,7 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            
+
             // 错误信息显示
             if (errorMessage.isNotEmpty()) {
                 Card(
@@ -419,10 +437,10 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            
+
             OutlinedTextField(
                 value = name,
-                onValueChange = { 
+                onValueChange = {
                     name = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -433,12 +451,12 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                     { Text("课程名称不能为空，且不超过50个字符") }
                 } else null
             )
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = location,
-                onValueChange = { 
+                onValueChange = {
                     location = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -449,12 +467,12 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                     { Text("上课地点不能超过100个字符") }
                 } else null
             )
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = dayOfWeek,
-                onValueChange = { 
+                onValueChange = {
                     dayOfWeek = it.filter { c -> c.isDigit() }
                     errorMessage = "" // 清除错误信息
                 },
@@ -465,12 +483,12 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                     { Text("1=周一，2=周二，...，7=周日") }
                 } else null
             )
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = periods,
-                onValueChange = { 
+                onValueChange = {
                     periods = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -485,12 +503,12 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                     { Text("请输入课程节次，多个节次用逗号分隔") }
                 }
             )
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = weeks,
-                onValueChange = { 
+                onValueChange = {
                     weeks = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -501,9 +519,9 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                     { Text("用逗号分隔，如：1,2,3，表示第几周上课") }
                 } else null
             )
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -519,39 +537,40 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                         periods = periods,
                         weeks = weeks
                     )
-                    
+
                     if (!validationResult.isValid) {
                         errorMessage = validationResult.errorMessage
                         return@Button
                     }
-                    
+
                     // 检查课程时间重叠
                     val day = dayOfWeek.toInt()
                     val periodList = periods.split(",").map { it.trim().toInt() }
                     val weekList = weeks.split(",").map { it.trim().toInt() }
-                    
+
                     // 检查是否有时间冲突
                     val hasTimeOverlap = filteredCourses.any { existingCourse ->
                         // 检查是否同一天
                         if (existingCourse.dayOfWeek != day) return@any false
-                        
+
                         // 检查是否同一周
                         val weekOverlap = existingCourse.weeks.any { w -> weekList.contains(w) }
                         if (!weekOverlap) return@any false
-                        
+
                         // 检查是否同一节次
-                        val periodOverlap = existingCourse.periods.any { p -> periodList.contains(p) }
+                        val periodOverlap =
+                            existingCourse.periods.any { p -> periodList.contains(p) }
                         periodOverlap
                     }
-                    
+
                     if (hasTimeOverlap) {
                         errorMessage = "时间重叠：与现有课程在同一时间"
                         return@Button
                     }
-                    
+
                     // 验证通过，保存数据
                     scope.launch {
-                        dao.updateCourse(
+                        dao.updateCourseWithReminders(
                             course.copy(
                                 name = name,
                                 location = location,
@@ -566,7 +585,7 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                     Text("保存")
                 }
             }
-            
+
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -582,12 +601,12 @@ fun AddLessonTimeSheet(
 ) {
     // 获取当前课表的所有课程时间，用于重叠检测
     val lessonTimes by dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
-    
+
     var startTime by remember { mutableStateOf("08:00") }
     var endTime by remember { mutableStateOf("08:45") }
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    
+
     // 时间选择器状态
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
@@ -607,7 +626,7 @@ fun AddLessonTimeSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            
+
             // 错误信息显示
             if (errorMessage.isNotEmpty()) {
                 Card(
@@ -625,10 +644,10 @@ fun AddLessonTimeSheet(
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            
+
             OutlinedTextField(
                 value = startTime,
-                onValueChange = { 
+                onValueChange = {
                     startTime = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -649,12 +668,12 @@ fun AddLessonTimeSheet(
                     { Text("点击选择课程开始时间") }
                 }
             )
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = endTime,
-                onValueChange = { 
+                onValueChange = {
                     endTime = it
                     errorMessage = "" // 清除错误信息
                 },
@@ -675,9 +694,9 @@ fun AddLessonTimeSheet(
                     { Text("点击选择课程结束时间") }
                 }
             )
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -686,24 +705,29 @@ fun AddLessonTimeSheet(
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     // 数据验证
-                    val validationResult = ValidationUtils.LessonTimeValidation.validateTimeFormat(startTime, "开始时间")
+                    val validationResult = ValidationUtils.LessonTimeValidation.validateTimeFormat(
+                        startTime,
+                        "开始时间"
+                    )
                     if (!validationResult.isValid) {
                         errorMessage = validationResult.errorMessage
                         return@Button
                     }
-                    
-                    val validationResult2 = ValidationUtils.LessonTimeValidation.validateTimeFormat(endTime, "结束时间")
+
+                    val validationResult2 =
+                        ValidationUtils.LessonTimeValidation.validateTimeFormat(endTime, "结束时间")
                     if (!validationResult2.isValid) {
                         errorMessage = validationResult2.errorMessage
                         return@Button
                     }
-                    
-                    val timeRangeResult = ValidationUtils.LessonTimeValidation.validateTimeRange(startTime, endTime)
+
+                    val timeRangeResult =
+                        ValidationUtils.LessonTimeValidation.validateTimeRange(startTime, endTime)
                     if (!timeRangeResult.isValid) {
                         errorMessage = timeRangeResult.errorMessage
                         return@Button
                     }
-                    
+
                     // 检查时间重叠
                     val newStartTime = startTime
                     val newEndTime = endTime
@@ -711,15 +735,15 @@ fun AddLessonTimeSheet(
                         // 检查时间是否重叠
                         (newStartTime < lesson.endTime && newEndTime > lesson.startTime)
                     }
-                    
+
                     if (hasOverlap) {
                         errorMessage = "时间重叠：与现有课程时间冲突"
                         return@Button
                     }
-                    
+
                     // 验证通过，保存数据（节次将自动分配）
                     scope.launch {
-                        dao.insertLessonTimeWithAutoSort(
+                        dao.insertOrUpdateLessonTimeAutoSort(
                             LessonTimeEntity(
                                 timetableId = timetableId,
                                 period = 1, // 临时值，会被自动排序方法覆盖
@@ -733,29 +757,31 @@ fun AddLessonTimeSheet(
                     Text("保存")
                 }
             }
-            
+
             Spacer(Modifier.height(16.dp))
         }
     }
-    
+
     // 时间选择器
     if (showStartTimePicker) {
         TimePickerDialog(
             onDismiss = { showStartTimePicker = false },
             onConfirm = { hour, minute ->
-                startTime = java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
+                startTime =
+                    java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
                 showStartTimePicker = false
             },
             initialHour = startTime.split(":")[0].toIntOrNull() ?: 8,
             initialMinute = startTime.split(":")[1].toIntOrNull() ?: 0
         )
     }
-    
+
     if (showEndTimePicker) {
         TimePickerDialog(
             onDismiss = { showEndTimePicker = false },
             onConfirm = { hour, minute ->
-                endTime = java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
+                endTime =
+                    java.text.MessageFormat.format("{0,number,00}:{1,number,00}", hour, minute)
                 showEndTimePicker = false
             },
             initialHour = endTime.split(":")[0].toIntOrNull() ?: 8,
@@ -937,7 +963,8 @@ fun AddCourseSheet(
                         if (!weekOverlap) return@any false
 
                         // 检查是否同一节次
-                        val periodOverlap = existingCourse.periods.any { p -> periodList.contains(p) }
+                        val periodOverlap =
+                            existingCourse.periods.any { p -> periodList.contains(p) }
                         periodOverlap
                     }
 
@@ -948,7 +975,7 @@ fun AddCourseSheet(
 
                     // 验证通过，保存数据
                     scope.launch {
-                        dao.insertCourse(
+                        dao.insertCourseWithReminders(
                             CourseEntity(
                                 timetableId = timetableId,
                                 name = name,
@@ -974,23 +1001,23 @@ fun AddCourseSheet(
 @Composable
 fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao: ScheduleDao) {
     val scope = rememberCoroutineScope()
-    
+
     // 课表信息状态
     var name by remember { mutableStateOf(timetable.name) }
     var startDate by remember { mutableStateOf(timetable.startDate) }
     var showWeekend by remember { mutableStateOf(timetable.showWeekend) }
     var errorMessage by remember { mutableStateOf("") }
-    
+
     // 日期选择器状态
     var showDatePicker by remember { mutableStateOf(false) }
-    
+
     // 课程时间管理 (按节次排序)
     val lessonTimes by dao.getLessonTimesFlow(timetable.id).collectAsState(initial = emptyList())
     val sortedLessonTimes = lessonTimes.sortedBy { it.period }
-    
+
     // 课程管理
     val courses by dao.getCoursesFlow(timetable.id).collectAsState(initial = emptyList())
-    
+
     // 子 BottomSheet 状态
     var showAddLessonSheet by remember { mutableStateOf(false) }
     var showAddCourseSheet by remember { mutableStateOf(false) }
@@ -1020,9 +1047,9 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                     Icon(Icons.Rounded.Close, contentDescription = "关闭")
                 }
             }
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             // 错误信息显示
             if (errorMessage.isNotEmpty()) {
                 Card(
@@ -1040,16 +1067,19 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            
+
             // 课表信息编辑
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { 
+                        onValueChange = {
                             name = it
                             errorMessage = "" // 清除错误信息
                         },
@@ -1063,7 +1093,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
 
                     OutlinedTextField(
                         value = startDate,
-                        onValueChange = { 
+                        onValueChange = {
                             startDate = it
                             errorMessage = "" // 清除错误信息
                         },
@@ -1076,7 +1106,10 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                             }
                         },
                         isError = errorMessage.contains("日期") || errorMessage.contains("学期"),
-                        supportingText = if (errorMessage.contains("日期") || errorMessage.contains("学期")) {
+                        supportingText = if (errorMessage.contains("日期") || errorMessage.contains(
+                                "学期"
+                            )
+                        ) {
                             { Text("请使用有效的日期格式") }
                         } else null
                     )
@@ -1096,19 +1129,20 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                     Button(
                         onClick = {
                             // 数据验证
-                            val validationResult = ValidationUtils.TimetableValidation.validateTimetableData(
-                                name = name,
-                                startDate = startDate
-                            )
-                            
+                            val validationResult =
+                                ValidationUtils.TimetableValidation.validateTimetableData(
+                                    name = name,
+                                    startDate = startDate
+                                )
+
                             if (!validationResult.isValid) {
                                 errorMessage = validationResult.errorMessage
                                 return@Button
                             }
-                            
+
                             // 验证通过，保存数据
                             scope.launch {
-                                dao.updateTimetable(
+                                dao.updateTimetableWithReminders(
                                     timetable.copy(
                                         name = name,
                                         startDate = startDate,
@@ -1123,15 +1157,18 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                     }
                 }
             }
-            
+
             Spacer(Modifier.height(12.dp))
-            
+
             // 课程时间管理
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1142,7 +1179,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                             Icon(Icons.Rounded.Add, contentDescription = "新增课程时间")
                         }
                     }
-                    
+
                     if (sortedLessonTimes.isEmpty()) {
                         Text(
                             text = "暂无课程时间",
@@ -1161,10 +1198,22 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                                 Text("第${lesson.period}节 ${lesson.startTime}-${lesson.endTime}")
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { showEditLessonSheet = lesson }) {
-                                        Icon(Icons.Rounded.Edit, contentDescription = "编辑课程时间")
+                                        Icon(
+                                            Icons.Rounded.Edit,
+                                            contentDescription = "编辑课程时间"
+                                        )
                                     }
-                                    IconButton(onClick = { scope.launch { dao.deleteLessonTimeWithAutoSort(lesson) } }) {
-                                        Icon(Icons.Rounded.Delete, contentDescription = "删除课程时间")
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            dao.deleteLessonTimeAutoSort(
+                                                lesson
+                                            )
+                                        }
+                                    }) {
+                                        Icon(
+                                            Icons.Rounded.Delete,
+                                            contentDescription = "删除课程时间"
+                                        )
                                     }
                                 }
                             }
@@ -1172,15 +1221,18 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                     }
                 }
             }
-            
+
             Spacer(Modifier.height(12.dp))
-            
+
             // 课程管理
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1191,7 +1243,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                             Icon(Icons.Rounded.Add, contentDescription = "新增课程")
                         }
                     }
-                    
+
                     if (courses.isEmpty()) {
                         Text(
                             text = "暂无课程",
@@ -1207,12 +1259,24 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                             ) {
-                                Text("${course.name} (周${course.dayOfWeek} 节次:${course.periods.joinToString(",")})")
+                                Text(
+                                    "${course.name} (周${course.dayOfWeek} 节次:${
+                                        course.periods.joinToString(
+                                            ","
+                                        )
+                                    })"
+                                )
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { showEditCourseSheet = course }) {
                                         Icon(Icons.Rounded.Edit, contentDescription = "编辑课程")
                                     }
-                                    IconButton(onClick = { scope.launch { dao.deleteCourse(course) } }) {
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            dao.deleteCourseWithReminders(
+                                                course
+                                            )
+                                        }
+                                    }) {
                                         Icon(Icons.Rounded.Delete, contentDescription = "删除课程")
                                     }
                                 }
@@ -1221,28 +1285,30 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                     }
                 }
             }
-            
+
             Spacer(Modifier.height(16.dp))
         }
     }
-    
+
     // 日期选择器对话框
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = try {
-                LocalDate.parse(startDate).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                LocalDate.parse(startDate).atStartOfDay(ZoneId.systemDefault()).toInstant()
+                    .toEpochMilli()
             } catch (e: Exception) {
                 System.currentTimeMillis()
             }
         )
-        
+
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        datePickerState.selectedDateMillis?.let { 
-                            val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                        datePickerState.selectedDateMillis?.let {
+                            val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
+                                .toLocalDate()
                             startDate = date.toString()
                         }
                         showDatePicker = false
@@ -1264,7 +1330,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
             DatePicker(state = datePickerState)
         }
     }
-    
+
     // 子 BottomSheet
     if (showAddLessonSheet) {
         AddLessonTimeSheet(
@@ -1273,7 +1339,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
             dao = dao
         )
     }
-    
+
     if (showAddCourseSheet) {
         AddCourseSheet(
             timetableId = timetable.id,
@@ -1281,7 +1347,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
             dao = dao
         )
     }
-    
+
     showEditLessonSheet?.let { lesson ->
         EditLessonTimeSheet(
             lesson = lesson,
@@ -1289,7 +1355,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
             dao = dao
         )
     }
-    
+
     showEditCourseSheet?.let { course ->
         EditCourseSheet(
             course = course,
@@ -1312,7 +1378,7 @@ fun TimePickerDialog(
         initialMinute = initialMinute,
         is24Hour = true
     )
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {

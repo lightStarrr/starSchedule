@@ -1,4 +1,3 @@
-// DatabaseProvider.kt
 package com.star.schedule.db
 
 import android.content.Context
@@ -18,7 +17,9 @@ object DatabaseProvider {
                 AppDatabase::class.java,
                 "schedule.db"
             )
+                .fallbackToDestructiveMigration() // ⚡️ 如果没正式发布，推荐加这个
                 .build()
+
             CoroutineScope(Dispatchers.IO).launch {
                 db.scheduleDao().initializeDefaultTimetable()
             }

@@ -65,7 +65,8 @@ data class CourseBlock(
 @Composable
 fun DateRange(content: Activity, dao: ScheduleDao) {
     // 当前课表ID
-    val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable").collectAsState(initial = null)
+    val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable")
+        .collectAsState(initial = null)
     val timetableId = currentTimetableIdPref?.toLongOrNull()
 
     // 当前周的课程
@@ -174,9 +175,11 @@ fun ScheduleScreen(
 
                 // 每节课行
                 lessonTimes.forEach { lesson ->
-                    Row(modifier = Modifier
-                        .height(cellHeight)
-                        .fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .height(cellHeight)
+                            .fillMaxWidth()
+                    ) {
                         // 左侧节次列
                         Column(
                             modifier = Modifier

@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.star.schedule.db.DatabaseProvider
+import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.layouts.DateRange
 import com.star.schedule.ui.layouts.Settings
 import com.star.schedule.ui.layouts.TimetableSettings
@@ -56,6 +57,7 @@ fun Layout(content: Activity) {
     var selectedItem by remember { mutableIntStateOf(0) }
     val haptic = LocalHapticFeedback.current
     val dao = DatabaseProvider.dao()
+    val notificationManager = UnifiedNotificationManager(content)
 
     data class ItemData(
         val name: String,
@@ -65,7 +67,7 @@ fun Layout(content: Activity) {
     val items = listOf(
         ItemData("日程", Icons.Rounded.DateRange),
         ItemData("课表设置", Icons.Rounded.CalendarMonth),
-                ItemData("设置", Icons.Rounded.Settings)
+        ItemData("设置", Icons.Rounded.Settings)
     )
     Scaffold(
         bottomBar = {
@@ -122,13 +124,16 @@ fun Layout(content: Activity) {
                     content = content,
                     dao = dao
                 )
+
                 1 -> TimetableSettings(
                     content = content,
                     dao = dao
                 )
+
                 2 -> Settings(
                     content = content,
-                    dao = dao
+                    dao = dao,
+                    notificationManager = notificationManager
                 )
             }
         }

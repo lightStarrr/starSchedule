@@ -10,9 +10,10 @@ import androidx.room.TypeConverters
         PreferenceEntity::class,
         TimetableEntity::class,
         LessonTimeEntity::class,
-        CourseEntity::class
+        CourseEntity::class,
+        ReminderEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter

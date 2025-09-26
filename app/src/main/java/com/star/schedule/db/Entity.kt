@@ -1,9 +1,9 @@
 package com.star.schedule.db
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 
 // 偏好设置
@@ -65,4 +65,12 @@ data class CourseEntity(
     val dayOfWeek: Int,           // 星期几（1=周一, 7=周日）
     val periods: List<Int>,       // 上课节次，例如 [1,2]
     val weeks: List<Int>          // 上课周数，例如 [1,2,3,4,5,6,7]
+)
+
+@Entity(tableName = "reminder")
+data class ReminderEntity(
+    @PrimaryKey val requestCode: Int,
+    val courseId: Long,
+    val date: String,   // yyyy-MM-dd
+    val period: Int
 )

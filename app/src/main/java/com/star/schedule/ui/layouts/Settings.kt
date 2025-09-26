@@ -7,13 +7,39 @@ import android.media.MediaPlayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -28,15 +54,12 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Settings(content: Activity, dao: ScheduleDao) {
+fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNotificationManager) {
     val haptic = LocalHapticFeedback.current
     var clickCount by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     var resetJob by remember { mutableStateOf<Job?>(null) }
-    
-    // 统一通知管理器
-    val notificationManager = remember { UnifiedNotificationManager(content) }
-    
+
     // 权限申请器
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -50,23 +73,25 @@ fun Settings(content: Activity, dao: ScheduleDao) {
 
     // 所有课表
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
-    val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable").collectAsState(initial = null)
+    val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable")
+        .collectAsState(initial = null)
 
     // 当前课表ID
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
-    
+
     // 课前提醒开关状态
     var reminderEnabled by remember { mutableStateOf(false) }
 
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
-    
+
     // 权限申请辅助函数
     fun requestNotificationPermissionIfNeeded(onPermissionGranted: () -> Unit) {
         when (ContextCompat.checkSelfPermission(content, Manifest.permission.POST_NOTIFICATIONS)) {
             PackageManager.PERMISSION_GRANTED -> {
                 onPermissionGranted()
             }
+
             else -> {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
@@ -76,16 +101,16 @@ fun Settings(content: Activity, dao: ScheduleDao) {
     // 保证 currentTimetableId 与 preference 和 timetables 同步
     LaunchedEffect(timetables, currentTimetableIdPref) {
         val newTimetableId = currentTimetableIdPref?.toLongOrNull()
-        
+
         // 如果课表切换了，需要关闭之前课表的提醒
         if (currentTimetableId != null && newTimetableId != currentTimetableId) {
             // 课表切换时自动关闭提醒
             notificationManager.disableReminders()
             reminderEnabled = false
         }
-        
+
         currentTimetableId = newTimetableId
-        
+
         // 检查当前课表是否启用了提醒
         reminderEnabled = if (newTimetableId != null) {
             notificationManager.isReminderEnabledForTimetableSync(newTimetableId)
@@ -104,9 +129,12 @@ fun Settings(content: Activity, dao: ScheduleDao) {
         // 当前课表切换
         OutlinedButton(
             onClick = { showTimetableSheet = true },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
-            val currentName = timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择"
+            val currentName =
+                timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择"
             Text("当前课表: $currentName")
         }
 
@@ -128,21 +156,24 @@ fun Settings(content: Activity, dao: ScheduleDao) {
                             modifier = Modifier.padding(16.dp)
                         )
                     }
-                    
+
                     items(timetables) { timetable ->
                         ListItem(
                             headlineContent = { Text(timetable.name) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    scope.launch { 
-                                        dao.setPreference("current_timetable", timetable.id.toString())
+                                    scope.launch {
+                                        dao.setPreference(
+                                            "current_timetable",
+                                            timetable.id.toString()
+                                        )
                                     }
                                     showTimetableSheet = false
                                 }
                         )
                     }
-                    
+
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -156,15 +187,16 @@ fun Settings(content: Activity, dao: ScheduleDao) {
         // 课前15分钟提醒开关
         ListItem(
             headlineContent = { Text("课前提醒") },
-            supportingContent = { 
-                val currentName = timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择课表"
+            supportingContent = {
+                val currentName =
+                    timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择课表"
                 Text("为当前课表（$currentName）开启课前15分钟提醒（自动选择通知类型）")
             },
-            leadingContent = { 
+            leadingContent = {
                 Icon(
-                    if (reminderEnabled) Icons.Rounded.NotificationsActive else Icons.Rounded.Notifications, 
+                    if (reminderEnabled) Icons.Rounded.NotificationsActive else Icons.Rounded.Notifications,
                     contentDescription = null
-                ) 
+                )
             },
             trailingContent = {
                 Switch(
@@ -174,7 +206,9 @@ fun Settings(content: Activity, dao: ScheduleDao) {
                         if (enabled && currentTimetableId != null) {
                             requestNotificationPermissionIfNeeded {
                                 scope.launch {
-                                    notificationManager.enableRemindersForTimetable(currentTimetableId!!)
+                                    notificationManager.enableRemindersForTimetable(
+                                        currentTimetableId!!
+                                    )
                                     reminderEnabled = true
                                     notificationManager.logNotificationStatus()
                                 }
@@ -210,7 +244,14 @@ fun Settings(content: Activity, dao: ScheduleDao) {
 
         ListItem(
             headlineContent = { Text("关于应用") },
-            supportingContent = { Text("版本 " + content.packageManager.getPackageInfo(content.packageName, 0).versionName) },
+            supportingContent = {
+                Text(
+                    "版本 " + content.packageManager.getPackageInfo(
+                        content.packageName,
+                        0
+                    ).versionName
+                )
+            },
             leadingContent = { Icon(Icons.Rounded.Info, contentDescription = null) },
             modifier = Modifier.clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
