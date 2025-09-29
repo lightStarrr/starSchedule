@@ -512,6 +512,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         try {
             Log.d("UnifiedNotification", "设备重启，恢复提醒设置")
             
+            // 确保数据库已初始化
+            if (!DatabaseProvider.isInitialized()) {
+                DatabaseProvider.init(context)
+            }
+            
             val dao = DatabaseProvider.dao()
             val enabledTimetableId = dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
             
@@ -680,21 +685,25 @@ class BootCompletedReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
             intent.action == Intent.ACTION_PACKAGE_REPLACED) {
-            
+
             Log.d("BootCompleted", "收到系统启动广播: ${intent.action}")
-            
-            // 在后台线程中重新设置提醒
+
+            // 保证异步任务不会被系统中断
+            val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val notificationManager = UnifiedNotificationManager(context)
                     notificationManager.restoreRemindersAfterBoot()
                 } catch (e: Exception) {
                     Log.e("BootCompleted", "重新设置提醒失败", e)
+                } finally {
+                    pendingResult.finish()
                 }
             }
         }
     }
 }
+
 
 /**
  * 定期更新提醒的广播接收器

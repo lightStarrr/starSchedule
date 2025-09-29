@@ -10,6 +10,8 @@ object DatabaseProvider {
     lateinit var db: AppDatabase
         private set
 
+    fun isInitialized(): Boolean = ::db.isInitialized
+
     fun init(context: Context) {
         if (!::db.isInitialized) {
             db = Room.databaseBuilder(

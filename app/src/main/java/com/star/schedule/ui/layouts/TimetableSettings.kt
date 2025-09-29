@@ -4,6 +4,7 @@ import android.app.Activity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
@@ -350,14 +352,21 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
 
                     // 验证通过，保存数据（节次将自动分配）
                     scope.launch {
-                        dao.insertOrUpdateLessonTimeAutoSort(
-                            lesson.copy(
-                                startTime = startTime,
-                                endTime = endTime
+                        try {
+                            val result = dao.insertOrUpdateLessonTimeAutoSort(
+                                lesson.copy(
+                                    startTime = startTime,
+                                    endTime = endTime
+                                ),
+                                isInsert = false
                             )
-                        )
+                            android.util.Log.d("EditLessonTimeSheet", "更新课程时间成功，ID: $result")
+                            onDismiss()
+                        } catch (e: Exception) {
+                            android.util.Log.e("EditLessonTimeSheet", "更新课程时间失败", e)
+                            errorMessage = "保存失败: ${e.message}"
+                        }
                     }
-                    onDismiss()
                 }) { Text("保存") }
             }
 
@@ -575,17 +584,23 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
 
                     // 验证通过，保存数据
                     scope.launch {
-                        dao.updateCourseWithReminders(
-                            course.copy(
-                                name = name,
-                                location = location,
-                                dayOfWeek = day,
-                                periods = periodList,
-                                weeks = weekList
+                        try {
+                            dao.updateCourseWithReminders(
+                                course.copy(
+                                    name = name,
+                                    location = location,
+                                    dayOfWeek = day,
+                                    periods = periodList,
+                                    weeks = weekList
+                                )
                             )
-                        )
+                            android.util.Log.d("EditCourseSheet", "更新课程成功，ID: ${course.id}")
+                            onDismiss()
+                        } catch (e: Exception) {
+                            android.util.Log.e("EditCourseSheet", "更新课程失败", e)
+                            errorMessage = "保存失败: ${e.message}"
+                        }
                     }
-                    onDismiss()
                 }) {
                     Text("保存")
                 }
@@ -748,16 +763,22 @@ fun AddLessonTimeSheet(
 
                     // 验证通过，保存数据（节次将自动分配）
                     scope.launch {
-                        dao.insertOrUpdateLessonTimeAutoSort(
-                            LessonTimeEntity(
-                                timetableId = timetableId,
-                                period = 1, // 临时值，会被自动排序方法覆盖
-                                startTime = startTime,
-                                endTime = endTime
+                        try {
+                            val result = dao.insertOrUpdateLessonTimeAutoSort(
+                                LessonTimeEntity(
+                                    timetableId = timetableId,
+                                    period = 1, // 临时值，会被自动排序方法覆盖
+                                    startTime = startTime,
+                                    endTime = endTime
+                                )
                             )
-                        )
+                            android.util.Log.d("AddLessonTimeSheet", "新增课程时间成功，ID: $result")
+                            onDismiss()
+                        } catch (e: Exception) {
+                            android.util.Log.e("AddLessonTimeSheet", "新增课程时间失败", e)
+                            errorMessage = "保存失败: ${e.message}"
+                        }
                     }
-                    onDismiss()
                 }) {
                     Text("保存")
                 }
@@ -980,18 +1001,24 @@ fun AddCourseSheet(
 
                     // 验证通过，保存数据
                     scope.launch {
-                        dao.insertCourseWithReminders(
-                            CourseEntity(
-                                timetableId = timetableId,
-                                name = name,
-                                location = location,
-                                dayOfWeek = day,
-                                periods = periodList,
-                                weeks = weekList
+                        try {
+                            val result = dao.insertCourseWithReminders(
+                                CourseEntity(
+                                    timetableId = timetableId,
+                                    name = name,
+                                    location = location,
+                                    dayOfWeek = day,
+                                    periods = periodList,
+                                    weeks = weekList
+                                )
                             )
-                        )
+                            android.util.Log.d("AddCourseSheet", "新增课程成功，ID: $result")
+                            onDismiss()
+                        } catch (e: Exception) {
+                            android.util.Log.e("AddCourseSheet", "新增课程失败", e)
+                            errorMessage = "保存失败: ${e.message}"
+                        }
                     }
-                    onDismiss()
                 }) {
                     Text("保存")
                 }
@@ -1200,8 +1227,16 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                             ) {
-                                Text("第${lesson.period}节 ${lesson.startTime}-${lesson.endTime}")
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "第${lesson.period}节 ${lesson.startTime}-${lesson.endTime}",
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.width(IntrinsicSize.Min)
+                                ) {
                                     IconButton(onClick = { showEditLessonSheet = lesson }) {
                                         Icon(
                                             Icons.Rounded.Edit,
@@ -1265,13 +1300,19 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                                     .padding(vertical = 4.dp)
                             ) {
                                 Text(
-                                    "${course.name} (周${course.dayOfWeek} 节次:${
+                                    text = "${course.name} (周${course.dayOfWeek} 节次:${
                                         course.periods.joinToString(
                                             ","
                                         )
-                                    })"
+                                    })",
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.width(IntrinsicSize.Min)
+                                ) {
                                     IconButton(onClick = { showEditCourseSheet = course }) {
                                         Icon(Icons.Rounded.Edit, contentDescription = "编辑课程")
                                     }

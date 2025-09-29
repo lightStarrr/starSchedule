@@ -140,8 +140,18 @@ abstract class ScheduleDao {
     private suspend fun checkAndEnableReminders(timetableId: Long) {
         val currentId = getPreferenceFlow("current_timetable").firstOrNull()?.toLongOrNull()
         android.util.Log.d("ScheduleDao", "checkAndEnableReminders: timetableId=$timetableId, currentId=$currentId, notificationManager=$notificationManager")
+        
         if (currentId == timetableId) {
-            notificationManager?.enableRemindersForTimetable(currentId)
+            try {
+                android.util.Log.d("ScheduleDao", "正在为课表ID $timetableId 启用提醒")
+                notificationManager?.enableRemindersForTimetable(currentId)
+                android.util.Log.d("ScheduleDao", "提醒启用操作完成")
+            } catch (e: Exception) {
+                android.util.Log.e("ScheduleDao", "启用提醒时出错", e)
+                // 不抛出异常，因为提醒功能不应该影响主要的数据操作
+            }
+        } else {
+            android.util.Log.d("ScheduleDao", "当前课表ID($currentId)与操作课表ID($timetableId)不匹配，跳过提醒启用")
         }
     }
 
@@ -151,15 +161,36 @@ abstract class ScheduleDao {
         lessonTime: LessonTimeEntity,
         isInsert: Boolean = true
     ): Long {
-        val id = if (isInsert) insertLessonTime(lessonTime) else {
-            updateLessonTime(lessonTime); lessonTime.id
+        android.util.Log.d("ScheduleDao", "开始${if (isInsert) "插入" else "更新"}课程时间: $lessonTime")
+        val id = if (isInsert) {
+            val insertedId = insertLessonTime(lessonTime)
+            android.util.Log.d("ScheduleDao", "插入课程时间成功，ID: $insertedId")
+            insertedId
+        } else {
+            updateLessonTime(lessonTime)
+            android.util.Log.d("ScheduleDao", "更新课程时间成功，ID: ${lessonTime.id}")
+            lessonTime.id
         }
-        val lessonTimes = getLessonTimesFlow(lessonTime.timetableId).firstOrNull() ?: return id
-        lessonTimes.sortedBy { it.startTime }.forEachIndexed { index, lesson ->
-            val newPeriod = index + 1
-            if (lesson.period != newPeriod) updateLessonTime(lesson.copy(period = newPeriod))
+        
+        try {
+            val lessonTimes = getLessonTimesFlow(lessonTime.timetableId).firstOrNull() ?: return id
+            android.util.Log.d("ScheduleDao", "获取到${lessonTimes.size}个课程时间，开始重新排序")
+            
+            lessonTimes.sortedBy { it.startTime }.forEachIndexed { index, lesson ->
+                val newPeriod = index + 1
+                if (lesson.period != newPeriod) {
+                    android.util.Log.d("ScheduleDao", "更新课程时间 ${lesson.id} 的节次从 ${lesson.period} 到 $newPeriod")
+                    updateLessonTime(lesson.copy(period = newPeriod))
+                }
+            }
+            
+            checkAndEnableReminders(lessonTime.timetableId)
+            android.util.Log.d("ScheduleDao", "课程时间操作完成")
+        } catch (e: Exception) {
+            android.util.Log.e("ScheduleDao", "课程时间排序过程中出错", e)
+            throw e
         }
-        checkAndEnableReminders(lessonTime.timetableId)
+        
         return id
     }
 
@@ -177,15 +208,25 @@ abstract class ScheduleDao {
     // ---------- 课程操作 ----------
     @Transaction
     open suspend fun insertCourseWithReminders(course: CourseEntity): Long {
+        android.util.Log.d("ScheduleDao", "开始插入课程: $course")
         val id = insertCourse(course)
+        android.util.Log.d("ScheduleDao", "插入课程成功，ID: $id")
         checkAndEnableReminders(course.timetableId)
         return id
     }
 
     @Transaction
     open suspend fun updateCourseWithReminders(course: CourseEntity) {
-        updateCourse(course)
-        checkAndEnableReminders(course.timetableId)
+        android.util.Log.d("ScheduleDao", "开始更新课程: $course")
+        try {
+            updateCourse(course)
+            android.util.Log.d("ScheduleDao", "更新课程成功，ID: ${course.id}")
+            checkAndEnableReminders(course.timetableId)
+            android.util.Log.d("ScheduleDao", "课程更新操作完成")
+        } catch (e: Exception) {
+            android.util.Log.e("ScheduleDao", "更新课程失败", e)
+            throw e
+        }
     }
 
     @Transaction
