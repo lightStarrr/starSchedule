@@ -1342,7 +1342,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
             initialSelectedDateMillis = try {
                 LocalDate.parse(startDate).atStartOfDay(ZoneId.systemDefault()).toInstant()
                     .toEpochMilli()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 System.currentTimeMillis()
             }
         )

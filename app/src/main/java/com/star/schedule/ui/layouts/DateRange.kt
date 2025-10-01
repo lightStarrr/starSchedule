@@ -37,21 +37,20 @@ import androidx.compose.ui.unit.dp
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
+import com.star.schedule.db.TimetableEntity
 import java.time.LocalDate
 
-// 定义一节课的时间范围
 data class LessonTime(
-    val period: Int,          // 第几节
-    val startTime: String,    // 开始时间，例如 "08:00"
-    val endTime: String       // 结束时间，例如 "08:45"
+    val period: Int,
+    val startTime: String,
+    val endTime: String
 )
 
-// 定义一门课
 data class Course(
-    val name: String,          // 课程名称
-    val location: String,      // 上课地点
-    val dayOfWeek: Int,        // 星期几（1=周一, 7=周日）
-    val periods: List<Int>     // 对应的节次，例如 [1,2] 表示第1-2节
+    val name: String,
+    val location: String,
+    val dayOfWeek: Int,
+    val periods: List<Int>
 )
 
 data class CourseBlock(
@@ -62,12 +61,18 @@ data class CourseBlock(
 )
 
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun DateRange(content: Activity, dao: ScheduleDao) {
     // 当前课表ID
     val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable")
         .collectAsState(initial = null)
     val timetableId = currentTimetableIdPref?.toLongOrNull()
+
+    // 获取当前课表实体以读取 showWeekend
+    val timetable by if (timetableId != null) {
+        dao.getTimetableFlow(timetableId).collectAsState(initial = null)
+    } else remember { mutableStateOf(null as TimetableEntity?) }
 
     // 当前周的课程
     val today = LocalDate.now()
@@ -96,7 +101,8 @@ fun DateRange(content: Activity, dao: ScheduleDao) {
                     startTime = entity.startTime,
                     endTime = entity.endTime
                 )
-            }
+            },
+            showWeekend = timetable?.showWeekend ?: true
         )
     }
 }
@@ -128,16 +134,21 @@ fun ScheduleScreen(
     courses: List<Course>,
     lessonTimes: List<LessonTime>,
     cellHeight: Dp = 60.dp,
-    cellPadding: Dp = 2.dp
+    cellPadding: Dp = 2.dp,
+    showWeekend: Boolean = true
 ) {
-    val daysOfWeek = listOf("一", "二", "三", "四", "五", "六", "日")
+    val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
+    // 可见的星期数字（1=周一 ...）
+    val visibleDays = if (showWeekend) (1..7).toList() else (1..5).toList()
+    val visibleDayLabels = visibleDays.map { allDayLabels[it - 1] }
+
     val courseBlocks = buildCourseBlocks(courses)
     val scrollState = rememberScrollState()
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val totalWidth = maxWidth
         val leftColumnWidth = 35.dp
-        val dayColumnWidth = (totalWidth - leftColumnWidth - 5.dp) / (daysOfWeek.lastIndex + 1)
+        val dayColumnWidth = (totalWidth - leftColumnWidth - 5.dp) / visibleDayLabels.size
 
         // 使用 remember + mutableStateOf 保存标题高度
         val density = LocalDensity.current
@@ -159,7 +170,7 @@ fun ScheduleScreen(
                         }
                 ) {
                     Box(modifier = Modifier.width(leftColumnWidth)) // 左上角空白
-                    daysOfWeek.forEach { day ->
+                    visibleDayLabels.forEach { day ->
                         Box(
                             modifier = Modifier
                                 .width(dayColumnWidth)
@@ -201,8 +212,8 @@ fun ScheduleScreen(
                             )
                         }
 
-                        // 7列课程网格占位
-                        for (day in 1..daysOfWeek.lastIndex + 1) {
+                        // 可见列课程网格占位
+                        visibleDays.forEach { day ->
                             val isOccupied = courseBlocks.any { block ->
                                 block.dayOfWeek == day &&
                                         block.startPeriod <= lesson.period &&
@@ -227,12 +238,15 @@ fun ScheduleScreen(
 
             // 课程块 Overlay，覆盖在网格上
             courseBlocks.forEach { block ->
-                if (block.dayOfWeek > daysOfWeek.lastIndex + 1) return@forEach
+                // 如果该课程的星期不在可见范围内（例如隐藏周末），则跳过
+                val dayIndex = visibleDays.indexOf(block.dayOfWeek)
+                if (dayIndex == -1) return@forEach
+
                 val span = block.endPeriod - block.startPeriod + 1
                 Box(
                     modifier = Modifier
                         .absoluteOffset(
-                            x = leftColumnWidth + dayColumnWidth * (block.dayOfWeek - 1) + cellPadding,
+                            x = leftColumnWidth + dayColumnWidth * dayIndex + cellPadding,
                             y = headerHeightDp + cellHeight * (block.startPeriod - 1) + cellPadding
                         )
                         .width(dayColumnWidth - cellPadding * 2)
