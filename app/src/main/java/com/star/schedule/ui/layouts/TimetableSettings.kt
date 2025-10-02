@@ -1,6 +1,7 @@
 package com.star.schedule.ui.layouts
 
 import android.app.Activity
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -60,10 +61,24 @@ import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
 import com.star.schedule.utils.ValidationUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +93,8 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
     var showEditLessonSheet by remember { mutableStateOf<LessonTimeEntity?>(null) }
     var showEditCourseSheet by remember { mutableStateOf<CourseEntity?>(null) }
     var showTimetableDetailSheet by remember { mutableStateOf<TimetableEntity?>(null) }
+    var showImportOptionsSheet by remember { mutableStateOf(false) }
+    var showWakeUpImportSheet by remember { mutableStateOf(false) }
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
 
     LazyColumn(
@@ -93,26 +110,44 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
                 modifier = Modifier.padding(bottom = 8.dp)
             )
         }
-        // 新建课表
+        // 新建和导入按钮
         item {
-            Button(
-                onClick = {
-                    scope.launch {
-                        dao.insertTimetableWithReminders(
-                            TimetableEntity(
-                                name = "新建课表",
-                                showWeekend = true,
-                                startDate = LocalDate.now().toString()
-                            )
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("新建课表")
+                Button(
+                    onClick = {
+                        scope.launch {
+                            dao.insertTimetableWithReminders(
+                                TimetableEntity(
+                                    name = "新建课表",
+                                    showWeekend = true,
+                                    startDate = LocalDate.now().toString()
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(0.48f)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("新建")
+                    }
+                }
+                
+                Spacer(Modifier.width(8.dp))
+                
+                Button(
+                    onClick = { showImportOptionsSheet = true },
+                    modifier = Modifier.weight(0.48f)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("导入")
+                    }
                 }
             }
         }
@@ -196,6 +231,25 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
         EditCourseSheet(
             course = course,
             onDismiss = { showEditCourseSheet = null },
+            dao = dao
+        )
+    }
+
+    // 导入选项 BottomSheet
+    if (showImportOptionsSheet) {
+        ImportOptionsSheet(
+            onDismiss = { showImportOptionsSheet = false },
+            onWakeUpImport = {
+                showImportOptionsSheet = false
+                showWakeUpImportSheet = true
+            }
+        )
+    }
+
+    // WakeUp导入 BottomSheet
+    if (showWakeUpImportSheet) {
+        WakeUpImportSheet(
+            onDismiss = { showWakeUpImportSheet = false },
             dao = dao
         )
     }
@@ -1443,4 +1497,301 @@ fun TimePickerDialog(
             TimePicker(state = timePickerState)
         }
     )
+}
+
+// ---------- 导入选项弹窗 ----------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ImportOptionsSheet(
+    onDismiss: () -> Unit,
+    onWakeUpImport: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .navigationBarsPadding()
+        ) {
+            Text(
+                text = "选择导入方式",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            // WakeUp课程表导入选项
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onWakeUpImport() },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Rounded.CalendarMonth, 
+                        contentDescription = "WakeUp课程表",
+                        modifier = Modifier.padding(end = 12.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "WakeUp课程表",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "从WakeUp课程表在线导入",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            Text(
+                text = "更多导入方式即将推出...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+    }
+}
+
+// ---------- WakeUp导入弹窗 ----------
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WakeUpImportSheet(
+    onDismiss: () -> Unit,
+    dao: ScheduleDao
+) {
+    var shareText by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "从WakeUp课程表在线导入",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            Text(
+                text = "请完整复制分享口令",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            // 示例分享口令
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "[示例]这是来自「WakeUp课程表」的课表分享，30分钟内有效哦，如果失效请朋友再分享一遍叭。为了保护隐私我们选择不监听你的剪贴板，请复制这条消息后，打开App的主界面，右上角第二个按钮 -> 从分享口令导入，按操作提示即可完成导入~分享口令为「0000000000000000」",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = shareText,
+                onValueChange = {
+                    shareText = it
+                    errorMessage = ""
+                },
+                label = { Text("分享口令或口令内容") },
+                modifier = Modifier.fillMaxWidth(),
+                isError = errorMessage.isNotEmpty(),
+                supportingText = {
+                    if (errorMessage.isNotEmpty()) {
+                        Text(errorMessage)
+                    } else {
+                        Text("可粘贴完整分享口令或直接输入口令内容")
+                    }
+                },
+                placeholder = { Text("粘贴分享口令或输入口令内容") }
+            )
+            
+            Spacer(Modifier.height(16.dp))
+            
+            if (isLoading) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text("正在导入...")
+                }
+            }
+            
+            Button(
+                onClick = {
+                    if (shareText.isBlank()) {
+                        errorMessage = "请输入分享口令"
+                        return@Button
+                    }
+                    
+                    // 提取口令内容
+                    val key = extractKeyFromShareText(shareText)
+                    if (key.isBlank()) {
+                        errorMessage = "未找到有效的分享口令"
+                        return@Button
+                    }
+                    
+                    isLoading = true
+                    scope.launch {
+                        try {
+                            // 调用WakeUp API导入课表
+                            val result = importFromWakeUp(key, dao)
+                            if (result) {
+                                onDismiss()
+                            } else {
+                                errorMessage = "导入失败，请检查分享口令是否有效"
+                            }
+                        } catch (e: Exception) {
+                            errorMessage = "导入失败: ${e.message}"
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading
+            ) {
+                Text(if (isLoading) "导入中..." else "导入")
+            }
+        }
+    }
+}
+
+// 从分享文本中提取口令
+fun extractKeyFromShareText(text: String): String {
+    val pattern = "分享口令为「([a-f0-9]+)」".toRegex()
+    val match = pattern.find(text)
+    val key = match?.groupValues?.get(1) ?: ""
+    return key
+}
+
+// WakeUp导入函数
+suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val client = OkHttpClient()
+        val request = Request.Builder()
+            .url("https://i.wakeup.fun/share_schedule/get?key=$key")
+            .get()
+            .build()
+        val response = client.newCall(request).execute()
+        val body = response.body.string()
+
+        if (response.code != 200) return@withContext false
+
+        val rootJson = Json.parseToJsonElement(body).jsonObject
+        if (rootJson["status"]?.jsonPrimitive?.int != 1) return@withContext false
+
+        val dataStr = rootJson["data"]?.jsonPrimitive?.content ?: return@withContext false
+        val segments = dataStr.split("\n")
+        if (segments.size < 4) return@withContext false
+
+        val timetableInfo = Json.decodeFromString<JsonObject>(segments[0])
+        val lessonTimes = Json.decodeFromString<JsonArray>(segments[1])
+        val configInfo = Json.decodeFromString<JsonObject>(segments[2])
+        val courses = Json.decodeFromString<JsonArray>(segments[3])
+        val courseInfo = Json.decodeFromString<JsonArray>(segments[4])
+
+        Log.d("WakeUp", "timetableInfo: $timetableInfo")
+        Log.d("WakeUp", "lessonTimes: $lessonTimes")
+        Log.d("WakeUp", "configInfo: $configInfo")
+        Log.d("WakeUp", "courses: $courses")
+        Log.d("WakeUp", "courseInfo: $courseInfo")
+
+
+        val timetableId = dao.insertTimetableWithReminders(
+            TimetableEntity(
+                name = configInfo["tableName"]?.jsonPrimitive?.content ?: "未命名WakeUp课程表",
+                showWeekend = configInfo["showSun"]?.jsonPrimitive?.boolean ?: true,
+                startDate = configInfo["startDate"]?.jsonPrimitive?.content?.let { parseDateAutoFix(it) }
+                    ?: LocalDate.now().toString()
+            )
+        )
+
+        lessonTimes.forEach { jsonElement ->
+            val lessonObject = jsonElement.jsonObject
+            val period = lessonObject["node"]?.jsonPrimitive?.int ?: 1
+            val startTime = lessonObject["startTime"]?.jsonPrimitive?.content ?: return@forEach
+            val endTime = lessonObject["endTime"]?.jsonPrimitive?.content ?: return@forEach
+
+            if (startTime == endTime) {
+                return@forEach
+            }
+
+            dao.insertOrUpdateLessonTimeAutoSort(
+                LessonTimeEntity(
+                    timetableId = timetableId,
+                    period = period,
+                    startTime = startTime,
+                    endTime = endTime
+                )
+            )
+        }
+
+        courseInfo.forEach { jsonElement ->
+            val courseInfoObject = jsonElement.jsonObject
+            val startWeek = courseInfoObject["startWeek"]?.jsonPrimitive?.int ?: return@forEach
+            val endWeek = courseInfoObject["endWeek"]?.jsonPrimitive?.int ?: return@forEach
+            val weeks = (startWeek..endWeek).toList()
+            val startPeriod = courseInfoObject["startNode"]?.jsonPrimitive?.int ?: return@forEach
+            val endPeriod = startPeriod + (courseInfoObject["step"]?.jsonPrimitive?.int ?: return@forEach)-1
+            val periods = (startPeriod..endPeriod).toList()
+            val location = courseInfoObject["room"]?.jsonPrimitive?.content ?: return@forEach
+            val courseId = courseInfoObject["id"]?.jsonPrimitive?.int ?: return@forEach
+            val courseInfo = courses.firstOrNull { course ->
+                course.jsonObject["id"]?.jsonPrimitive?.int == courseId
+            }
+            if (courseInfo == null) return@withContext false
+            val courseName = courseInfo.jsonObject["courseName"]?.jsonPrimitive?.content ?: return@forEach
+
+            val dayOfWeek = courseInfoObject["day"]?.jsonPrimitive?.int ?: return@forEach
+
+            dao.insertCourseWithReminders(
+                CourseEntity(
+                    timetableId = timetableId,
+                    name = courseName,
+                    location = location,
+                    dayOfWeek = dayOfWeek,
+                    periods = periods,
+                    weeks = weeks
+                )
+            )
+        }
+        true
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+}
+fun parseDateAutoFix(dateStr: String): String {
+    val parts = dateStr.split("-")
+    if (parts.size != 3) throw IllegalArgumentException("Invalid date format: $dateStr")
+    val year = parts[0].padStart(4, '0')
+    val month = parts[1].padStart(2, '0')
+    val day = parts[2].padStart(2, '0')
+    val fixedDateStr = "$year-$month-$day"
+    return LocalDate.parse(fixedDateStr, DateTimeFormatter.ISO_LOCAL_DATE).toString()
 }

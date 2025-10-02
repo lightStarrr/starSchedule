@@ -54,12 +54,15 @@ dependencies {
         exclude(group = "com.intellij", module = "annotations")
     }
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.okhttp)
+    implementation(platform(libs.okhttp.bom))
     kapt(libs.androidx.room.compiler) {
         exclude(group = "com.intellij", module = "annotations")
     }
     implementation(libs.androidx.room.ktx) {
         exclude(group = "com.intellij", module = "annotations")
     }
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.wheelpickercompose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

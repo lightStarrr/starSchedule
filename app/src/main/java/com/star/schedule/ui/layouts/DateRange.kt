@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.star.schedule.db.CourseEntity
@@ -39,6 +40,7 @@ import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 data class LessonTime(
     val period: Int,
@@ -69,7 +71,7 @@ fun DateRange(content: Activity, dao: ScheduleDao) {
         .collectAsState(initial = null)
     val timetableId = currentTimetableIdPref?.toLongOrNull()
 
-    // 获取当前课表实体以读取 showWeekend
+    // 获取当前课表实体以读取 showWeekend 和 startDate
     val timetable by if (timetableId != null) {
         dao.getTimetableFlow(timetableId).collectAsState(initial = null)
     } else remember { mutableStateOf(null as TimetableEntity?) }
@@ -84,6 +86,20 @@ fun DateRange(content: Activity, dao: ScheduleDao) {
     val lessonTimes by if (timetableId != null) {
         dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
     } else emptyList<LessonTimeEntity>().let { mutableStateOf(it) }
+
+    // 计算当前是第几周（基于 timetable.startDate），若失败则为 null
+    val currentWeekNumber: Int? = try {
+        val startStr = timetable?.startDate
+        if (startStr.isNullOrBlank()) null
+        else {
+            val start = LocalDate.parse(startStr)
+            val days = ChronoUnit.DAYS.between(start, today).toInt()
+            val week = (days / 7) + 1
+            if (week < 1) 1 else week
+        }
+    } catch (_: Exception) {
+        null
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         ScheduleScreen(
@@ -102,7 +118,8 @@ fun DateRange(content: Activity, dao: ScheduleDao) {
                     endTime = entity.endTime
                 )
             },
-            showWeekend = timetable?.showWeekend ?: true
+            showWeekend = timetable?.showWeekend ?: true,
+            currentWeek = currentWeekNumber
         )
     }
 }
@@ -135,7 +152,8 @@ fun ScheduleScreen(
     lessonTimes: List<LessonTime>,
     cellHeight: Dp = 60.dp,
     cellPadding: Dp = 2.dp,
-    showWeekend: Boolean = true
+    showWeekend: Boolean = true,
+    currentWeek: Int? = null
 ) {
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
     // 可见的星期数字（1=周一 ...）
@@ -167,9 +185,29 @@ fun ScheduleScreen(
                         .fillMaxWidth()
                         .onGloballyPositioned { coords ->
                             headerHeightDp = with(density) { coords.size.height.toDp() }
-                        }
+                        },
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.width(leftColumnWidth)) // 左上角空白
+                    Box(
+                        modifier = Modifier
+                            .width(leftColumnWidth)
+                            .padding(cellPadding),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (currentWeek != null) {
+                            Text(
+                                text = "第${currentWeek}周",
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                softWrap = false,
+                                // 让文本在 Box 内水平居中
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
                     visibleDayLabels.forEach { day ->
                         Box(
                             modifier = Modifier
@@ -255,16 +293,20 @@ fun ScheduleScreen(
                         .background(MaterialTheme.colorScheme.secondary)
                         .padding(4.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = block.course.name,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondary
+                            color = MaterialTheme.colorScheme.onSecondary,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start
                         )
                         Text(
                             text = block.course.location,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondary
+                            color = MaterialTheme.colorScheme.onSecondary,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start
                         )
                     }
                 }
