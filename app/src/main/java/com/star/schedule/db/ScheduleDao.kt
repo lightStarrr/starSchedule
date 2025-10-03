@@ -142,13 +142,21 @@ abstract class ScheduleDao {
         android.util.Log.d("ScheduleDao", "checkAndEnableReminders: timetableId=$timetableId, currentId=$currentId, notificationManager=$notificationManager")
         
         if (currentId == timetableId) {
-            try {
-                android.util.Log.d("ScheduleDao", "正在为课表ID $timetableId 启用提醒")
-                notificationManager?.enableRemindersForTimetable(currentId)
-                android.util.Log.d("ScheduleDao", "提醒启用操作完成")
-            } catch (e: Exception) {
-                android.util.Log.e("ScheduleDao", "启用提醒时出错", e)
-                // 不抛出异常，因为提醒功能不应该影响主要的数据操作
+            // 检查用户是否已经启用了课前提醒
+            val enabledTimetableId = getPreferenceFlow("reminder_enabled_timetable").firstOrNull()
+            val isReminderEnabled = enabledTimetableId?.toLongOrNull() == currentId
+            
+            if (isReminderEnabled) {
+                try {
+                    android.util.Log.d("ScheduleDao", "用户已启用课前提醒，正在为课表ID $timetableId 启用提醒")
+                    notificationManager?.enableRemindersForTimetable(currentId)
+                    android.util.Log.d("ScheduleDao", "提醒启用操作完成")
+                } catch (e: Exception) {
+                    android.util.Log.e("ScheduleDao", "启用提醒时出错", e)
+                    // 不抛出异常，因为提醒功能不应该影响主要的数据操作
+                }
+            } else {
+                android.util.Log.d("ScheduleDao", "用户未启用课前提醒，跳过自动启用提醒")
             }
         } else {
             android.util.Log.d("ScheduleDao", "当前课表ID($currentId)与操作课表ID($timetableId)不匹配，跳过提醒启用")

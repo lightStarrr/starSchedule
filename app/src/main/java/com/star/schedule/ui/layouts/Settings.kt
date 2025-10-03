@@ -8,7 +8,9 @@ import android.media.MediaPlayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,11 +20,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -33,6 +38,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,6 +48,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -50,6 +57,8 @@ import androidx.core.content.ContextCompat
 import com.star.schedule.R
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.ui.components.OptimizedBottomSheet
+import com.star.schedule.ui.components.hideBottomSheet
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -87,6 +96,7 @@ fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
+    val timetableSheetState = rememberModalBottomSheetState()
 
     // 权限申请辅助函数
     fun requestNotificationPermissionIfNeeded(onPermissionGranted: () -> Unit) {
@@ -145,43 +155,83 @@ fun Settings(content: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
         // 课表选择 BottomSheet
         if (showTimetableSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showTimetableSheet = false }
+            OptimizedBottomSheet(
+                onDismiss = { showTimetableSheet = false },
+                sheetState = timetableSheetState
             ) {
-                LazyColumn(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp)
                         .navigationBarsPadding()
                 ) {
-                    item {
-                        Text(
-                            text = "选择课表",
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-
-                    items(timetables) { timetable ->
-                        ListItem(
-                            headlineContent = { Text(timetable.name) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
+                    Text(
+                        text = "选择课表",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(timetables) { timetable ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                onClick = {
                                     scope.launch {
                                         dao.setPreference(
                                             "current_timetable",
                                             timetable.id.toString()
                                         )
                                     }
-                                    showTimetableSheet = false
+                                    hideBottomSheet(timetableSheetState, scope) {
+                                        showTimetableSheet = false
+                                    }
+                                },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (timetable.id == currentTimetableId) 
+                                        MaterialTheme.colorScheme.secondaryContainer 
+                                    else 
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.CalendarMonth, 
+                                        contentDescription = "课表",
+                                        modifier = Modifier.padding(end = 12.dp),
+                                        tint = if (timetable.id == currentTimetableId)
+                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Column {
+                                        Text(
+                                            text = timetable.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = if (timetable.id == currentTimetableId)
+                                                MaterialTheme.colorScheme.onSecondaryContainer
+                                            else
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (timetable.id == currentTimetableId) {
+                                            Text(
+                                                text = "当前课表",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        }
+                                    }
                                 }
-                        )
+                            }
+                        }
                     }
-
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }

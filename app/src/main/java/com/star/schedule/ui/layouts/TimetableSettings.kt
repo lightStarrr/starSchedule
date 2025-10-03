@@ -2,7 +2,6 @@ package com.star.schedule.ui.layouts
 
 import android.app.Activity
 import android.util.Log
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -42,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -60,6 +60,8 @@ import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
+import com.star.schedule.ui.components.OptimizedBottomSheet
+import com.star.schedule.ui.components.hideBottomSheet
 import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,6 +98,15 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
     var showImportOptionsSheet by remember { mutableStateOf(false) }
     var showWakeUpImportSheet by remember { mutableStateOf(false) }
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
+    
+    // BottomSheet状态
+    val addLessonSheetState = rememberModalBottomSheetState()
+    val addCourseSheetState = rememberModalBottomSheetState()
+    val editLessonSheetState = rememberModalBottomSheetState()
+    val editCourseSheetState = rememberModalBottomSheetState()
+    val timetableDetailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val importOptionsSheetState = rememberModalBottomSheetState()
+    val wakeUpImportSheetState = rememberModalBottomSheetState()
 
     LazyColumn(
         modifier = Modifier
@@ -153,12 +164,12 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
         }
         items(timetables) { timetable ->
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                        showTimetableDetailSheet = timetable },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    showTimetableDetailSheet = timetable
+                }
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(
@@ -188,8 +199,15 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
     showTimetableDetailSheet?.let { timetable ->
         TimetableDetailSheet(
             timetable = timetable,
-            onDismiss = { showTimetableDetailSheet = null },
-            dao = dao
+            onDismiss = { 
+                scope.launch { timetableDetailSheetState.hide() }.invokeOnCompletion {
+                    if (!timetableDetailSheetState.isVisible) {
+                        showTimetableDetailSheet = null
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = timetableDetailSheetState
         )
     }
 
@@ -198,10 +216,15 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
         AddLessonTimeSheet(
             timetableId = currentTimetableId!!,
             onDismiss = {
-                showAddLessonSheet = false
-                currentTimetableId = null
+                scope.launch { addLessonSheetState.hide() }.invokeOnCompletion {
+                    if (!addLessonSheetState.isVisible) {
+                        showAddLessonSheet = false
+                        currentTimetableId = null
+                    }
+                }
             },
-            dao = dao
+            dao = dao,
+            sheetState = addLessonSheetState
         )
     }
 
@@ -210,10 +233,15 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
         AddCourseSheet(
             timetableId = currentTimetableId!!,
             onDismiss = {
-                showAddCourseSheet = false
-                currentTimetableId = null
+                scope.launch { addCourseSheetState.hide() }.invokeOnCompletion {
+                    if (!addCourseSheetState.isVisible) {
+                        showAddCourseSheet = false
+                        currentTimetableId = null
+                    }
+                }
             },
-            dao = dao
+            dao = dao,
+            sheetState = addCourseSheetState
         )
     }
 
@@ -221,8 +249,15 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
     showEditLessonSheet?.let { lesson ->
         EditLessonTimeSheet(
             lesson = lesson,
-            onDismiss = { showEditLessonSheet = null },
-            dao = dao
+            onDismiss = {
+                scope.launch { editLessonSheetState.hide() }.invokeOnCompletion {
+                    if (!editLessonSheetState.isVisible) {
+                        showEditLessonSheet = null
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = editLessonSheetState
         )
     }
 
@@ -230,27 +265,52 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
     showEditCourseSheet?.let { course ->
         EditCourseSheet(
             course = course,
-            onDismiss = { showEditCourseSheet = null },
-            dao = dao
+            onDismiss = {
+                scope.launch { editCourseSheetState.hide() }.invokeOnCompletion {
+                    if (!editCourseSheetState.isVisible) {
+                        showEditCourseSheet = null
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = editCourseSheetState
         )
     }
 
     // 导入选项 BottomSheet
     if (showImportOptionsSheet) {
         ImportOptionsSheet(
-            onDismiss = { showImportOptionsSheet = false },
+            onDismiss = {
+                scope.launch { importOptionsSheetState.hide() }.invokeOnCompletion {
+                    if (!importOptionsSheetState.isVisible) {
+                        showImportOptionsSheet = false
+                    }
+                }
+            },
             onWakeUpImport = {
-                showImportOptionsSheet = false
-                showWakeUpImportSheet = true
-            }
+                scope.launch { importOptionsSheetState.hide() }.invokeOnCompletion {
+                    if (!importOptionsSheetState.isVisible) {
+                        showImportOptionsSheet = false
+                        showWakeUpImportSheet = true
+                    }
+                }
+            },
+            sheetState = importOptionsSheetState
         )
     }
 
     // WakeUp导入 BottomSheet
     if (showWakeUpImportSheet) {
         WakeUpImportSheet(
-            onDismiss = { showWakeUpImportSheet = false },
-            dao = dao
+            onDismiss = {
+                scope.launch { wakeUpImportSheetState.hide() }.invokeOnCompletion {
+                    if (!wakeUpImportSheetState.isVisible) {
+                        showWakeUpImportSheet = false
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = wakeUpImportSheetState
         )
     }
 }
@@ -258,7 +318,7 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
 // ---------- 编辑课程时间弹窗 ----------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: ScheduleDao) {
+fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: ScheduleDao, sheetState: androidx.compose.material3.SheetState) {
     // 获取当前课表的所有课程时间，用于重叠检测
     val lessonTimes by dao.getLessonTimesFlow(lesson.timetableId)
         .collectAsState(initial = emptyList())
@@ -274,8 +334,9 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -459,7 +520,7 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
 // ---------- 编辑课程弹窗 ----------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDao) {
+fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDao, sheetState: androidx.compose.material3.SheetState) {
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(course.timetableId).collectAsState(initial = emptyList())
     val filteredCourses = courses.filter { it.id != course.id } // 排除当前正在编辑的课程
@@ -472,8 +533,9 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -671,7 +733,8 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
 fun AddLessonTimeSheet(
     timetableId: Long,
     onDismiss: () -> Unit,
-    dao: ScheduleDao
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
 ) {
     // 获取当前课表的所有课程时间，用于重叠检测
     val lessonTimes by dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
@@ -685,8 +748,9 @@ fun AddLessonTimeSheet(
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -876,7 +940,8 @@ fun AddLessonTimeSheet(
 fun AddCourseSheet(
     timetableId: Long,
     onDismiss: () -> Unit,
-    dao: ScheduleDao
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
 ) {
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
@@ -889,8 +954,9 @@ fun AddCourseSheet(
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -1085,7 +1151,7 @@ fun AddCourseSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao: ScheduleDao) {
+fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao: ScheduleDao, sheetState: androidx.compose.material3.SheetState) {
     val scope = rememberCoroutineScope()
 
     // 课表信息状态
@@ -1109,9 +1175,16 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
     var showAddCourseSheet by remember { mutableStateOf(false) }
     var showEditLessonSheet by remember { mutableStateOf<LessonTimeEntity?>(null) }
     var showEditCourseSheet by remember { mutableStateOf<CourseEntity?>(null) }
+    
+    // 子 BottomSheet 状态
+    val addLessonSheetState = rememberModalBottomSheetState()
+    val addCourseSheetState = rememberModalBottomSheetState()
+    val editLessonSheetState = rememberModalBottomSheetState()
+    val editCourseSheetState = rememberModalBottomSheetState()
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -1129,9 +1202,9 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                     text = timetable.name,
                     style = MaterialTheme.typography.headlineSmall
                 )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "关闭")
-                }
+//                IconButton(onClick = onDismiss) {
+//                    Icon(Icons.Rounded.Close, contentDescription = "关闭")
+//                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -1435,32 +1508,60 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
     if (showAddLessonSheet) {
         AddLessonTimeSheet(
             timetableId = timetable.id,
-            onDismiss = { showAddLessonSheet = false },
-            dao = dao
+            onDismiss = {
+                scope.launch { addLessonSheetState.hide() }.invokeOnCompletion {
+                    if (!addLessonSheetState.isVisible) {
+                        showAddLessonSheet = false
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = addLessonSheetState
         )
     }
 
     if (showAddCourseSheet) {
         AddCourseSheet(
             timetableId = timetable.id,
-            onDismiss = { showAddCourseSheet = false },
-            dao = dao
+            onDismiss = {
+                scope.launch { addCourseSheetState.hide() }.invokeOnCompletion {
+                    if (!addCourseSheetState.isVisible) {
+                        showAddCourseSheet = false
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = addCourseSheetState
         )
     }
 
     showEditLessonSheet?.let { lesson ->
         EditLessonTimeSheet(
             lesson = lesson,
-            onDismiss = { showEditLessonSheet = null },
-            dao = dao
+            onDismiss = {
+                scope.launch { editLessonSheetState.hide() }.invokeOnCompletion {
+                    if (!editLessonSheetState.isVisible) {
+                        showEditLessonSheet = null
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = editLessonSheetState
         )
     }
 
     showEditCourseSheet?.let { course ->
         EditCourseSheet(
             course = course,
-            onDismiss = { showEditCourseSheet = null },
-            dao = dao
+            onDismiss = {
+                scope.launch { editCourseSheetState.hide() }.invokeOnCompletion {
+                    if (!editCourseSheetState.isVisible) {
+                        showEditCourseSheet = null
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = editCourseSheetState
         )
     }
 }
@@ -1504,10 +1605,12 @@ fun TimePickerDialog(
 @Composable
 fun ImportOptionsSheet(
     onDismiss: () -> Unit,
-    onWakeUpImport: () -> Unit
+    onWakeUpImport: () -> Unit,
+    sheetState: androidx.compose.material3.SheetState
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -1524,8 +1627,8 @@ fun ImportOptionsSheet(
             // WakeUp课程表导入选项
             Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onWakeUpImport() },
+                    .fillMaxWidth(),
+                onClick = { onWakeUpImport() },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
@@ -1568,15 +1671,17 @@ fun ImportOptionsSheet(
 @Composable
 fun WakeUpImportSheet(
     onDismiss: () -> Unit,
-    dao: ScheduleDao
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
 ) {
     var shareText by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
