@@ -63,9 +63,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         createNotificationChannels()
     }
 
-    private fun isMeizuDevice(): Boolean =
-        Build.MANUFACTURER.equals("meizu", ignoreCase = true)
-
     private fun createNotificationChannels() {
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -109,6 +106,13 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
 
+    private fun getFlymeVersion(): Int {
+        val display = Build.DISPLAY ?: return -1
+        val regex = Regex("Flyme\\s*([0-9]+)")
+        val match = regex.find(display)
+        return match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: -1
+    }
+
     fun showCourseNotification(
         courseName: String = "课程提醒",
         location: String = "",
@@ -117,14 +121,17 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     ) {
         if (!hasNotificationPermission()) return
 
-        if (isMeizuDevice()) {
-            try {
-                showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
-            } catch (e: Exception) {
+        when (Build.MANUFACTURER) {
+            "meizu" -> {
+                if (getFlymeVersion() >= 12) {
+                    showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
+                } else {
+                    showNormalNotification(courseName, location, startTime, minutesBefore)
+                }
+            }
+            else -> {
                 showNormalNotification(courseName, location, startTime, minutesBefore)
             }
-        } else {
-            showNormalNotification(courseName, location, startTime, minutesBefore)
         }
     }
 
@@ -184,6 +191,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
+
 
     private fun showNormalNotification(
         courseName: String,
@@ -448,7 +456,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     fun logNotificationStatus() {
         Log.d("UnifiedNotification", "通知权限: ${hasNotificationPermission()}")
         Log.d("UnifiedNotification", "设备厂商: ${Build.MANUFACTURER}")
-        Log.d("UnifiedNotification", "使用魅族实况通知: ${isMeizuDevice()}")
 
         val channel = notificationManager.getNotificationChannel(CHANNEL_ID)
         Log.d("UnifiedNotification", "通知渠道重要性: ${channel?.importance}")
