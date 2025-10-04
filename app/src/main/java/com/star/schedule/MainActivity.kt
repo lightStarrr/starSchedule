@@ -52,22 +52,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             StarScheduleTheme {
-                Layout(content = this)
+                Layout(context = this)
             }
         }
     }
 }
 
 @Composable
-fun Layout(content: Activity) {
+fun Layout(context: Activity) {
     var selectedItem by remember { mutableIntStateOf(0) }
     val haptic = LocalHapticFeedback.current
     val dao = DatabaseProvider.dao()
-    val notificationManager = UnifiedNotificationManager(content)
-    
+    val notificationManager = UnifiedNotificationManager(context)
+
     // 注入 notificationManager 到 dao 中
     dao.notificationManager = notificationManager
-    
+
     // 在应用启动时初始化提醒系统
     LaunchedEffect(Unit) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -137,17 +137,17 @@ fun Layout(content: Activity) {
         ) { page ->
             when (page) {
                 0 -> DateRange(
-                    content = content,
+                    context = context,
                     dao = dao
                 )
 
                 1 -> TimetableSettings(
-                    content = content,
+                    context = context,
                     dao = dao
                 )
 
                 2 -> Settings(
-                    content = content,
+                    context = context,
                     dao = dao,
                     notificationManager = notificationManager
                 )

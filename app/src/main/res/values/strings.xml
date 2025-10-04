@@ -5,4 +5,5 @@
     <string name="location">地点</string>
     <string name="location_example">综合教室202</string>
     <string name="class_example">高数</string>
+    <string name="min">分钟</string>
 </resources>

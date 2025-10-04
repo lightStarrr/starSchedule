@@ -32,6 +32,7 @@ import com.star.schedule.db.NotificationManagerProvider
 import com.star.schedule.db.ReminderEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -52,7 +53,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         const val LIVE_CHANNEL_NAME = "实况通知"
         const val REMINDER_MINUTES = 15L // 课前15分钟提醒
         const val NOTIFICATION_ID = 1001
-        
+
         // 定期更新提醒的请求码
         const val DAILY_UPDATE_REQUEST_CODE = 9999
 
@@ -121,19 +122,28 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     ) {
         if (!hasNotificationPermission()) return
 
-        when (Build.MANUFACTURER) {
-            "meizu" -> {
-                if (getFlymeVersion() >= 12) {
-                    showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
-                } else {
+        CoroutineScope(Dispatchers.Default).launch {
+            when (Build.MANUFACTURER) {
+                "meizu" -> {
+                    if (getFlymeVersion() >= 12) {
+                        showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
+                    } else {
+                        showNormalNotification(courseName, location, startTime, minutesBefore)
+                    }
+                }
+
+                else -> {
                     showNormalNotification(courseName, location, startTime, minutesBefore)
                 }
             }
-            else -> {
-                showNormalNotification(courseName, location, startTime, minutesBefore)
-            }
+
+            delay(minutesBefore * 60 * 1000L)
+
+            // 最终提醒，课程开始
+            showNormalNotification(courseName, location, startTime, 0)
         }
     }
+
 
     private fun showMeizuLiveNotification(
         courseName: String,
@@ -168,22 +178,14 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             RemoteViews(context.packageName, R.layout.live_notification_card).apply {
                 setTextViewText(R.id.live_title, courseName)
                 setTextViewText(R.id.location, location)
+                setTextViewText(R.id.live_time, minutesBefore.toString())
+                setImageViewResource(R.id.live_icon, R.drawable.star)
             }
-
-//        val launchIntent = Intent(context, MainActivity::class.java).apply {
-//            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-//        }
-
-//        val pendingIntent = PendingIntent.getActivity(
-//            context, 0, launchIntent,
-//            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-//        )
 
         val notification = Notification.Builder(context, LIVE_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(courseName)
             .setContentText("${minutesBefore}分钟后开始上课")
-//            .setContentIntent(pendingIntent)
             .addExtras(liveBundle)
             .setCustomContentView(contentRemoteViews)
             .setAutoCancel(true)
@@ -209,16 +211,24 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val contentText = if (location.isNotEmpty()) {
-            "$courseName 将在${minutesBefore}分钟后开始\n地点: $location"
+        val contentText = if (minutesBefore > 0) {
+            if (location.isNotEmpty()) {
+                "$courseName 将在${minutesBefore}分钟后开始\n地点: $location"
+            } else {
+                "$courseName 将在${minutesBefore}分钟后开始"
+            }
         } else {
-            "$courseName 将在${minutesBefore}分钟后开始"
+            if (location.isNotEmpty()) {
+                "$courseName 已开始\n地点: $location"
+            } else {
+                "$courseName 已开始"
+            }
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("课程提醒")
-            .setContentText("$courseName 将在${minutesBefore}分钟后开始")
+            .setContentText(contentText)
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
                     if (startTime.isNotEmpty()) {
@@ -384,21 +394,27 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
     fun sendTestNotification() {
+        val startTime = LocalTime.now().plusMinutes(15)
+            .format(DateTimeFormatter.ofPattern("HH:mm"))
+
         showCourseNotification(
             courseName = "测试课程",
             location = "测试教室A101",
-            startTime = "08:00",
+            startTime = startTime,
             minutesBefore = 15
         )
     }
 
     fun scheduleTestReminder() {
         if (!hasNotificationPermission()) return
-        
+
+        val startTime = LocalTime.now().plusMinutes(15)
+            .format(DateTimeFormatter.ofPattern("HH:mm"))
+
         val intent = Intent(context, CourseReminderReceiver::class.java).apply {
-            putExtra("course_name", "上课提醒测试")
-            putExtra("course_location", "测试教室B203")
-            putExtra("course_time", "当前时间")
+            putExtra("course_name", "测试课程")
+            putExtra("course_location", "测试教室A101")
+            putExtra("course_time", startTime)
         }
 
         val requestCode = "test_reminder_${System.currentTimeMillis()}".hashCode().and(0x7FFFFFFF)
@@ -419,7 +435,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                     triggerTime,
                     pendingIntent
                 )
-                
+
                 CoroutineScope(Dispatchers.Main).launch {
                     Toast.makeText(
                         context,
@@ -429,9 +445,10 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 }
             } else {
                 // 如果无法设置精确闹钟，引导用户开启权限
-                val settingsIntent = Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                val settingsIntent =
+                    Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                 context.startActivity(settingsIntent)
                 CoroutineScope(Dispatchers.Main).launch {
                     Toast.makeText(
@@ -483,26 +500,26 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     suspend fun initializeOnAppStart() {
         try {
             Log.d("UnifiedNotification", "应用启动，初始化提醒系统")
-            
+
             // 检查是否有启用的课表提醒
             val dao = DatabaseProvider.dao()
             val enabledTimetableId = dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
-            
+
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
                     val timetableId = idString.toLongOrNull()
                     if (timetableId != null) {
                         Log.d("UnifiedNotification", "检测到启用的课表提醒: $timetableId")
-                        
+
                         // 检查并更新过期的提醒
                         cleanupExpiredReminders()
-                        
+
                         // 重新设置提醒（以防系统清理或其他原因导致丢失）
                         scheduleRemindersForTimetable(timetableId)
-                        
+
                         // 设置定期更新机制
                         scheduleDailyUpdate()
-                        
+
                         Log.d("UnifiedNotification", "提醒系统初始化完成")
                     }
                 }
@@ -518,30 +535,30 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     suspend fun restoreRemindersAfterBoot() {
         try {
             Log.d("UnifiedNotification", "设备重启，恢复提醒设置")
-            
+
             // 确保数据库已初始化
             if (!DatabaseProvider.isInitialized()) {
                 DatabaseProvider.init(context)
             }
-            
+
             val dao = DatabaseProvider.dao()
             val enabledTimetableId = dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
-            
+
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
                     val timetableId = idString.toLongOrNull()
                     if (timetableId != null) {
                         Log.d("UnifiedNotification", "重启后恢复课表提醒: $timetableId")
-                        
+
                         // 清理数据库中的记录（因为重启后所有闹钟都会被清除）
                         dao.deleteAllReminders()
-                        
+
                         // 重新设置所有提醒
                         scheduleRemindersForTimetable(timetableId)
-                        
+
                         // 重新设置定期更新
                         scheduleDailyUpdate()
-                        
+
                         Log.d("UnifiedNotification", "重启后提醒恢复完成")
                     }
                 }
@@ -558,20 +575,20 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     suspend fun updateUpcomingReminders() {
         try {
             Log.d("UnifiedNotification", "开始定期更新提醒")
-            
+
             val dao = DatabaseProvider.dao()
             val enabledTimetableId = dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
-            
+
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
                     val timetableId = idString.toLongOrNull()
                     if (timetableId != null) {
                         // 清理过期的提醒
                         cleanupExpiredReminders()
-                        
+
                         // 重新设置未来两周的提醒
                         scheduleRemindersForTimetable(timetableId)
-                        
+
                         Log.d("UnifiedNotification", "定期更新提醒完成")
                     }
                 }
@@ -602,13 +619,13 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             } else {
                 now.toLocalDate().plusDays(1).atTime(2, 0)
             }
-            
+
             val triggerTime = next2AM.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            
+
             if (alarmManager.canScheduleExactAlarms()) {
                 // 先取消已存在的闹钟，防止重复设置
                 alarmManager.cancel(pendingIntent)
-                
+
                 // 设置重复的闹钟，每24小时执行一次
                 alarmManager.setRepeating(
                     AlarmManager.RTC_WAKEUP,
@@ -616,7 +633,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                     AlarmManager.INTERVAL_DAY,
                     pendingIntent
                 )
-                
+
                 Log.d("UnifiedNotification", "已设置定期更新，下次执行: $next2AM")
             } else {
                 Log.w("UnifiedNotification", "无法设置精确闹钟，跳过定期更新设置")
@@ -634,12 +651,12 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             val dao = DatabaseProvider.dao()
             val allReminders = dao.getAllReminders()
             val currentDate = LocalDate.now()
-            
+
             val expiredReminders = allReminders.filter { reminder ->
                 val reminderDate = LocalDate.parse(reminder.date)
                 reminderDate.isBefore(currentDate)
             }
-            
+
             // 取消过期的闹钟
             expiredReminders.forEach { reminder ->
                 val intent = Intent(context, CourseReminderReceiver::class.java)
@@ -653,11 +670,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                     alarmManager.cancel(pendingIntent)
                     pendingIntent.cancel()
                 }
-                
+
                 // 从数据库中删除
                 dao.deleteReminder(reminder.requestCode)
             }
-            
+
             if (expiredReminders.isNotEmpty()) {
                 Log.d("UnifiedNotification", "已清理 ${expiredReminders.size} 个过期提醒")
             }
@@ -691,7 +708,8 @@ class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
-            intent.action == Intent.ACTION_PACKAGE_REPLACED) {
+            intent.action == Intent.ACTION_PACKAGE_REPLACED
+        ) {
 
             Log.d("BootCompleted", "收到系统启动广播: ${intent.action}")
 
@@ -719,7 +737,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
 class DailyUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("DailyUpdate", "执行定期提醒更新")
-        
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val notificationManager = UnifiedNotificationManager(context)

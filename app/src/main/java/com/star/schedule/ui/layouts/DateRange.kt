@@ -65,7 +65,7 @@ data class CourseBlock(
 
 @Suppress("UNUSED_PARAMETER")
 @Composable
-fun DateRange(content: Activity, dao: ScheduleDao) {
+fun DateRange(context: Activity, dao: ScheduleDao) {
     // 当前课表ID
     val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable")
         .collectAsState(initial = null)

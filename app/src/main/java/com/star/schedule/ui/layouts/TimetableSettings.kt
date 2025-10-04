@@ -1,6 +1,8 @@
 package com.star.schedule.ui.layouts
 
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccessTime
@@ -56,6 +59,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.star.schedule.WebActivity
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
@@ -84,7 +88,7 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimetableSettings(content: Activity, dao: ScheduleDao) {
+fun TimetableSettings(context: Activity, dao: ScheduleDao) {
     val scope = rememberCoroutineScope()
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
     val haptic = LocalHapticFeedback.current
@@ -128,6 +132,7 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
+                    shape = RoundedCornerShape(topStart = 50.dp, topEnd = 8.dp, bottomEnd = 8.dp, bottomStart = 50.dp),
                     onClick = {
                         scope.launch {
                             dao.insertTimetableWithReminders(
@@ -139,7 +144,7 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
                             )
                         }
                     },
-                    modifier = Modifier.weight(0.48f)
+                    modifier = Modifier.weight(0.5f)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Add, contentDescription = null)
@@ -147,12 +152,13 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
                         Text("新建")
                     }
                 }
-                
-                Spacer(Modifier.width(8.dp))
+
+                Spacer(Modifier.width(2.dp))
                 
                 Button(
+                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 50.dp, bottomEnd = 50.dp, bottomStart = 8.dp),
                     onClick = { showImportOptionsSheet = true },
-                    modifier = Modifier.weight(0.48f)
+                    modifier = Modifier.weight(0.5f)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
@@ -280,6 +286,7 @@ fun TimetableSettings(content: Activity, dao: ScheduleDao) {
     // 导入选项 BottomSheet
     if (showImportOptionsSheet) {
         ImportOptionsSheet(
+            context = context,
             onDismiss = {
                 scope.launch { importOptionsSheetState.hide() }.invokeOnCompletion {
                     if (!importOptionsSheetState.isVisible) {
@@ -1604,6 +1611,7 @@ fun TimePickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportOptionsSheet(
+    context: Context,
     onDismiss: () -> Unit,
     onWakeUpImport: () -> Unit,
     sheetState: androidx.compose.material3.SheetState
@@ -1653,6 +1661,41 @@ fun ImportOptionsSheet(
                     }
                 }
             }
+
+//            Spacer(Modifier.height(8.dp))
+//
+//            Card(
+//                modifier = Modifier
+//                    .fillMaxWidth(),
+//                onClick = {
+//                    //跳转activity
+//                    val intent = Intent(context, WebActivity::class.java)
+//                    context.startActivity(intent)
+//                },
+//                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+//            ) {
+//                Row(
+//                    modifier = Modifier.padding(16.dp),
+//                    verticalAlignment = Alignment.CenterVertically
+//                ) {
+//                    Icon(
+//                        Icons.Rounded.CalendarMonth,
+//                        contentDescription = "从教务系统导入",
+//                        modifier = Modifier.padding(end = 12.dp)
+//                    )
+//                    Column {
+//                        Text(
+//                            text = "教务系统",
+//                            style = MaterialTheme.typography.titleMedium
+//                        )
+//                        Text(
+//                            text = "从教务系统导入",
+//                            style = MaterialTheme.typography.bodySmall,
+//                            color = MaterialTheme.colorScheme.onSurfaceVariant
+//                        )
+//                    }
+//                }
+//            }
             
             Spacer(Modifier.height(16.dp))
             
