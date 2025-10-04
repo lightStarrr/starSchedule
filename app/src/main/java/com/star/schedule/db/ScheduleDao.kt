@@ -14,8 +14,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
-import java.time.temporal.WeekFields
-import java.util.Locale
 
 // NotificationManager 接口
 interface NotificationManagerProvider {
@@ -275,11 +273,6 @@ class Converters {
 }
 
 // ---------- Helper 扩展 ----------
-fun LocalDate.getWeekOfYear(): Int {
-    val weekFields = WeekFields.of(Locale.getDefault())
-    return this.get(weekFields.weekOfWeekBasedYear())
-}
-
 fun LocalDate.getWeekOfSemester(startDate: LocalDate): Int {
     val days = java.time.temporal.ChronoUnit.DAYS.between(startDate, this)
     return (days / 7 + 1).toInt()

@@ -1,9 +1,7 @@
 package com.star.schedule
 
 import android.app.Activity
-import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -142,7 +140,6 @@ fun Layout(context: Activity) {
                 )
 
                 1 -> TimetableSettings(
-                    context = context,
                     dao = dao
                 )
 

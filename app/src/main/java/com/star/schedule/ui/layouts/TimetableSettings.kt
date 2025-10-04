@@ -1,8 +1,5 @@
 package com.star.schedule.ui.layouts
 
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.AlertDialog
@@ -37,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -59,13 +54,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.star.schedule.WebActivity
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
 import com.star.schedule.ui.components.OptimizedBottomSheet
-import com.star.schedule.ui.components.hideBottomSheet
 import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,9 +67,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
@@ -88,7 +79,7 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimetableSettings(context: Activity, dao: ScheduleDao) {
+fun TimetableSettings(dao: ScheduleDao) {
     val scope = rememberCoroutineScope()
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
     val haptic = LocalHapticFeedback.current
@@ -286,7 +277,6 @@ fun TimetableSettings(context: Activity, dao: ScheduleDao) {
     // 导入选项 BottomSheet
     if (showImportOptionsSheet) {
         ImportOptionsSheet(
-            context = context,
             onDismiss = {
                 scope.launch { importOptionsSheetState.hide() }.invokeOnCompletion {
                     if (!importOptionsSheetState.isVisible) {
@@ -482,10 +472,10 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
                                 ),
                                 isInsert = false
                             )
-                            android.util.Log.d("EditLessonTimeSheet", "更新课程时间成功，ID: $result")
+                            Log.d("EditLessonTimeSheet", "更新课程时间成功，ID: $result")
                             onDismiss()
                         } catch (e: Exception) {
-                            android.util.Log.e("EditLessonTimeSheet", "更新课程时间失败", e)
+                            Log.e("EditLessonTimeSheet", "更新课程时间失败", e)
                             errorMessage = "保存失败: ${e.message}"
                         }
                     }
@@ -717,10 +707,10 @@ fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDa
                                     weeks = weekList
                                 )
                             )
-                            android.util.Log.d("EditCourseSheet", "更新课程成功，ID: ${course.id}")
+                            Log.d("EditCourseSheet", "更新课程成功，ID: ${course.id}")
                             onDismiss()
                         } catch (e: Exception) {
-                            android.util.Log.e("EditCourseSheet", "更新课程失败", e)
+                            Log.e("EditCourseSheet", "更新课程失败", e)
                             errorMessage = "保存失败: ${e.message}"
                         }
                     }
@@ -897,10 +887,10 @@ fun AddLessonTimeSheet(
                                     endTime = endTime
                                 )
                             )
-                            android.util.Log.d("AddLessonTimeSheet", "新增课程时间成功，ID: $result")
+                            Log.d("AddLessonTimeSheet", "新增课程时间成功，ID: $result")
                             onDismiss()
                         } catch (e: Exception) {
-                            android.util.Log.e("AddLessonTimeSheet", "新增课程时间失败", e)
+                            Log.e("AddLessonTimeSheet", "新增课程时间失败", e)
                             errorMessage = "保存失败: ${e.message}"
                         }
                     }
@@ -1139,10 +1129,10 @@ fun AddCourseSheet(
                                     weeks = weekList
                                 )
                             )
-                            android.util.Log.d("AddCourseSheet", "新增课程成功，ID: $result")
+                            Log.d("AddCourseSheet", "新增课程成功，ID: $result")
                             onDismiss()
                         } catch (e: Exception) {
-                            android.util.Log.e("AddCourseSheet", "新增课程失败", e)
+                            Log.e("AddCourseSheet", "新增课程失败", e)
                             errorMessage = "保存失败: ${e.message}"
                         }
                     }
@@ -1611,7 +1601,6 @@ fun TimePickerDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportOptionsSheet(
-    context: Context,
     onDismiss: () -> Unit,
     onWakeUpImport: () -> Unit,
     sheetState: androidx.compose.material3.SheetState

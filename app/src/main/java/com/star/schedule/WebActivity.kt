@@ -7,15 +7,12 @@ import androidx.activity.enableEdgeToEdge
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.ui.theme.StarScheduleTheme
 import android.annotation.SuppressLint
-import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +34,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.rememberCoroutineScope
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import kotlinx.coroutines.launch
@@ -70,7 +69,7 @@ fun WebCaptureScreen(context: WebActivity, url: String, onHtmlReceived: (String)
                 title = { Text(webViewTitle) },
                 navigationIcon = {
                     IconButton(onClick = { context.finish() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
@@ -179,12 +178,12 @@ fun WebViewContent(
 
                 webChromeClient = WebChromeClient()
 
-                addJavascriptInterface(object {
-                    @JavascriptInterface
-                    fun processHtml(html: String) {
-                        onHtmlReceived(html)
-                    }
-                }, "AndroidBridge")
+//                addJavascriptInterface(object {
+//                    @JavascriptInterface
+//                    fun processHtml(html: String) {
+//                        onHtmlReceived(html)
+//                    }
+//                }, "AndroidBridge")
 
                 loadUrl(url)
             }

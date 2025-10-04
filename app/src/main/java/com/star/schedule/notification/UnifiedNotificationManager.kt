@@ -1,6 +1,5 @@
 package com.star.schedule.notification
 
-import android.Manifest
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,7 +8,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.os.Build
@@ -17,7 +15,6 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.RemoteViews
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -101,12 +98,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         notificationManager.createNotificationChannel(liveChannel)
     }
 
-    fun hasNotificationPermission(): Boolean =
-        ActivityCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
-
     private fun getFlymeVersion(): Int {
         val display = Build.DISPLAY ?: return -1
         val regex = Regex("Flyme\\s*([0-9]+)")
@@ -120,8 +111,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         startTime: String = "",
         minutesBefore: Int = 15
     ) {
-        if (!hasNotificationPermission()) return
-
         CoroutineScope(Dispatchers.Default).launch {
             when (Build.MANUFACTURER) {
                 "meizu" -> {
@@ -265,48 +254,32 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
     private suspend fun scheduleRemindersForTimetable(timetableId: Long) {
-        if (alarmManager.canScheduleExactAlarms()) {
-            val dao = DatabaseProvider.dao()
-            val timetable = dao.getTimetableFlow(timetableId).first() ?: return
-            val courses = dao.getCoursesFlow(timetableId).first()
-            val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
+        val dao = DatabaseProvider.dao()
+        val timetable = dao.getTimetableFlow(timetableId).first() ?: return
+        val courses = dao.getCoursesFlow(timetableId).first()
+        val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
 
-            val startDate =
-                runCatching { LocalDate.parse(timetable.startDate) }.getOrElse { LocalDate.now() }
-            val currentDate = LocalDate.now()
-            val endDate = currentDate.plusWeeks(2)
+        val startDate =
+            runCatching { LocalDate.parse(timetable.startDate) }.getOrElse { LocalDate.now() }
+        val currentDate = LocalDate.now()
+        val endDate = currentDate.plusWeeks(2)
 
-            var date = currentDate
-            while (!date.isAfter(endDate)) {
-                val weekNumber = getWeekOfSemester(date, startDate)
-                val dayOfWeek = date.dayOfWeek.value
-                val todayCourses =
-                    courses.filter { it.dayOfWeek == dayOfWeek && it.weeks.contains(weekNumber) }
+        var date = currentDate
+        while (!date.isAfter(endDate)) {
+            val weekNumber = getWeekOfSemester(date, startDate)
+            val dayOfWeek = date.dayOfWeek.value
+            val todayCourses =
+                courses.filter { it.dayOfWeek == dayOfWeek && it.weeks.contains(weekNumber) }
 
-                todayCourses.forEach { course ->
-                    course.periods.forEach { period ->
-                        val lessonTime = lessonTimes.find { it.period == period }
-                        if (lessonTime != null) {
-                            scheduleReminderForCourse(course, lessonTime, date)
-                        }
+            todayCourses.forEach { course ->
+                course.periods.forEach { period ->
+                    val lessonTime = lessonTimes.find { it.period == period }
+                    if (lessonTime != null) {
+                        scheduleReminderForCourse(course, lessonTime, date)
                     }
                 }
-                date = date.plusDays(1)
             }
-        } else {
-            // ⚠️ 精确闹钟被限制，提示用户开启权限
-            val intent =
-                Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            context.startActivity(intent)
-            CoroutineScope(Dispatchers.Main).launch {
-                Toast.makeText(
-                    context,
-                    "请允许应用使用精确闹钟，否则无法提醒课程",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+            date = date.plusDays(1)
         }
     }
 
@@ -351,8 +324,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                         ReminderEntity(requestCode, course.id, date.toString(), lessonTime.period)
                     )
                 }
-            } catch (e: SecurityException) {
-                // 捕获意外安全异常
+            } catch (_: SecurityException) {
                 CoroutineScope(Dispatchers.Main).launch {
                     Toast.makeText(
                         context,
@@ -406,8 +378,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
     fun scheduleTestReminder() {
-        if (!hasNotificationPermission()) return
-
         val startTime = LocalTime.now().plusMinutes(15)
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
@@ -458,7 +428,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                     ).show()
                 }
             }
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             CoroutineScope(Dispatchers.Main).launch {
                 Toast.makeText(
                     context,
@@ -467,15 +437,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 ).show()
             }
         }
-    }
-
-    // 保留 logNotificationStatus
-    fun logNotificationStatus() {
-        Log.d("UnifiedNotification", "通知权限: ${hasNotificationPermission()}")
-        Log.d("UnifiedNotification", "设备厂商: ${Build.MANUFACTURER}")
-
-        val channel = notificationManager.getNotificationChannel(CHANNEL_ID)
-        Log.d("UnifiedNotification", "通知渠道重要性: ${channel?.importance}")
     }
 
     // 保留 isReminderEnabledForTimetableSync

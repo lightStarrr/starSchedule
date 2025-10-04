@@ -2,9 +2,11 @@ package com.star.schedule.ui.layouts
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -32,15 +34,11 @@ import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -59,15 +57,17 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.getSystemService
+import androidx.core.net.toUri
 import com.star.schedule.R
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
-import com.star.schedule.ui.components.hideBottomSheet
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,12 +80,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     // 权限申请器
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            if (isGranted) {
-                // 权限获得后，发送测试通知
-                notificationManager.sendTestNotification()
-            }
-        }
+        onResult = {}
     )
 
     // 所有课表
@@ -105,7 +100,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
     var showStartupHint by remember { mutableStateOf(true) }
 
-    val startupHintClosedPref by dao.getPreferenceFlow("startup_hint_closed").collectAsState(initial = "false")
+    val startupHintClosedPref by dao.getPreferenceFlow("startup_hint_closed")
+        .collectAsState(initial = "false")
     LaunchedEffect(startupHintClosedPref) {
         showStartupHint = startupHintClosedPref != "true"
     }
@@ -114,7 +110,27 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     fun requestNotificationPermissionIfNeeded(onPermissionGranted: () -> Unit) {
         when (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
             PackageManager.PERMISSION_GRANTED -> {
-                onPermissionGranted()
+                when {
+                    context.getSystemService<AlarmManager>()!!.canScheduleExactAlarms() -> {
+                        onPermissionGranted()
+                    }
+
+                    else -> {
+                        val intent =
+                            Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                        context.startActivity(intent)
+
+                        CoroutineScope(Dispatchers.Main).launch {
+                            Toast.makeText(
+                                context,
+                                "请允许应用使用精确闹钟，然后重试",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
             }
 
             else -> {
@@ -155,7 +171,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            onClick =  {
+            onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                 showTimetableSheet = true
             },
@@ -203,7 +219,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
-                    
+
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -224,9 +240,9 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 //                                    }
                                 },
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (timetable.id == currentTimetableId) 
+                                    containerColor = if (timetable.id == currentTimetableId)
                                         MaterialTheme.colorScheme.secondary
-                                    else 
+                                    else
                                         MaterialTheme.colorScheme.surfaceVariant
                                 )
                             ) {
@@ -235,7 +251,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        Icons.Rounded.CalendarMonth, 
+                                        Icons.Rounded.CalendarMonth,
                                         contentDescription = "课表",
                                         modifier = Modifier.padding(end = 12.dp),
                                         tint = if (timetable.id == currentTimetableId)
@@ -264,7 +280,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             }
                         }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
@@ -302,7 +318,11 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "软件不会常驻后台，仅在需要发送通知时被系统唤起。",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f))
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSecondary.copy(
+                                    alpha = 0.8f
+                                )
+                            )
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -350,7 +370,6 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                         currentTimetableId!!
                                     )
                                     reminderEnabled = true
-                                    notificationManager.logNotificationStatus()
                                 }
                             }
                         } else {
@@ -370,14 +389,9 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             leadingContent = { Icon(Icons.Rounded.PhoneAndroid, contentDescription = null) },
             modifier = Modifier.clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                scope.launch {
-                    if (notificationManager.hasNotificationPermission()) {
+                requestNotificationPermissionIfNeeded {
+                    scope.launch {
                         notificationManager.sendTestNotification()
-                        notificationManager.logNotificationStatus()
-                    } else {
-                        requestNotificationPermissionIfNeeded {
-                            notificationManager.sendTestNotification()
-                        }
                     }
                 }
             }
@@ -389,14 +403,9 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
             modifier = Modifier.clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                scope.launch {
-                    if (notificationManager.hasNotificationPermission()) {
+                requestNotificationPermissionIfNeeded {
+                    scope.launch {
                         notificationManager.scheduleTestReminder()
-                        notificationManager.logNotificationStatus()
-                    } else {
-                        requestNotificationPermissionIfNeeded {
-                            notificationManager.scheduleTestReminder()
-                        }
                     }
                 }
             }
@@ -439,7 +448,10 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             modifier = Modifier.clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                 val intent =
-                    Intent(Intent.ACTION_VIEW, "https://github.com/lightStarrr/starSchedule".toUri())
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        "https://github.com/lightStarrr/starSchedule".toUri()
+                    )
                 context.startActivity(intent)
             }
         )
@@ -451,7 +463,10 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             modifier = Modifier.clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                 val intent =
-                    Intent(Intent.ACTION_VIEW, "https://qun.qq.com/universal-share/share?ac=1&authKey=vkf2HO4ASBIuSUo58JkyisXvAH3O2ahAWe8WCZhNtWb7naUMzjEaLdmFzqMq%2B1c9&busi_data=eyJncm91cENvZGUiOiI5NDc1NzQ5NTMiLCJ0b2tlbiI6ImZlZ2k0bjV0RXRmMVphaEZDNDFPZkVHSmFZSzMxMUErRExWVXp0M2k4cHR2RmthaTdaR3JwR2dVL3Q1RWFIZ2oiLCJ1aW4iOiIyNzMzOTc3OTMyIn0%3D&data=NkI03UL5UEBOZSjmEjCZ1XOX_FMW7sODMR0NVcuFpi5n-wd8cRrJzpDlKmpZ63I8SJ8U2_9S81TBshw62OIXcQ&svctype=4&tempid=h5_group_info".toUri())
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        "https://qun.qq.com/universal-share/share?ac=1&authKey=vkf2HO4ASBIuSUo58JkyisXvAH3O2ahAWe8WCZhNtWb7naUMzjEaLdmFzqMq%2B1c9&busi_data=eyJncm91cENvZGUiOiI5NDc1NzQ5NTMiLCJ0b2tlbiI6ImZlZ2k0bjV0RXRmMVphaEZDNDFPZkVHSmFZSzMxMUErRExWVXp0M2k4cHR2RmthaTdaR3JwR2dVL3Q1RWFIZ2oiLCJ1aW4iOiIyNzMzOTc3OTMyIn0%3D&data=NkI03UL5UEBOZSjmEjCZ1XOX_FMW7sODMR0NVcuFpi5n-wd8cRrJzpDlKmpZ63I8SJ8U2_9S81TBshw62OIXcQ&svctype=4&tempid=h5_group_info".toUri()
+                    )
                 context.startActivity(intent)
             }
         )

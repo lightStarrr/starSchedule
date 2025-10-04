@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
@@ -24,9 +23,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OptimizedBottomSheet(
+    modifier: Modifier = Modifier,
     onDismiss: () -> Unit,
     sheetState: SheetState = rememberModalBottomSheetState(),
-    modifier: Modifier = Modifier,
     shape: Shape = androidx.compose.material3.MaterialTheme.shapes.large,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -49,23 +48,23 @@ fun OptimizedBottomSheet(
     )
 }
 
-/**
- * 用于隐藏BottomSheet的扩展函数
- * 
- * @param sheetState BottomSheet的状态
- * @param onDismiss 当BottomSheet完全隐藏后的回调
- */
-@OptIn(ExperimentalMaterial3Api::class)
-fun hideBottomSheet(
-    sheetState: SheetState,
-    scope: kotlinx.coroutines.CoroutineScope,
-    onDismiss: () -> Unit
-) {
-    scope.launch {
-        sheetState.hide()
-    }.invokeOnCompletion {
-        if (!sheetState.isVisible) {
-            onDismiss()
-        }
-    }
-}
+///**
+// * 用于隐藏BottomSheet的扩展函数
+// *
+// * @param sheetState BottomSheet的状态
+// * @param onDismiss 当BottomSheet完全隐藏后的回调
+// */
+//@OptIn(ExperimentalMaterial3Api::class)
+//fun hideBottomSheet(
+//    sheetState: SheetState,
+//    scope: kotlinx.coroutines.CoroutineScope,
+//    onDismiss: () -> Unit
+//) {
+//    scope.launch {
+//        sheetState.hide()
+//    }.invokeOnCompletion {
+//        if (!sheetState.isVisible) {
+//            onDismiss()
+//        }
+//    }
+//}

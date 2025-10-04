@@ -66,6 +66,7 @@
                 android:id="@+id/live_icon"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
+                android:contentDescription="@null"
                 android:scaleType="centerCrop" />
         </LinearLayout>
 
