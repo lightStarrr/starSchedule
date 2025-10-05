@@ -78,9 +78,17 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
     } else remember { mutableStateOf(null as TimetableEntity?) }
 
     // 设置：是否显示非本周课程
-    val showNonCurrentPref by dao.getPreferenceFlow("show_non_current_week")
-        .collectAsState(initial = "false")
-    val showNonCurrent = showNonCurrentPref == "true"
+    val perTableKey = timetableId?.let { "timetable_${it}_show_non_current_week" }
+    val showNonCurrentPerTable by if (perTableKey != null) {
+        dao.getPreferenceFlow(perTableKey).collectAsState(initial = null)
+    } else remember { mutableStateOf(null as String?) }
+    val showNonCurrentGlobal by dao.getPreferenceFlow("show_non_current_week")
+        .collectAsState(initial = null)
+    val showNonCurrent = when (showNonCurrentPerTable) {
+        "true" -> true
+        "false" -> false
+        else -> showNonCurrentGlobal == "true"
+    }
 
     // 当前周的课程或全部课程（根据开关）
     val today = LocalDate.now()

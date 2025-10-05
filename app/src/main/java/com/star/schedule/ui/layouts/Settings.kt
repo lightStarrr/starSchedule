@@ -94,12 +94,6 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     // 课前提醒开关状态
     var reminderEnabled by remember { mutableStateOf(false) }
 
-    // 显示非本周课程开关（使用偏好）
-    val showNonCurrentPref by dao.getPreferenceFlow("show_non_current_week")
-        .collectAsState(initial = "false")
-    var showNonCurrent by remember(showNonCurrentPref) {
-        mutableStateOf(showNonCurrentPref == "true")
-    }
 
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
@@ -390,24 +384,6 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             }
         )
 
-        // 显示非本周课程开关
-        ListItem(
-            headlineContent = { Text("显示非本周课程") },
-            supportingContent = { Text("将其他周的课程以更透明卡片显示") },
-            leadingContent = { Icon(Icons.Rounded.CalendarMonth, contentDescription = null) },
-            trailingContent = {
-                Switch(
-                    checked = showNonCurrent,
-                    onCheckedChange = { enabled ->
-                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                        showNonCurrent = enabled
-                        scope.launch {
-                            dao.setPreference("show_non_current_week", enabled.toString())
-                        }
-                    }
-                )
-            }
-        )
 
         ListItem(
             headlineContent = { Text("通知测试") },
