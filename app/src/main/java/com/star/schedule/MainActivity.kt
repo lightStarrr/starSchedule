@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.EditCalendar
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -69,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -138,8 +141,8 @@ fun Layout(context: Activity) {
     )
 
     val items = listOf(
-        ItemData("日程", Icons.Rounded.DateRange),
-        ItemData("课表设置", Icons.Rounded.CalendarMonth),
+        ItemData("日程", Icons.Rounded.CalendarMonth),
+        ItemData("课表设置", Icons.Rounded.EditCalendar),
         ItemData("设置", Icons.Rounded.Settings)
     )
 
@@ -157,60 +160,78 @@ fun Layout(context: Activity) {
                 colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
                 content = {
                     items.forEachIndexed { index, item ->
-                        if (selectedItem == 0 && index == 0) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                            ) {
-                                ToggleButton(
-                                    checked = false,
-                                    enabled = currentWeekNumber > 1,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                        if (currentWeekNumber > 1) {
-                                            onCurrentWeekNumberChange(currentWeekNumber - 1)
+                        if (index == 0) {
+                            AnimatedContent(
+                                targetState = selectedItem == 0
+                            ) {isWeekRow ->
+                                if (isWeekRow) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                                    ) {
+                                        ToggleButton(
+                                            checked = false,
+                                            enabled = weeksWithCourses.indexOf(currentWeekNumber) > 0,
+                                            onCheckedChange = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                                val index = weeksWithCourses.indexOf(currentWeekNumber)
+                                                if (index > 0) {
+                                                    onCurrentWeekNumberChange(weeksWithCourses[index - 1])
+                                                }
+                                            },
+                                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.secondary,
+                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                            )
+                                        ) {
+                                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "上一周")
                                         }
-                                    },
-                                    colors = ToggleButtonDefaults.toggleButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondary,
-                                        contentColor = MaterialTheme.colorScheme.onSecondary
-                                    )
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.ChevronLeft,
-                                        contentDescription = "上一周"
-                                    )
-                                }
-                                ToggleButton(
-                                    checked = false,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                        showWeekSelector = true
-                                    },
-                                    colors = ToggleButtonDefaults.toggleButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondary,
-                                        contentColor = MaterialTheme.colorScheme.onSecondary
-                                    )
-                                ) {
-                                    Text("第 $currentWeekNumber 周")
-                                }
-                                ToggleButton(
-                                    checked = false,
-                                    onCheckedChange = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                        onCurrentWeekNumberChange(currentWeekNumber + 1)
-                                    },
-                                    colors = ToggleButtonDefaults.toggleButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondary,
-                                        contentColor = MaterialTheme.colorScheme.onSecondary
-                                    )
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.ChevronRight,
-                                        contentDescription = "下一周"
+                                        ToggleButton(
+                                            checked = false,
+                                            onCheckedChange = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                                showWeekSelector = true
+                                            },
+                                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.secondary,
+                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                            )
+                                        ) {
+                                            Text("第 $currentWeekNumber 周")
+                                        }
+                                        ToggleButton(
+                                            checked = false,
+                                            enabled = weeksWithCourses.indexOf(currentWeekNumber) < weeksWithCourses.size - 1,
+                                            onCheckedChange = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                                val index = weeksWithCourses.indexOf(currentWeekNumber)
+                                                if (index < weeksWithCourses.size - 1) {
+                                                    onCurrentWeekNumberChange(weeksWithCourses[index + 1])
+                                                }
+                                            },
+                                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.secondary,
+                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                            )
+                                        ) {
+                                            Icon(Icons.Rounded.ChevronRight, contentDescription = "下一周")
+                                        }
+                                    }
+                                } else {
+                                    ToggleButton(
+                                        checked = selectedItem == index,
+                                        onCheckedChange = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            selectedItem = index
+                                        },
+                                        content = {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = item.name
+                                            )
+                                        }
                                     )
                                 }
                             }
-
                         } else {
                             ToggleButton(
                                 checked = selectedItem == index,
