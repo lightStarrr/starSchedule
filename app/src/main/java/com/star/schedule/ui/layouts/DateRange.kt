@@ -52,7 +52,8 @@ data class Course(
     val name: String,
     val location: String,
     val dayOfWeek: Int,
-    val periods: List<Int>
+    val periods: List<Int>,
+    val weeks: List<Int>
 )
 
 data class CourseBlock(
@@ -76,10 +77,25 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
         dao.getTimetableFlow(timetableId).collectAsState(initial = null)
     } else remember { mutableStateOf(null as TimetableEntity?) }
 
-    // 当前周的课程
+    // 设置：是否显示非本周课程
+    val perTableKey = timetableId?.let { "timetable_${it}_show_non_current_week" }
+    val showNonCurrentPerTable by if (perTableKey != null) {
+        dao.getPreferenceFlow(perTableKey).collectAsState(initial = null)
+    } else remember { mutableStateOf(null as String?) }
+    val showNonCurrentGlobal by dao.getPreferenceFlow("show_non_current_week")
+        .collectAsState(initial = null)
+    val showNonCurrent = when (showNonCurrentPerTable) {
+        "true" -> true
+        "false" -> false
+        else -> showNonCurrentGlobal == "true"
+    }
+
+    // 当前周的课程或全部课程（根据开关）
     val today = LocalDate.now()
     val courses by if (timetableId != null) {
-        dao.getCoursesForDateFlow(timetableId, today).collectAsState(initial = emptyList())
+        val flow = if (showNonCurrent) dao.getCoursesFlow(timetableId)
+        else dao.getCoursesForDateFlow(timetableId, today)
+        flow.collectAsState(initial = emptyList())
     } else emptyList<CourseEntity>().let { mutableStateOf(it) }
 
     // 当前课表的作息时间
@@ -101,14 +117,31 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
         null
     }
 
+    // 基于设置与当前周，显示当前周和未来周
+    val visibleEntities: List<CourseEntity> = if (currentWeekNumber != null) {
+        if (showNonCurrent) {
+            val currentCourses = courses.filter { it.weeks.contains(currentWeekNumber) }
+            val occupied = currentCourses.flatMap { ce -> ce.periods.map { p -> ce.dayOfWeek to p } }.toSet()
+            val futureCourses = courses.filter { entity ->
+                entity.weeks.any { it > currentWeekNumber } && !entity.weeks.contains(currentWeekNumber)
+            }.filter { entity ->
+                entity.periods.none { p -> (entity.dayOfWeek to p) in occupied }
+            }
+            currentCourses + futureCourses
+        } else {
+            courses.filter { entity -> entity.weeks.contains(currentWeekNumber) }
+        }
+    } else courses
+
     Box(modifier = Modifier.fillMaxSize()) {
         ScheduleScreen(
-            courses = courses.map { entity ->
+            courses = visibleEntities.map { entity ->
                 Course(
                     name = entity.name,
                     location = entity.location,
                     dayOfWeek = entity.dayOfWeek,
-                    periods = entity.periods
+                    periods = entity.periods,
+                    weeks = entity.weeks
                 )
             },
             lessonTimes = lessonTimes.map { entity ->
@@ -119,7 +152,8 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
                 )
             },
             showWeekend = timetable?.showWeekend ?: true,
-            currentWeek = currentWeekNumber
+            currentWeek = currentWeekNumber,
+            showNonCurrentWeekCourses = showNonCurrent
         )
     }
 }
@@ -153,7 +187,8 @@ fun ScheduleScreen(
     cellHeight: Dp = 60.dp,
     cellPadding: Dp = 2.dp,
     showWeekend: Boolean = true,
-    currentWeek: Int? = null
+    currentWeek: Int? = null,
+    showNonCurrentWeekCourses: Boolean = false
 ) {
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
     // 可见的星期数字（1=周一 ...）
@@ -290,7 +325,15 @@ fun ScheduleScreen(
                         .width(dayColumnWidth - cellPadding * 2)
                         .height(cellHeight * span - cellPadding * 2)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.secondary)
+                        .background(
+                            if (currentWeek != null && showNonCurrentWeekCourses) {
+                                val base = MaterialTheme.colorScheme.secondary
+                                if (block.course.weeks.contains(currentWeek)) base
+                                else base.copy(alpha = 0.35f) // 未来周课程统一使用较低透明度
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            }
+                        )
                         .padding(4.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {

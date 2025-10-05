@@ -1157,6 +1157,21 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
     var showWeekend by remember { mutableStateOf(timetable.showWeekend) }
     var errorMessage by remember { mutableStateOf("") }
 
+    // 显示非本周课程开关
+    val perTableKey = "timetable_${timetable.id}_show_non_current_week"
+    val showNonCurrentPerTable by dao.getPreferenceFlow(perTableKey)
+        .collectAsState(initial = null)
+    val showNonCurrentGlobal by dao.getPreferenceFlow("show_non_current_week")
+        .collectAsState(initial = null)
+    val effectiveShowNonCurrent = when (showNonCurrentPerTable) {
+        "true" -> true
+        "false" -> false
+        else -> showNonCurrentGlobal == "true"
+    }
+    var showNonCurrent by remember(showNonCurrentPerTable, showNonCurrentGlobal) {
+        mutableStateOf(effectiveShowNonCurrent)
+    }
+
     // 日期选择器状态
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -1279,6 +1294,23 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                         Switch(
                             checked = showWeekend,
                             onCheckedChange = { showWeekend = it }
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("显示非本周课程")
+                        Switch(
+                            checked = showNonCurrent,
+                            onCheckedChange = { enabled ->
+                                showNonCurrent = enabled
+                                scope.launch {
+                                    dao.setPreference(perTableKey, enabled.toString())
+                                }
+                            }
                         )
                     }
 

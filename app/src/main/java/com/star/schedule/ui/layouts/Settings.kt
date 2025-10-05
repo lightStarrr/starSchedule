@@ -94,6 +94,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     // 课前提醒开关状态
     var reminderEnabled by remember { mutableStateOf(false) }
 
+
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
     val timetableSheetState = rememberModalBottomSheetState()
@@ -382,6 +383,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 )
             }
         )
+
 
         ListItem(
             headlineContent = { Text("通知测试") },
