@@ -308,15 +308,6 @@ fun ScheduleScreen(
                 if (dayIndex == -1) return@forEach
 
                 val span = block.endPeriod - block.startPeriod + 1
-                // 按是否为当前周调整透明度，未来周使用较低透明度
-                val bgColor = run {
-                    val base = MaterialTheme.colorScheme.secondary
-                    if (currentWeek != null && showNonCurrentWeekCourses) {
-                        val inCurrent = block.course.weeks.contains(currentWeek)
-                        if (inCurrent) base
-                        else base.copy(alpha = 0.35f) // 未来周课程统一使用较低透明度
-                    } else base
-                }
                 Box(
                     modifier = Modifier
                         .absoluteOffset(
@@ -326,7 +317,15 @@ fun ScheduleScreen(
                         .width(dayColumnWidth - cellPadding * 2)
                         .height(cellHeight * span - cellPadding * 2)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(bgColor)
+                        .background(
+                            if (currentWeek != null && showNonCurrentWeekCourses) {
+                                val base = MaterialTheme.colorScheme.secondary
+                                if (block.course.weeks.contains(currentWeek)) base
+                                else base.copy(alpha = 0.35f) // 未来周课程统一使用较低透明度
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            }
+                        )
                         .padding(4.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
