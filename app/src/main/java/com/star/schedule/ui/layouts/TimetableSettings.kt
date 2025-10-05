@@ -108,7 +108,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp, 16.dp, 16.dp, 0.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {

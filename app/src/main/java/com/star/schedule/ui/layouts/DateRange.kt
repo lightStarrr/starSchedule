@@ -1,38 +1,60 @@
 package com.star.schedule.ui.layouts
 
 import android.app.Activity
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.FloatingToolbarDefaults.ScreenOffset
+import androidx.compose.material3.FloatingToolbarState
+import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalFloatingToolbar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -71,7 +93,7 @@ data class CourseBlock(
 
 @Suppress("UNUSED_PARAMETER")
 @Composable
-fun DateRange(context: Activity, dao: ScheduleDao) {
+fun DateRange(context: Activity, dao: ScheduleDao, currentWeekNumber: Int, onCurrentWeekNumberChange : (Int) -> Unit, onWeeksCalculated: (List<Int>) -> Unit = {}, upDateRealCurrentWeek: (Int) -> Unit) {
     // 当前课表ID
     val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable")
         .collectAsState(initial = null)
@@ -98,9 +120,8 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
     // 当前周的课程或全部课程（根据开关）
     val today = LocalDate.now()
     val courses by if (timetableId != null) {
-        val flow = if (showNonCurrent) dao.getCoursesFlow(timetableId)
-        else dao.getCoursesForDateFlow(timetableId, today)
-        flow.collectAsState(initial = emptyList())
+        // 总是加载所有课程，后续根据showNonCurrent设置来决定显示哪些课程
+        dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
     } else emptyList<CourseEntity>().let { mutableStateOf(it) }
 
     // 当前课表的作息时间
@@ -108,8 +129,19 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
         dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
     } else emptyList<LessonTimeEntity>().let { mutableStateOf(it) }
 
+    // 计算有课的周数
+    val weeksWithCourses = courses.flatMap { it.weeks }.distinct().sorted()
+    
+    // 当有课周数变化时，通知MainActivity
+    LaunchedEffect(weeksWithCourses) {
+        Log.d("DateRange", "weeksWithCourses: $weeksWithCourses")
+        if (weeksWithCourses.isNotEmpty()) {
+            onWeeksCalculated(weeksWithCourses)
+        }
+    }
+
     // 计算当前是第几周（基于 timetable.startDate），若失败则为 null
-    val currentWeekNumber: Int? = try {
+    val calculatedWeekNumber: Int? = try {
         val startStr = timetable?.startDate
         if (startStr.isNullOrBlank()) null
         else {
@@ -122,8 +154,18 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
         null
     }
 
-    // 基于设置与当前周，显示当前周和未来周
-    val visibleEntities: List<CourseEntity> = if (currentWeekNumber != null) {
+    // 当组件首次加载时，如果计算出的周数不为null且与传入的不同，则更新传入的周数
+    LaunchedEffect(calculatedWeekNumber) {
+        if (calculatedWeekNumber != null && calculatedWeekNumber != currentWeekNumber) {
+            onCurrentWeekNumberChange(calculatedWeekNumber)
+        }
+        // 无论是否更新了currentWeekNumber，都要更新realCurrentWeek为计算出的实际周数
+        if (calculatedWeekNumber != null) {
+            upDateRealCurrentWeek(calculatedWeekNumber)
+        }
+    }
+
+    val visibleEntities: List<CourseEntity> = if (currentWeekNumber > 0) {
         if (showNonCurrent) {
             val currentCourses = courses.filter { it.weeks.contains(currentWeekNumber) }
 
@@ -150,6 +192,7 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
 
             currentCourses + futureCourses
         } else {
+            // 只显示当前周的课程
             courses.filter { entity -> entity.weeks.contains(currentWeekNumber) }
         }
     } else courses
@@ -200,6 +243,7 @@ fun buildCourseBlocks(courses: List<Course>): List<CourseBlock> {
 }
 
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ScheduleScreen(
     courses: List<Course>,
@@ -231,10 +275,9 @@ fun ScheduleScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState) // 整个Box可滚动
+                .verticalScroll(scrollState)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // 星期标题行
+            Column(modifier = Modifier.fillMaxSize().padding(bottom = 32.dp)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -251,7 +294,7 @@ fun ScheduleScreen(
                     ) {
                         if (currentWeek != null) {
                             Text(
-                                text = "第${currentWeek}周",
+                                text = currentWeek.toString(),
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,

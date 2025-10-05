@@ -165,7 +165,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         Text(
             text = "设置",
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 0.dp),
         )
 
         Card(
