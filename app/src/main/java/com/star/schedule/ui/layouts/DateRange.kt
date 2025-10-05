@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,10 +29,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -121,12 +126,28 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
     val visibleEntities: List<CourseEntity> = if (currentWeekNumber != null) {
         if (showNonCurrent) {
             val currentCourses = courses.filter { it.weeks.contains(currentWeekNumber) }
-            val occupied = currentCourses.flatMap { ce -> ce.periods.map { p -> ce.dayOfWeek to p } }.toSet()
-            val futureCourses = courses.filter { entity ->
-                entity.weeks.any { it > currentWeekNumber } && !entity.weeks.contains(currentWeekNumber)
-            }.filter { entity ->
-                entity.periods.none { p -> (entity.dayOfWeek to p) in occupied }
-            }
+
+            // 当前周已占用的节次（dayOfWeek + period）
+            val occupied = currentCourses
+                .flatMap { ce -> ce.periods.map { p -> ce.dayOfWeek to p } }
+                .toMutableSet()
+
+            val futureCourses = mutableListOf<CourseEntity>()
+
+            courses
+                .filter { entity ->
+                    entity.weeks.any { it > currentWeekNumber } && !entity.weeks.contains(currentWeekNumber)
+                }
+                .forEach { entity ->
+                    val occupiedNow = entity.periods.any { p -> (entity.dayOfWeek to p) in occupied }
+                    if (!occupiedNow) {
+                        // 不冲突，则加入显示列表
+                        futureCourses.add(entity)
+                        // 标记这些节次为已占用，防止后续未来课叠加
+                        occupied.addAll(entity.periods.map { p -> entity.dayOfWeek to p })
+                    }
+                }
+
             currentCourses + futureCourses
         } else {
             courses.filter { entity -> entity.weeks.contains(currentWeekNumber) }
@@ -152,8 +173,7 @@ fun DateRange(context: Activity, dao: ScheduleDao) {
                 )
             },
             showWeekend = timetable?.showWeekend ?: true,
-            currentWeek = currentWeekNumber,
-            showNonCurrentWeekCourses = showNonCurrent
+            currentWeek = currentWeekNumber
         )
     }
 }
@@ -187,9 +207,9 @@ fun ScheduleScreen(
     cellHeight: Dp = 60.dp,
     cellPadding: Dp = 2.dp,
     showWeekend: Boolean = true,
-    currentWeek: Int? = null,
-    showNonCurrentWeekCourses: Boolean = false
+    currentWeek: Int? = null
 ) {
+    val haptic = LocalHapticFeedback.current
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
     // 可见的星期数字（1=周一 ...）
     val visibleDays = if (showWeekend) (1..7).toList() else (1..5).toList()
@@ -309,14 +329,14 @@ fun ScheduleScreen(
                 }
             }
 
-            // 课程块 Overlay，覆盖在网格上
+            val todayDayOfWeek = LocalDate.now().dayOfWeek.value
+
             courseBlocks.forEach { block ->
-                // 如果该课程的星期不在可见范围内（例如隐藏周末），则跳过
                 val dayIndex = visibleDays.indexOf(block.dayOfWeek)
                 if (dayIndex == -1) return@forEach
 
                 val span = block.endPeriod - block.startPeriod + 1
-                Box(
+                Card(
                     modifier = Modifier
                         .absoluteOffset(
                             x = leftColumnWidth + dayColumnWidth * dayIndex + cellPadding,
@@ -324,31 +344,30 @@ fun ScheduleScreen(
                         )
                         .width(dayColumnWidth - cellPadding * 2)
                         .height(cellHeight * span - cellPadding * 2)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            if (currentWeek != null && showNonCurrentWeekCourses) {
-                                val base = MaterialTheme.colorScheme.secondary
-                                if (block.course.weeks.contains(currentWeek)) base
-                                else base.copy(alpha = 0.35f) // 未来周课程统一使用较低透明度
-                            } else {
-                                MaterialTheme.colorScheme.secondary
-                            }
-                        )
-                        .padding(4.dp)
+                        .alpha(if (block.course.weeks.contains(currentWeek)) 1f else 0.5f),
+                    shape = RoundedCornerShape(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if ((block.dayOfWeek == todayDayOfWeek)&&(block.course.weeks.contains(currentWeek))) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        contentColor = if ((block.dayOfWeek == todayDayOfWeek)&&(block.course.weeks.contains(currentWeek))) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondary
+                    ),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    }
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp)
+                    ) {
+                        val name = if (block.course.weeks.contains(currentWeek)) block.course.name else "[非本周]" + block.course.name
                         Text(
-                            text = block.course.name,
+                            text = name,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondary,
-                            modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Start
                         )
                         Text(
                             text = block.course.location,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondary,
-                            modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Start
                         )
                     }

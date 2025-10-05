@@ -30,8 +30,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -93,7 +95,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     var showImportOptionsSheet by remember { mutableStateOf(false) }
     var showWakeUpImportSheet by remember { mutableStateOf(false) }
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
-    
+
     // BottomSheet状态
     val addLessonSheetState = rememberModalBottomSheetState()
     val addCourseSheetState = rememberModalBottomSheetState()
@@ -123,8 +125,14 @@ fun TimetableSettings(dao: ScheduleDao) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    shape = RoundedCornerShape(topStart = 50.dp, topEnd = 8.dp, bottomEnd = 8.dp, bottomStart = 50.dp),
+                    shape = RoundedCornerShape(
+                        topStart = 50.dp,
+                        topEnd = 8.dp,
+                        bottomEnd = 8.dp,
+                        bottomStart = 50.dp
+                    ),
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         scope.launch {
                             dao.insertTimetableWithReminders(
                                 TimetableEntity(
@@ -145,10 +153,18 @@ fun TimetableSettings(dao: ScheduleDao) {
                 }
 
                 Spacer(Modifier.width(2.dp))
-                
+
                 Button(
-                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 50.dp, bottomEnd = 50.dp, bottomStart = 8.dp),
-                    onClick = { showImportOptionsSheet = true },
+                    shape = RoundedCornerShape(
+                        topStart = 8.dp,
+                        topEnd = 50.dp,
+                        bottomEnd = 50.dp,
+                        bottomStart = 8.dp
+                    ),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        showImportOptionsSheet = true
+                    },
                     modifier = Modifier.weight(0.5f)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -176,6 +192,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                     ) {
                         Text(timetable.name, style = MaterialTheme.typography.titleMedium)
                         IconButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                             scope.launch {
                                 dao.deleteTimetableWithReminders(
                                     timetable
@@ -196,7 +213,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     showTimetableDetailSheet?.let { timetable ->
         TimetableDetailSheet(
             timetable = timetable,
-            onDismiss = { 
+            onDismiss = {
                 scope.launch { timetableDetailSheetState.hide() }.invokeOnCompletion {
                     if (!timetableDetailSheetState.isVisible) {
                         showTimetableDetailSheet = null
@@ -315,7 +332,12 @@ fun TimetableSettings(dao: ScheduleDao) {
 // ---------- 编辑课程时间弹窗 ----------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: ScheduleDao, sheetState: androidx.compose.material3.SheetState) {
+fun EditLessonTimeSheet(
+    lesson: LessonTimeEntity,
+    onDismiss: () -> Unit,
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
+) {
     // 获取当前课表的所有课程时间，用于重叠检测
     val lessonTimes by dao.getLessonTimesFlow(lesson.timetableId)
         .collectAsState(initial = emptyList())
@@ -517,7 +539,12 @@ fun EditLessonTimeSheet(lesson: LessonTimeEntity, onDismiss: () -> Unit, dao: Sc
 // ---------- 编辑课程弹窗 ----------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditCourseSheet(course: CourseEntity, onDismiss: () -> Unit, dao: ScheduleDao, sheetState: androidx.compose.material3.SheetState) {
+fun EditCourseSheet(
+    course: CourseEntity,
+    onDismiss: () -> Unit,
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
+) {
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(course.timetableId).collectAsState(initial = emptyList())
     val filteredCourses = courses.filter { it.id != course.id } // 排除当前正在编辑的课程
@@ -1148,7 +1175,12 @@ fun AddCourseSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao: ScheduleDao, sheetState: androidx.compose.material3.SheetState) {
+fun TimetableDetailSheet(
+    timetable: TimetableEntity,
+    onDismiss: () -> Unit,
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
+) {
     val scope = rememberCoroutineScope()
 
     // 课表信息状态
@@ -1187,7 +1219,7 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
     var showAddCourseSheet by remember { mutableStateOf(false) }
     var showEditLessonSheet by remember { mutableStateOf<LessonTimeEntity?>(null) }
     var showEditCourseSheet by remember { mutableStateOf<CourseEntity?>(null) }
-    
+
     // 子 BottomSheet 状态
     val addLessonSheetState = rememberModalBottomSheetState()
     val addCourseSheetState = rememberModalBottomSheetState()
@@ -1205,22 +1237,6 @@ fun TimetableDetailSheet(timetable: TimetableEntity, onDismiss: () -> Unit, dao:
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = timetable.name,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-//                IconButton(onClick = onDismiss) {
-//                    Icon(Icons.Rounded.Close, contentDescription = "关闭")
-//                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
             // 错误信息显示
             if (errorMessage.isNotEmpty()) {
                 Card(
@@ -1652,7 +1668,7 @@ fun ImportOptionsSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            
+
             // WakeUp课程表导入选项
             Card(
                 modifier = Modifier
@@ -1665,7 +1681,7 @@ fun ImportOptionsSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Rounded.CalendarMonth, 
+                        Icons.Rounded.CalendarMonth,
                         contentDescription = "WakeUp课程表",
                         modifier = Modifier.padding(end = 12.dp)
                     )
@@ -1717,9 +1733,9 @@ fun ImportOptionsSheet(
 //                    }
 //                }
 //            }
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             Text(
                 text = "更多导入方式即将推出...",
                 style = MaterialTheme.typography.bodySmall,
@@ -1731,7 +1747,7 @@ fun ImportOptionsSheet(
 }
 
 // ---------- WakeUp导入弹窗 ----------
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun WakeUpImportSheet(
     onDismiss: () -> Unit,
@@ -1742,7 +1758,7 @@ fun WakeUpImportSheet(
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    
+
     OptimizedBottomSheet(
         onDismiss = onDismiss,
         sheetState = sheetState
@@ -1759,13 +1775,13 @@ fun WakeUpImportSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
-            
+
             Text(
                 text = "请完整复制分享口令",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            
+
             // 示例分享口令
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -1777,9 +1793,9 @@ fun WakeUpImportSheet(
                     modifier = Modifier.padding(12.dp)
                 )
             }
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             OutlinedTextField(
                 value = shareText,
                 onValueChange = {
@@ -1798,53 +1814,48 @@ fun WakeUpImportSheet(
                 },
                 placeholder = { Text("粘贴分享口令或输入口令内容") }
             )
-            
+
             Spacer(Modifier.height(16.dp))
-            
+
             if (isLoading) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text("正在导入...")
-                }
-            }
-            
-            Button(
-                onClick = {
-                    if (shareText.isBlank()) {
-                        errorMessage = "请输入分享口令"
-                        return@Button
-                    }
-                    
-                    // 提取口令内容
-                    val key = extractKeyFromShareText(shareText)
-                    if (key.isBlank()) {
-                        errorMessage = "未找到有效的分享口令"
-                        return@Button
-                    }
-                    
-                    isLoading = true
-                    scope.launch {
-                        try {
-                            // 调用WakeUp API导入课表
-                            val result = importFromWakeUp(key, dao)
-                            if (result) {
-                                onDismiss()
-                            } else {
-                                errorMessage = "导入失败，请检查分享口令是否有效"
-                            }
-                        } catch (e: Exception) {
-                            errorMessage = "导入失败: ${e.message}"
-                        } finally {
-                            isLoading = false
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) { LoadingIndicator() }
+            } else {
+                Button(
+                    onClick = {
+                        if (shareText.isBlank()) {
+                            errorMessage = "请输入分享口令"
+                            return@Button
                         }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
-            ) {
-                Text(if (isLoading) "导入中..." else "导入")
+
+                        // 提取口令内容
+                        val key = extractKeyFromShareText(shareText)
+                        if (key.isBlank()) {
+                            errorMessage = "未找到有效的分享口令"
+                            return@Button
+                        }
+
+                        isLoading = true
+                        scope.launch {
+                            try {
+                                // 调用WakeUp API导入课表
+                                val result = importFromWakeUp(key, dao)
+                                if (result) {
+                                    onDismiss()
+                                } else {
+                                    errorMessage = "导入失败，请检查分享口令是否有效"
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = "导入失败: ${e.message}"
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                ) {
+                    Text("导入")
+                }
             }
         }
     }
@@ -1895,7 +1906,11 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             TimetableEntity(
                 name = configInfo["tableName"]?.jsonPrimitive?.content ?: "未命名WakeUp课程表",
                 showWeekend = configInfo["showSun"]?.jsonPrimitive?.boolean ?: true,
-                startDate = configInfo["startDate"]?.jsonPrimitive?.content?.let { parseDateAutoFix(it) }
+                startDate = configInfo["startDate"]?.jsonPrimitive?.content?.let {
+                    parseDateAutoFix(
+                        it
+                    )
+                }
                     ?: LocalDate.now().toString()
             )
         )
@@ -1926,7 +1941,8 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             val endWeek = courseInfoObject["endWeek"]?.jsonPrimitive?.int ?: return@forEach
             val weeks = (startWeek..endWeek).toList()
             val startPeriod = courseInfoObject["startNode"]?.jsonPrimitive?.int ?: return@forEach
-            val endPeriod = startPeriod + (courseInfoObject["step"]?.jsonPrimitive?.int ?: return@forEach)-1
+            val endPeriod =
+                startPeriod + (courseInfoObject["step"]?.jsonPrimitive?.int ?: return@forEach) - 1
             val periods = (startPeriod..endPeriod).toList()
             val location = courseInfoObject["room"]?.jsonPrimitive?.content ?: return@forEach
             val courseId = courseInfoObject["id"]?.jsonPrimitive?.int ?: return@forEach
@@ -1934,7 +1950,8 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
                 course.jsonObject["id"]?.jsonPrimitive?.int == courseId
             }
             if (courseInfo == null) return@withContext false
-            val courseName = courseInfo.jsonObject["courseName"]?.jsonPrimitive?.content ?: return@forEach
+            val courseName =
+                courseInfo.jsonObject["courseName"]?.jsonPrimitive?.content ?: return@forEach
 
             val dayOfWeek = courseInfoObject["day"]?.jsonPrimitive?.int ?: return@forEach
 
@@ -1955,6 +1972,7 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
         false
     }
 }
+
 fun parseDateAutoFix(dateStr: String): String {
     val parts = dateStr.split("-")
     if (parts.size != 3) throw IllegalArgumentException("Invalid date format: $dateStr")
