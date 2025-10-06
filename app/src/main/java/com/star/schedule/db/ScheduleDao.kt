@@ -137,16 +137,22 @@ abstract class ScheduleDao {
     // ------------------ 自动排序和提醒 ------------------
     private suspend fun checkAndEnableReminders(timetableId: Long) {
         val currentId = getPreferenceFlow("current_timetable").firstOrNull()?.toLongOrNull()
-        android.util.Log.d("ScheduleDao", "checkAndEnableReminders: timetableId=$timetableId, currentId=$currentId, notificationManager=$notificationManager")
-        
+        android.util.Log.d(
+            "ScheduleDao",
+            "checkAndEnableReminders: timetableId=$timetableId, currentId=$currentId, notificationManager=$notificationManager"
+        )
+
         if (currentId == timetableId) {
             // 检查用户是否已经启用了课前提醒
             val enabledTimetableId = getPreferenceFlow("reminder_enabled_timetable").firstOrNull()
             val isReminderEnabled = enabledTimetableId?.toLongOrNull() == currentId
-            
+
             if (isReminderEnabled) {
                 try {
-                    android.util.Log.d("ScheduleDao", "用户已启用课前提醒，正在为课表ID $timetableId 启用提醒")
+                    android.util.Log.d(
+                        "ScheduleDao",
+                        "用户已启用课前提醒，正在为课表ID $timetableId 启用提醒"
+                    )
                     notificationManager?.enableRemindersForTimetable(currentId)
                     android.util.Log.d("ScheduleDao", "提醒启用操作完成")
                 } catch (e: Exception) {
@@ -157,7 +163,10 @@ abstract class ScheduleDao {
                 android.util.Log.d("ScheduleDao", "用户未启用课前提醒，跳过自动启用提醒")
             }
         } else {
-            android.util.Log.d("ScheduleDao", "当前课表ID($currentId)与操作课表ID($timetableId)不匹配，跳过提醒启用")
+            android.util.Log.d(
+                "ScheduleDao",
+                "当前课表ID($currentId)与操作课表ID($timetableId)不匹配，跳过提醒启用"
+            )
         }
     }
 
@@ -167,7 +176,10 @@ abstract class ScheduleDao {
         lessonTime: LessonTimeEntity,
         isInsert: Boolean = true
     ): Long {
-        android.util.Log.d("ScheduleDao", "开始${if (isInsert) "插入" else "更新"}课程时间: $lessonTime")
+        android.util.Log.d(
+            "ScheduleDao",
+            "开始${if (isInsert) "插入" else "更新"}课程时间: $lessonTime"
+        )
         val id = if (isInsert) {
             val insertedId = insertLessonTime(lessonTime)
             android.util.Log.d("ScheduleDao", "插入课程时间成功，ID: $insertedId")
@@ -177,26 +189,29 @@ abstract class ScheduleDao {
             android.util.Log.d("ScheduleDao", "更新课程时间成功，ID: ${lessonTime.id}")
             lessonTime.id
         }
-        
+
         try {
             val lessonTimes = getLessonTimesFlow(lessonTime.timetableId).firstOrNull() ?: return id
             android.util.Log.d("ScheduleDao", "获取到${lessonTimes.size}个课程时间，开始重新排序")
-            
+
             lessonTimes.sortedBy { it.startTime }.forEachIndexed { index, lesson ->
                 val newPeriod = index + 1
                 if (lesson.period != newPeriod) {
-                    android.util.Log.d("ScheduleDao", "更新课程时间 ${lesson.id} 的节次从 ${lesson.period} 到 $newPeriod")
+                    android.util.Log.d(
+                        "ScheduleDao",
+                        "更新课程时间 ${lesson.id} 的节次从 ${lesson.period} 到 $newPeriod"
+                    )
                     updateLessonTime(lesson.copy(period = newPeriod))
                 }
             }
-            
+
             checkAndEnableReminders(lessonTime.timetableId)
             android.util.Log.d("ScheduleDao", "课程时间操作完成")
         } catch (e: Exception) {
             android.util.Log.e("ScheduleDao", "课程时间排序过程中出错", e)
             throw e
         }
-        
+
         return id
     }
 

@@ -128,8 +128,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
             delay(minutesBefore * 60 * 1000L)
 
-            // 最终提醒，课程开始
             showNormalNotification(courseName, location, startTime, 0)
+
+            delay(60 * 1000L)
+
+            notificationManager.cancel(NOTIFICATION_ID)
         }
     }
 
@@ -167,14 +170,14 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             RemoteViews(context.packageName, R.layout.live_notification_card).apply {
                 setTextViewText(R.id.live_title, courseName)
                 setTextViewText(R.id.location, location)
-                setTextViewText(R.id.live_time, minutesBefore.toString())
+                setTextViewText(R.id.live_time, startTime)
                 setImageViewResource(R.id.live_icon, R.drawable.star)
             }
 
         val notification = Notification.Builder(context, LIVE_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(courseName)
-            .setContentText("${minutesBefore}分钟后开始上课")
+            .setContentText("${startTime}开始上课")
             .addExtras(liveBundle)
             .setCustomContentView(contentRemoteViews)
             .setAutoCancel(true)
@@ -202,15 +205,15 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
         val contentText = if (minutesBefore > 0) {
             if (location.isNotEmpty()) {
-                "$courseName 将在${minutesBefore}分钟后开始\n地点: $location"
+                "$courseName 即将上课\n地点: $location"
             } else {
-                "$courseName 将在${minutesBefore}分钟后开始"
+                "$courseName 即将上课"
             }
         } else {
             if (location.isNotEmpty()) {
-                "$courseName 已开始\n地点: $location"
+                "$courseName 已上课\n地点: $location"
             } else {
-                "$courseName 已开始"
+                "$courseName 已上课"
             }
         }
 

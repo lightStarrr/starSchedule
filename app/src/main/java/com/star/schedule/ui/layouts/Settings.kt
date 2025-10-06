@@ -17,7 +17,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.with
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -173,8 +172,11 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()
-        .verticalScroll(scrollState)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+    ) {
         Text(
             text = "设置",
             style = MaterialTheme.typography.headlineSmall,

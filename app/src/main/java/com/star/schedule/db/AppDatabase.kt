@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
         CourseEntity::class,
         ReminderEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter

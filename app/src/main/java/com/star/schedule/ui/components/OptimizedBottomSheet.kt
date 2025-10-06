@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 /**
  * 优化的BottomSheet组件，提供统一的实现方式
- * 
+ *
  * @param onDismiss 当BottomSheet被关闭时的回调
  * @param sheetState BottomSheet的状态
  * @param modifier 修饰符
@@ -30,7 +30,7 @@ fun OptimizedBottomSheet(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    
+
     ModalBottomSheet(
         onDismissRequest = {
             scope.launch {

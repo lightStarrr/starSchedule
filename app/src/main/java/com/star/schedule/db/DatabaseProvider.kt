@@ -2,6 +2,8 @@ package com.star.schedule.db
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,7 +21,7 @@ object DatabaseProvider {
                 AppDatabase::class.java,
                 "schedule.db"
             )
-                .fallbackToDestructiveMigration(false) // ⚡️ 如果没正式发布，推荐加这个
+                .addMigrations(MIGRATION_2_3)
                 .build()
 
             CoroutineScope(Dispatchers.IO).launch {
@@ -29,4 +31,10 @@ object DatabaseProvider {
     }
 
     fun dao(): ScheduleDao = db.scheduleDao()
+
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE timetable ADD COLUMN showFuture INTEGER NOT NULL DEFAULT 0")
+        }
+    }
 }

@@ -20,6 +20,7 @@ data class TimetableEntity(
     val name: String,            // 课程表名
     val showWeekend: Boolean,    // 是否显示周六周日
     val startDate: String,       // 学期开始日期
+    val showFuture: Boolean = false // 是否显示未来的课程
 )
 
 // 一节课的时间范围（依赖课程表）
