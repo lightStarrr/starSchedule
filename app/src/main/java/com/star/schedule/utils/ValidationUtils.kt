@@ -25,6 +25,43 @@ object ValidationUtils {
     object CourseValidation {
         
         /**
+         * 优化数字列表显示，将连续数字转换为范围格式
+         * 例如：[1,2,3,5,7,8,9] -> "1-3,5,7-9"
+         */
+        fun formatNumberList(numbers: List<Int>): String {
+            if (numbers.isEmpty()) return ""
+            
+            val sorted = numbers.distinct().sorted()
+            val result = StringBuilder()
+            var start = sorted[0]
+            var end = sorted[0]
+            
+            for (i in 1 until sorted.size) {
+                if (sorted[i] == end + 1) {
+                    end = sorted[i]
+                } else {
+                    if (result.isNotEmpty()) result.append(",")
+                    if (start == end) {
+                        result.append(start)
+                    } else {
+                        result.append("$start-$end")
+                    }
+                    start = sorted[i]
+                    end = sorted[i]
+                }
+            }
+            
+            if (result.isNotEmpty()) result.append(",")
+            if (start == end) {
+                result.append(start)
+            } else {
+                result.append("$start-$end")
+            }
+            
+            return result.toString()
+        }
+        
+        /**
          * 验证课程名称
          */
         fun validateCourseName(name: String): ValidationResult {
@@ -71,8 +108,38 @@ object ValidationUtils {
                     return ValidationResult(false, "至少需要一个节次")
                 }
                 
-                val periodNumbers = periodList.map { period ->
-                    period.toIntOrNull() ?: return ValidationResult(false, "节次必须是数字，格式如：1,2,3")
+                val periodNumbers = mutableListOf<Int>()
+                
+                for (period in periodList) {
+                    if (period.contains("-")) {
+                        // 处理范围格式，如 "1-7"
+                        val range = period.split("-")
+                        if (range.size != 2) {
+                            return ValidationResult(false, "节次范围格式错误，应为：开始-结束")
+                        }
+                        
+                        val start = range[0].toIntOrNull() ?: return ValidationResult(false, "节次范围开始值必须是数字")
+                        val end = range[1].toIntOrNull() ?: return ValidationResult(false, "节次范围结束值必须是数字")
+                        
+                        if (start > end) {
+                            return ValidationResult(false, "节次范围开始值不能大于结束值")
+                        }
+                        
+                        if (start < 1 || end > 20) {
+                            return ValidationResult(false, "节次范围必须在1-20之间")
+                        }
+                        
+                        periodNumbers.addAll(start..end)
+                    } else {
+                        // 处理单个数字
+                        val periodNum = period.toIntOrNull() ?: return ValidationResult(false, "节次必须是数字，格式如：1,2,3 或 1-7")
+                        
+                        if (periodNum < 1 || periodNum > 20) {
+                            return ValidationResult(false, "节次必须在1-20之间")
+                        }
+                        
+                        periodNumbers.add(periodNum)
+                    }
                 }
                 
                 if (periodNumbers.any { it < 1 || it > 20 }) {
@@ -85,7 +152,7 @@ object ValidationUtils {
                 
                 return ValidationResult(true)
             } catch (e: Exception) {
-                return ValidationResult(false, "节次格式错误，请使用逗号分隔的数字，如：1,2,3")
+                return ValidationResult(false, "节次格式错误，支持：1,2,3 或 1-7")
             }
         }
 
@@ -103,8 +170,38 @@ object ValidationUtils {
                     return ValidationResult(false, "至少需要一个周次")
                 }
                 
-                val weekNumbers = weekList.map { week ->
-                    week.toIntOrNull() ?: return ValidationResult(false, "周次必须是数字，格式如：1,2,3")
+                val weekNumbers = mutableListOf<Int>()
+                
+                for (week in weekList) {
+                    if (week.contains("-")) {
+                        // 处理范围格式，如 "1-7"
+                        val range = week.split("-")
+                        if (range.size != 2) {
+                            return ValidationResult(false, "周次范围格式错误，应为：开始-结束")
+                        }
+                        
+                        val start = range[0].toIntOrNull() ?: return ValidationResult(false, "周次范围开始值必须是数字")
+                        val end = range[1].toIntOrNull() ?: return ValidationResult(false, "周次范围结束值必须是数字")
+                        
+                        if (start > end) {
+                            return ValidationResult(false, "周次范围开始值不能大于结束值")
+                        }
+                        
+                        if (start < 1 || end > 30) {
+                            return ValidationResult(false, "周次范围必须在1-30之间")
+                        }
+                        
+                        weekNumbers.addAll(start..end)
+                    } else {
+                        // 处理单个数字
+                        val weekNum = week.toIntOrNull() ?: return ValidationResult(false, "周次必须是数字，格式如：1,2,3 或 1-7")
+                        
+                        if (weekNum < 1 || weekNum > 30) {
+                            return ValidationResult(false, "周次必须在1-30之间")
+                        }
+                        
+                        weekNumbers.add(weekNum)
+                    }
                 }
                 
                 if (weekNumbers.any { it < 1 || it > 30 }) {
@@ -117,8 +214,38 @@ object ValidationUtils {
                 
                 return ValidationResult(true)
             } catch (e: Exception) {
-                return ValidationResult(false, "周次格式错误，请使用逗号分隔的数字，如：1,2,3")
+                return ValidationResult(false, "周次格式错误，支持：1,2,3 或 1-7")
             }
+        }
+
+        /**
+         * 解析范围格式的数字字符串（如 "1,2,3" 或 "1-7"）为数字列表
+         */
+        fun parseNumberRange(input: String): List<Int> {
+            val result = mutableListOf<Int>()
+            val parts = input.split(",").map { it.trim() }
+            
+            for (part in parts) {
+                if (part.contains("-")) {
+                    // 处理范围格式，如 "1-7"
+                    val range = part.split("-")
+                    if (range.size == 2) {
+                        val start = range[0].toIntOrNull()
+                        val end = range[1].toIntOrNull()
+                        if (start != null && end != null && start <= end) {
+                            result.addAll(start..end)
+                        }
+                    }
+                } else {
+                    // 处理单个数字
+                    val number = part.toIntOrNull()
+                    if (number != null) {
+                        result.add(number)
+                    }
+                }
+            }
+            
+            return result.distinct().sorted()
         }
 
         /**

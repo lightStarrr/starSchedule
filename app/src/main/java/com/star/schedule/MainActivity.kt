@@ -79,6 +79,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.star.schedule.db.DatabaseProvider
@@ -350,16 +351,16 @@ fun WeekSelectorSheet(
     val listState = rememberLazyListState()
 
     val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
+    val windowInfo = LocalWindowInfo.current
+    val screenWidth = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
 
     LaunchedEffect(currentWeekNumber, weeksWithCourses, screenWidth) {
         val index = weeksWithCourses.indexOf(currentWeekNumber)
         if (index != -1) {
             kotlinx.coroutines.yield()
 
-            val itemWidth = 92.dp + 6.dp
-            val halfViewportPx = with(density) { (screenWidth - 40.dp).toPx() / 2 } // 20dp padding * 2
+            val itemWidth = 92.dp
+            val halfViewportPx = with(density) { (screenWidth - 40.dp).toPx() / 2 }
             val halfItemPx = with(density) { itemWidth.toPx() / 2 }
             val offset = (halfViewportPx - halfItemPx).toInt()
 
@@ -367,7 +368,6 @@ fun WeekSelectorSheet(
         }
     }
 
-    // ✅ 其他 UI 代码保持不变...
     Column(
         modifier = Modifier
             .fillMaxWidth()
