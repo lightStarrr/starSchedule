@@ -2,6 +2,8 @@ package com.star.schedule.ui.layouts
 
 import android.app.Activity
 import android.util.Log
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +49,8 @@ import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -129,12 +133,10 @@ fun DateRange(
         null
     }
 
-    // 当组件首次加载时，如果计算出的周数不为null且与传入的不同，则更新传入的周数
     LaunchedEffect(calculatedWeekNumber) {
         if (calculatedWeekNumber != null && calculatedWeekNumber != currentWeekNumber) {
             onCurrentWeekNumberChange(calculatedWeekNumber)
         }
-        // 无论是否更新了currentWeekNumber，都要更新realCurrentWeek为计算出的实际周数
         if (calculatedWeekNumber != null) {
             upDateRealCurrentWeek(calculatedWeekNumber)
         }
@@ -259,6 +261,13 @@ fun ScheduleScreen(
             Column(modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = 32.dp)) {
+                val firstDayOfWeek = realCurrentWeek?.let {
+                    LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+                } ?: LocalDate.now()
+
+                val visibleDates = visibleDays.map { day ->
+                    firstDayOfWeek.plusDays((day - 1).toLong())
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -275,19 +284,19 @@ fun ScheduleScreen(
                     ) {
                         if (currentWeek != null) {
                             Text(
-                                text = currentWeek.toString(),
+                                text = "${firstDayOfWeek.monthValue}月",
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 softWrap = false,
-                                // 让文本在 Box 内水平居中
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center
                             )
                         }
                     }
 
-                    visibleDayLabels.forEach { day ->
+                    visibleDates.forEachIndexed { index, date ->
+                        val dayLabel = allDayLabels[visibleDays[index] - 1]
                         Box(
                             modifier = Modifier
                                 .width(dayColumnWidth)
@@ -296,7 +305,11 @@ fun ScheduleScreen(
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("周$day", textAlign = TextAlign.Center)
+                            Text(
+                                text = "周$dayLabel\n${date.monthValue}/${date.dayOfMonth}",
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
                 }
@@ -330,11 +343,11 @@ fun ScheduleScreen(
 
                         // 可见列课程网格占位
                         visibleDays.forEach { day ->
-                            val isOccupied = courseBlocks.any { block ->
-                                block.dayOfWeek == day &&
-                                        block.startPeriod <= lesson.period &&
-                                        block.endPeriod >= lesson.period
-                            }
+//                            val isOccupied = courseBlocks.any { block ->
+//                                block.dayOfWeek == day &&
+//                                        block.startPeriod <= lesson.period &&
+//                                        block.endPeriod >= lesson.period
+//                            }
 
                             Box(
                                 modifier = Modifier
@@ -342,9 +355,9 @@ fun ScheduleScreen(
                                     .height(cellHeight)
                                     .padding(cellPadding)
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(
-                                        if (isOccupied) Color.Transparent
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+//                                        if (isOccupied) Color.Transparent
+//                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                     )
                             )
                         }
@@ -354,30 +367,42 @@ fun ScheduleScreen(
 
             val todayDayOfWeek = LocalDate.now().dayOfWeek.value
 
-            courseBlocks.forEach { block ->
+            courseBlocks.forEachIndexed { index, block ->
                 val dayIndex = visibleDays.indexOf(block.dayOfWeek)
-                if (dayIndex == -1) return@forEach
+                if (dayIndex == -1) return@forEachIndexed
 
                 val span = block.endPeriod - block.startPeriod + 1
+
+                val alpha = remember(currentWeek) { Animatable(0f) }
+                val offsetY = remember(currentWeek) { Animatable(20f) }
+
+                LaunchedEffect(currentWeek) {
+                    delay(index * 50L)
+                    launch { alpha.animateTo(1f, animationSpec = tween(400)) }
+                    launch { offsetY.animateTo(0f, animationSpec = tween(400)) }
+                }
+
                 Card(
                     modifier = Modifier
                         .absoluteOffset(
                             x = leftColumnWidth + dayColumnWidth * dayIndex + cellPadding,
-                            y = headerHeightDp + cellHeight * (block.startPeriod - 1) + cellPadding
+                            y = headerHeightDp + cellHeight * (block.startPeriod - 1) + cellPadding + offsetY.value.dp
                         )
                         .width(dayColumnWidth - cellPadding * 2)
                         .height(cellHeight * span - cellPadding * 2)
-                        .alpha(if (block.course.weeks.contains(currentWeek)) 1f else 0.5f),
+                        .alpha(alpha.value * if (block.course.weeks.contains(currentWeek)) 1f else 0.5f),
                     shape = RoundedCornerShape(4.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if ((block.dayOfWeek == todayDayOfWeek) && (block.course.weeks.contains(
-                                currentWeek
-                            )) && (currentWeek == realCurrentWeek)
-                        ) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                        contentColor = if ((block.dayOfWeek == todayDayOfWeek) && (block.course.weeks.contains(
-                                currentWeek
-                            )) && (currentWeek == realCurrentWeek)
-                        ) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondary
+                        containerColor = if ((block.dayOfWeek == todayDayOfWeek) &&
+                            (block.course.weeks.contains(currentWeek)) &&
+                            (currentWeek == realCurrentWeek)
+                        ) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.secondary,
+                        contentColor = if ((block.dayOfWeek == todayDayOfWeek) &&
+                            (block.course.weeks.contains(currentWeek)) &&
+                            (currentWeek == realCurrentWeek)
+                        ) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSecondary
                     ),
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)

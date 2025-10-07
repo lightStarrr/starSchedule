@@ -552,8 +552,8 @@ fun EditCourseSheet(
     var name by remember { mutableStateOf(course.name) }
     var location by remember { mutableStateOf(course.location) }
     var dayOfWeek by remember { mutableStateOf(course.dayOfWeek.toString()) }
-    var periods by remember { mutableStateOf(course.periods.joinToString(",")) }
-    var weeks by remember { mutableStateOf(course.weeks.joinToString(",")) }
+    var periods by remember { mutableStateOf(ValidationUtils.CourseValidation.formatNumberList(course.periods)) }
+    var weeks by remember { mutableStateOf(ValidationUtils.CourseValidation.formatNumberList(course.weeks)) }
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
@@ -646,15 +646,15 @@ fun EditCourseSheet(
                     periods = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("节次 (如 1,2,3)") },
+                label = { Text("节次 (如 1,2,3 或 1-7 或 1-5,7)") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = errorMessage.contains("节次") || errorMessage.contains("重叠"),
                 supportingText = if (errorMessage.contains("节次")) {
-                    { Text("用逗号分隔，如：1,2,3") }
+                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7") }
                 } else if (errorMessage.contains("重叠")) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("请输入课程节次，多个节次用逗号分隔") }
+                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
                 }
             )
 
@@ -666,12 +666,14 @@ fun EditCourseSheet(
                     weeks = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("周次 (如 1,2,3)") },
+                label = { Text("周次 (如 1,2,3 或 1-7 或 1-5,7)") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = errorMessage.contains("周次"),
                 supportingText = if (errorMessage.contains("周次")) {
-                    { Text("用逗号分隔，如：1,2,3，表示第几周上课") }
-                } else null
+                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7，表示第几周上课") }
+                } else {
+                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
+                }
             )
 
             Spacer(Modifier.height(16.dp))
@@ -699,8 +701,8 @@ fun EditCourseSheet(
 
                     // 检查课程时间重叠
                     val day = dayOfWeek.toInt()
-                    val periodList = periods.split(",").map { it.trim().toInt() }
-                    val weekList = weeks.split(",").map { it.trim().toInt() }
+                    val periodList = ValidationUtils.CourseValidation.parseNumberRange(periods)
+                    val weekList = ValidationUtils.CourseValidation.parseNumberRange(weeks)
 
                     // 检查是否有时间冲突
                     val hasTimeOverlap = filteredCourses.any { existingCourse ->
@@ -1067,15 +1069,15 @@ fun AddCourseSheet(
                     periods = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("节次 (如 1,2,3)") },
+                label = { Text("节次 (如 1,2,3 或 1-7 或 1-5,7)") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = errorMessage.contains("节次") || errorMessage.contains("重叠"),
                 supportingText = if (errorMessage.contains("节次")) {
-                    { Text("用逗号分隔，如：1,2,3") }
+                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7") }
                 } else if (errorMessage.contains("重叠")) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("请输入课程节次，多个节次用逗号分隔") }
+                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
                 }
             )
 
@@ -1087,12 +1089,14 @@ fun AddCourseSheet(
                     weeks = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("周次 (如 1,2,3)") },
+                label = { Text("周次 (如 1,2,3 或 1-7 或 1-5,7)") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = errorMessage.contains("周次"),
                 supportingText = if (errorMessage.contains("周次")) {
-                    { Text("用逗号分隔，如：1,2,3，表示第几周上课") }
-                } else null
+                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7，表示第几周上课") }
+                } else {
+                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
+                }
             )
 
             Spacer(Modifier.height(16.dp))
@@ -1120,8 +1124,8 @@ fun AddCourseSheet(
 
                     // 检查课程时间重叠
                     val day = dayOfWeek.toIntOrNull() ?: 1
-                    val periodList = periods.split(",").map { it.trim().toInt() }
-                    val weekList = weeks.split(",").map { it.trim().toInt() }
+                    val periodList = ValidationUtils.CourseValidation.parseNumberRange(periods)
+                    val weekList = ValidationUtils.CourseValidation.parseNumberRange(weeks)
 
                     // 检查是否有时间冲突
                     val hasTimeOverlap = courses.any { existingCourse ->
@@ -1455,9 +1459,7 @@ fun TimetableDetailSheet(
                             ) {
                                 Text(
                                     text = "${course.name} (周${course.dayOfWeek} 节次:${
-                                        course.periods.joinToString(
-                                            ","
-                                        )
+                                        ValidationUtils.CourseValidation.formatNumberList(course.periods)
                                     })",
                                     modifier = Modifier.weight(1f),
                                     maxLines = 1,

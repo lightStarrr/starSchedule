@@ -110,7 +110,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     var showTimetableSheet by remember { mutableStateOf(false) }
     val timetableSheetState = rememberModalBottomSheetState()
 
-    var showStartupHint by remember { mutableStateOf(true) }
+    var showStartupHint by remember { mutableStateOf(false) }
 
     val startupHintClosedPref by dao.getPreferenceFlow("startup_hint_closed")
         .collectAsState(initial = "false")
@@ -301,8 +301,6 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
 
         AnimatedContent(
             targetState = showStartupHint,
