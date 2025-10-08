@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.20"
     id("kotlin-kapt")
 }
 
@@ -61,6 +62,7 @@ dependencies {
     implementation(libs.androidx.room.ktx) {
         exclude(group = "com.intellij", module = "annotations")
     }
+    implementation(libs.poi)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.wheelpickercompose)
     testImplementation(libs.junit)

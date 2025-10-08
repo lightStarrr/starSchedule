@@ -1,6 +1,10 @@
 package com.star.schedule.ui.layouts
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -23,6 +27,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -53,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,8 +71,10 @@ import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
@@ -74,6 +82,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.apache.poi.hssf.usermodel.HSSFWorkbook
+import org.apache.poi.ss.usermodel.CellType
+import java.io.InputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -85,6 +96,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     val scope = rememberCoroutineScope()
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
     val haptic = LocalHapticFeedback.current
+    LocalContext.current
 
     // BottomSheet 状态管理
     var showAddLessonSheet by remember { mutableStateOf(false) }
@@ -94,6 +106,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     var showTimetableDetailSheet by remember { mutableStateOf<TimetableEntity?>(null) }
     var showImportOptionsSheet by remember { mutableStateOf(false) }
     var showWakeUpImportSheet by remember { mutableStateOf(false) }
+    var showXuexitongImportSheet by remember { mutableStateOf(false) }
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
 
     // BottomSheet状态
@@ -104,6 +117,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     val timetableDetailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val importOptionsSheetState = rememberModalBottomSheetState()
     val wakeUpImportSheetState = rememberModalBottomSheetState()
+    val xuexitongImportSheetState = rememberModalBottomSheetState()
 
     LazyColumn(
         modifier = Modifier
@@ -309,6 +323,14 @@ fun TimetableSettings(dao: ScheduleDao) {
                     }
                 }
             },
+            onXuexitongImport = {
+                scope.launch { importOptionsSheetState.hide() }.invokeOnCompletion {
+                    if (!importOptionsSheetState.isVisible) {
+                        showImportOptionsSheet = false
+                        showXuexitongImportSheet = true
+                    }
+                }
+            },
             sheetState = importOptionsSheetState
         )
     }
@@ -325,6 +347,21 @@ fun TimetableSettings(dao: ScheduleDao) {
             },
             dao = dao,
             sheetState = wakeUpImportSheetState
+        )
+    }
+
+    // 超星导入 BottomSheet
+    if (showXuexitongImportSheet) {
+        XuexitongImportSheet(
+            onDismiss = {
+                scope.launch { xuexitongImportSheetState.hide() }.invokeOnCompletion {
+                    if (!xuexitongImportSheetState.isVisible) {
+                        showXuexitongImportSheet = false
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = xuexitongImportSheetState
         )
     }
 }
@@ -552,7 +589,13 @@ fun EditCourseSheet(
     var name by remember { mutableStateOf(course.name) }
     var location by remember { mutableStateOf(course.location) }
     var dayOfWeek by remember { mutableStateOf(course.dayOfWeek.toString()) }
-    var periods by remember { mutableStateOf(ValidationUtils.CourseValidation.formatNumberList(course.periods)) }
+    var periods by remember {
+        mutableStateOf(
+            ValidationUtils.CourseValidation.formatNumberList(
+                course.periods
+            )
+        )
+    }
     var weeks by remember { mutableStateOf(ValidationUtils.CourseValidation.formatNumberList(course.weeks)) }
     var errorMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -1635,6 +1678,7 @@ fun TimePickerDialog(
 fun ImportOptionsSheet(
     onDismiss: () -> Unit,
     onWakeUpImport: () -> Unit,
+    onXuexitongImport: () -> Unit,
     sheetState: androidx.compose.material3.SheetState
 ) {
     OptimizedBottomSheet(
@@ -1676,6 +1720,39 @@ fun ImportOptionsSheet(
                         )
                         Text(
                             text = "从WakeUp课程表在线导入",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                onClick = {
+                    onXuexitongImport()
+                },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Rounded.FileOpen,
+                        contentDescription = "学习通导入",
+                        modifier = Modifier.padding(end = 12.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "学习通",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "从学习通导出xls导入",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1729,6 +1806,7 @@ fun ImportOptionsSheet(
         }
     }
 }
+
 
 // ---------- WakeUp导入弹窗 ----------
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -1968,4 +2046,383 @@ fun parseDateAutoFix(dateStr: String): String {
     val day = parts[2].padStart(2, '0')
     val fixedDateStr = "$year-$month-$day"
     return LocalDate.parse(fixedDateStr, DateTimeFormatter.ISO_LOCAL_DATE).toString()
+}
+
+// ---------- 超星导入弹窗 ----------
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun XuexitongImportSheet(
+    onDismiss: () -> Unit,
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
+) {
+    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
+    var fileName by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // 文件选择器
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            uri?.let {
+                selectedFileUri = it
+                fileName = getFileNameFromUri(context, it) ?: "未知文件"
+                errorMessage = ""
+            }
+        }
+    )
+
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "从超星导出xls文件导入",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Text(
+                text = "请选择从超星导出的xls文件",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // 文件选择说明
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "从超星APP或网页版导出课程表xls文件，然后在此处选择该文件进行导入。",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // 文件选择按钮
+            Button(
+                onClick = {
+                    filePickerLauncher.launch("application/vnd.ms-excel")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.FileOpen, contentDescription = "选择文件")
+                    Spacer(Modifier.width(8.dp))
+                    Text("选择xls文件")
+                }
+            }
+
+            // 显示选中的文件
+            if (fileName.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.FileOpen, contentDescription = "已选择文件")
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = fileName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // 错误信息显示
+            if (errorMessage.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            if (isLoading) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) { LoadingIndicator() }
+            } else {
+                Button(
+                    onClick = {
+                        if (selectedFileUri == null) {
+                            errorMessage = "请先选择xls文件"
+                            return@Button
+                        }
+
+                        isLoading = true
+                        scope.launch {
+                            try {
+                                // 调用超星导入函数
+                                val result = importFromXuexitong(selectedFileUri!!, context, dao)
+                                if (result) {
+                                    onDismiss()
+                                } else {
+                                    errorMessage = "导入失败，请检查文件格式是否正确"
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = "导入失败: ${e.message}"
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading && selectedFileUri != null
+                ) {
+                    Text("导入")
+                }
+            }
+        }
+    }
+}
+
+// 从URI获取文件名
+fun getFileNameFromUri(context: Context, uri: Uri): String? {
+    var fileName: String? = null
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+        if (cursor.moveToFirst()) {
+            fileName = cursor.getString(nameIndex)
+        }
+    }
+    return fileName
+}
+
+// 超星导入函数
+suspend fun importFromXuexitong(
+    fileUri: Uri,
+    context: Context,
+    dao: ScheduleDao
+): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val inputStream: InputStream = context.contentResolver.openInputStream(fileUri)
+            ?: return@withContext false
+        val workbook = HSSFWorkbook(inputStream)
+        val sheet = workbook.getSheetAt(0)
+
+        @Serializable
+        data class TimeSlot(val row: Int, val start: String, val end: String)
+        @Serializable
+        data class WeekInfo(val col: Int, val weekDay: Int)
+        @Serializable
+        data class Course(
+            val name: String,
+            val teacher: String,
+            val weeks: List<Int>,
+            val location: String,
+            val timeSlots: MutableList<Int>,
+            val weekDay: Int
+        )
+
+        val timeListRegex = Regex("""\d{1,2}:\d{2}""")
+        val weekRegex = Regex("""星期\s*([一二三四五六日])""")
+
+        val timeList = mutableListOf<TimeSlot>()
+        val weekList = mutableListOf<WeekInfo>()
+        val courses = mutableListOf<Course>()
+
+        // 创建公式计算器
+        val evaluator = workbook.creationHelper.createFormulaEvaluator()
+
+        // 解析所有行的时间段（第5列）
+        for (rowIndex in 0..sheet.lastRowNum) {
+            val row = sheet.getRow(rowIndex) ?: continue
+            val cell = row.getCell(4) ?: continue
+            val text = cell.toString().trim()
+            if (text.isEmpty()) continue
+
+            val lines = text.split("\n", "\r\n").map { it.trim() }.filter { it.matches(timeListRegex) }
+
+            if (lines.size == 2) {
+                timeList.add(TimeSlot(row = rowIndex + 1, start = lines[0], end = lines[1]))
+            }
+        }
+
+        // 解析第六行（索引5）的星期列
+        val weekRow = sheet.getRow(5)
+        if (weekRow != null) {
+            for (colIndex in 0 until weekRow.lastCellNum) {
+                val cell = weekRow.getCell(colIndex) ?: continue
+
+                val cellValue = when (cell.cellTypeEnum) {
+                    CellType.FORMULA -> evaluator.evaluate(cell).formatAsString()
+                    CellType.STRING -> cell.stringCellValue
+                    CellType.NUMERIC -> cell.numericCellValue.toInt().toString()
+                    else -> cell.toString()
+                }.replace("\n", "").replace("\r", "").trim()
+
+                val match = weekRegex.find(cellValue)
+                if (match != null) {
+                    val weekStr = match.groupValues[1]
+                    val weekNum = when (weekStr) {
+                        "一" -> 1
+                        "二" -> 2
+                        "三" -> 3
+                        "四" -> 4
+                        "五" -> 5
+                        "六" -> 6
+                        "日" -> 7
+                        else -> return@withContext false
+                    }
+                    weekList.add(WeekInfo(col = colIndex + 1, weekDay = weekNum))
+                }
+            }
+        }
+
+        // 解析课程信息
+        fun parseWeeks(weekStr: String): List<Int> {
+            val result = mutableListOf<Int>()
+            val regex = Regex("""(\d+)(?:-(\d+))?""")
+            regex.findAll(weekStr).forEach {
+                val start = it.groupValues[1].toInt()
+                val end = it.groupValues[2].takeIf { it.isNotEmpty() }?.toInt() ?: start
+                for (w in start..end) result.add(w)
+            }
+            return result
+        }
+
+        fun mergeOrCreateCourse(newCourse: Course, slot: Int) {
+            val existing = courses.find {
+                it.name == newCourse.name &&
+                        it.teacher == newCourse.teacher &&
+                        it.weeks == newCourse.weeks &&
+                        it.location == newCourse.location &&
+                        it.weekDay == newCourse.weekDay
+            }
+            if (existing != null) {
+                existing.timeSlots.add(slot)
+            } else {
+                newCourse.timeSlots.add(slot)
+                courses.add(newCourse)
+            }
+        }
+
+        for (week in weekList) {
+            for ((i, time) in timeList.withIndex()) {
+                val row = sheet.getRow(time.row - 1) ?: continue
+                val cell = row.getCell(week.col - 1) ?: continue
+                val cellText = cell.toString().trim()
+                if (cellText.isEmpty()) continue
+
+                val records = cellText.split("………………").map { it.trim() }.filter { it.isNotEmpty() }
+                for (record in records) {
+                    val lines = record.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                    if (lines.size < 3) continue
+
+                    val name = lines[0]
+                    val teacherLine = lines[1]
+                    val teacherMatch = Regex("""(.+?)【(.+)】""").find(teacherLine)
+                    val teacher = teacherMatch?.groupValues?.get(1)?.trim() ?: ""
+                    val weeks = teacherMatch?.groupValues?.get(2)?.let { parseWeeks(it) } ?: emptyList()
+                    val location = lines[2]
+
+                    val newCourse = Course(
+                        name = name,
+                        teacher = teacher,
+                        weeks = weeks,
+                        location = location,
+                        timeSlots = mutableListOf(),
+                        weekDay = week.weekDay
+                    )
+
+                    mergeOrCreateCourse(newCourse, i + 1)
+                }
+            }
+        }
+
+        fun <T> List<T>.hasNoData(): Boolean = this.isEmpty() || this.all {
+            when (it) {
+                is TimeSlot -> it.start.isEmpty() || it.end.isEmpty()
+                is WeekInfo -> false // WeekInfo 只有 col 和 weekDay，基本不会空
+                is Course -> it.name.isEmpty() || it.teacher.isEmpty() || it.weeks.isEmpty() || it.location.isEmpty() || it.timeSlots.isEmpty()
+                else -> false
+            }
+        }
+
+        if (timeList.hasNoData() || weekList.hasNoData() || courses.hasNoData()) {
+            Log.e("XuexitongImport", "解析失败: timeList, weekList 或 courses 内部数据无效")
+            workbook.close()
+            inputStream.close()
+            return@withContext false
+        }
+
+        workbook.close()
+        inputStream.close()
+
+        val jsonTimeList = Json.encodeToString(timeList)
+        val jsonWeekList = Json.encodeToString(weekList)
+        val jsonCourses = Json.encodeToString(courses)
+        Log.d("XuexitongImport", "TimeList: $jsonTimeList")
+        Log.d("XuexitongImport", "WeekList: $jsonWeekList")
+        Log.d("XuexitongImport", "Courses: $jsonCourses")
+
+        val timetableId = dao.insertTimetableWithReminders(
+            TimetableEntity(
+                name = "学习通导入的课表",
+                showWeekend = true,
+                startDate = LocalDate.now().toString()
+            )
+        )
+
+        for (time in timeList) {
+            dao.insertOrUpdateLessonTimeAutoSort(
+                LessonTimeEntity(
+                    timetableId = timetableId,
+                    period = 1,
+                    startTime = time.start,
+                    endTime = time.end
+                )
+            )
+        }
+
+        for (course in courses) {
+            dao.insertCourseWithReminders(
+                CourseEntity(
+                    timetableId = timetableId,
+                    name = course.name,
+                    location = course.location,
+                    dayOfWeek = course.weekDay,
+                    periods = course.timeSlots,
+                    weeks = course.weeks
+                )
+            )
+        }
+
+        true
+    } catch (e: Exception) {
+        Log.e("XuexitongImport", "解析失败: ${e.message}", e)
+        false
+    }
 }

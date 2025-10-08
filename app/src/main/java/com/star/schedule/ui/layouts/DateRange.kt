@@ -236,7 +236,7 @@ fun ScheduleScreen(
 ) {
     val haptic = LocalHapticFeedback.current
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
-    // 可见的星期数字（1=周一 ...）
+
     val visibleDays = if (showWeekend) (1..7).toList() else (1..5).toList()
     val visibleDayLabels = visibleDays.map { allDayLabels[it - 1] }
 
