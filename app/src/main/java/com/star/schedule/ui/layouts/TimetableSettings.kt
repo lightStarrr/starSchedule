@@ -1237,6 +1237,7 @@ fun TimetableDetailSheet(
     var showWeekend by remember { mutableStateOf(timetable.showWeekend) }
     var showFuture by remember { mutableStateOf(timetable.showFuture) }
     var rowHeight by remember { mutableStateOf(timetable.rowHeight.toFloat()) }
+    var reminderTime by remember { mutableStateOf(timetable.reminderTime.toFloat()) }
     var errorMessage by remember { mutableStateOf("") }
 
     // 日期选择器状态
@@ -1400,6 +1401,46 @@ fun TimetableDetailSheet(
                         }
                     }
 
+                    // 课前提醒时间设置
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("课前提醒时间")
+                            Text(
+                                text = "${reminderTime.toInt()} 分钟",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Slider(
+                            value = reminderTime,
+                            onValueChange = { reminderTime = it },
+                            valueRange = 5f..60f,
+                            steps = 10
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "5 分钟",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "60 分钟",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
                     Button(
                         onClick = {
                             // 数据验证
@@ -1422,7 +1463,8 @@ fun TimetableDetailSheet(
                                         startDate = startDate,
                                         showWeekend = showWeekend,
                                         showFuture = showFuture,
-                                        rowHeight = rowHeight.toInt()
+                                        rowHeight = rowHeight.toInt(),
+                                        reminderTime = reminderTime.toInt()
                                     )
                                 )
                             }

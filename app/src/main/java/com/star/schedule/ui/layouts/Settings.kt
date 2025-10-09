@@ -361,13 +361,14 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             }
         }
 
-        // 课前15分钟提醒开关
+        // 课前提醒开关
         ListItem(
             headlineContent = { Text("课前提醒") },
             supportingContent = {
-                val currentName =
-                    timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择课表"
-                Text("为当前课表（$currentName）开启课前15分钟提醒")
+                val currentTimetable = timetables.firstOrNull { it.id == currentTimetableId }
+                val currentName = currentTimetable?.name ?: "未选择课表"
+                val reminderTime = currentTimetable?.reminderTime ?: 15
+                Text("为当前课表（$currentName）开启课前${reminderTime}分钟提醒")
             },
             leadingContent = {
                 Icon(

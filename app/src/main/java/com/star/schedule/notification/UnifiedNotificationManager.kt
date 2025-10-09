@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.os.Build
@@ -32,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -278,7 +280,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 course.periods.forEach { period ->
                     val lessonTime = lessonTimes.find { it.period == period }
                     if (lessonTime != null) {
-                        scheduleReminderForCourse(course, lessonTime, date)
+                        scheduleReminderForCourse(course, lessonTime, date, timetable.reminderTime)
                     }
                 }
             }
@@ -289,11 +291,12 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     private fun scheduleReminderForCourse(
         course: CourseEntity,
         lessonTime: LessonTimeEntity,
-        date: LocalDate
+        date: LocalDate,
+        reminderTime: Int = 15
     ) {
         val startTime = LocalTime.parse(lessonTime.startTime, DateTimeFormatter.ofPattern("HH:mm"))
         val courseDateTime = LocalDateTime.of(date, startTime)
-        val reminderDateTime = courseDateTime.minusMinutes(REMINDER_MINUTES)
+        val reminderDateTime = courseDateTime.minusMinutes(reminderTime.toLong())
 
         if (reminderDateTime.isAfter(LocalDateTime.now())) {
             val intent = Intent(context, CourseReminderReceiver::class.java).apply {
@@ -655,12 +658,51 @@ class CourseReminderReceiver : BroadcastReceiver() {
         val courseLocation = intent.getStringExtra("course_location") ?: ""
         val courseTime = intent.getStringExtra("course_time") ?: ""
 
-        UnifiedNotificationManager(context).showCourseNotification(
-            courseName = courseName,
-            location = courseLocation,
-            startTime = courseTime,
-            minutesBefore = 15
-        )
+        // 获取当前启用的课表ID
+        val sharedPreferences = context.getSharedPreferences("star_schedule_prefs", Context.MODE_PRIVATE)
+        val timetableId = sharedPreferences.getString("reminder_enabled_timetable", "")?.toLongOrNull()
+        
+        // 获取课前提醒时间设置
+        var reminderTime = 15 // 默认15分钟
+        if (timetableId != null) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val dao = DatabaseProvider.dao()
+                    val timetable = dao.getTimetableFlow(timetableId).first()
+                    if (timetable != null) {
+                        reminderTime = timetable.reminderTime
+                    }
+                    
+                    // 在主线程显示通知
+                    withContext(Dispatchers.Main) {
+                        UnifiedNotificationManager(context).showCourseNotification(
+                            courseName = courseName,
+                            location = courseLocation,
+                            startTime = courseTime,
+                            minutesBefore = reminderTime
+                        )
+                    }
+                } catch (e: Exception) {
+                    // 如果获取设置失败，使用默认值
+                    withContext(Dispatchers.Main) {
+                        UnifiedNotificationManager(context).showCourseNotification(
+                            courseName = courseName,
+                            location = courseLocation,
+                            startTime = courseTime,
+                            minutesBefore = 15
+                        )
+                    }
+                }
+            }
+        } else {
+            // 如果没有启用的课表，使用默认值
+            UnifiedNotificationManager(context).showCourseNotification(
+                courseName = courseName,
+                location = courseLocation,
+                startTime = courseTime,
+                minutesBefore = 15
+            )
+        }
     }
 }
 

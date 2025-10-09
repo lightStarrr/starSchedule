@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CourseEntity::class,
         ReminderEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter
@@ -28,6 +28,14 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 // 添加rowHeight列，默认值为60
                 database.execSQL("ALTER TABLE timetable ADD COLUMN rowHeight INTEGER NOT NULL DEFAULT 60")
+            }
+        }
+
+        // 从版本4迁移到版本5，添加reminderTime字段
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 添加reminderTime列，默认值为15
+                database.execSQL("ALTER TABLE timetable ADD COLUMN reminderTime INTEGER NOT NULL DEFAULT 15")
             }
         }
     }

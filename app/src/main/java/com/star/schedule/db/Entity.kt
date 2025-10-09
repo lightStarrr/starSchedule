@@ -21,7 +21,8 @@ data class TimetableEntity(
     val showWeekend: Boolean,    // 是否显示周六周日
     val startDate: String,       // 学期开始日期
     val showFuture: Boolean = false, // 是否显示未来的课程
-    val rowHeight: Int = 60      // 课时行高度，默认60dp
+    val rowHeight: Int = 60,     // 课时行高度，默认60dp
+    val reminderTime: Int = 15   // 课前提醒时间，默认15分钟
 )
 
 // 一节课的时间范围（依赖课程表）
