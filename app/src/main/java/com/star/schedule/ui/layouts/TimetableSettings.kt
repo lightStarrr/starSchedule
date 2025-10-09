@@ -1980,6 +1980,9 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             )
         )
 
+        // 用于存储已经处理过的时间段，避免重复
+        val processedTimes = mutableSetOf<String>()
+        
         lessonTimes.forEach { jsonElement ->
             val lessonObject = jsonElement.jsonObject
             val period = lessonObject["node"]?.jsonPrimitive?.int ?: 1
@@ -1989,6 +1992,17 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             if (startTime == endTime) {
                 return@forEach
             }
+            
+            // 创建时间段的唯一标识符
+            val timeKey = "${startTime}_${endTime}"
+            
+            // 如果已经处理过相同的时间段，则跳过
+            if (processedTimes.contains(timeKey)) {
+                return@forEach
+            }
+            
+            // 将当前时间段添加到已处理集合中
+            processedTimes.add(timeKey)
 
             dao.insertOrUpdateLessonTimeAutoSort(
                 LessonTimeEntity(
