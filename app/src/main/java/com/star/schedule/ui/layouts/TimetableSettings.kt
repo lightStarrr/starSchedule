@@ -41,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1235,6 +1236,7 @@ fun TimetableDetailSheet(
     var startDate by remember { mutableStateOf(timetable.startDate) }
     var showWeekend by remember { mutableStateOf(timetable.showWeekend) }
     var showFuture by remember { mutableStateOf(timetable.showFuture) }
+    var rowHeight by remember { mutableStateOf(timetable.rowHeight.toFloat()) }
     var errorMessage by remember { mutableStateOf("") }
 
     // 日期选择器状态
@@ -1358,6 +1360,46 @@ fun TimetableDetailSheet(
                         )
                     }
 
+                    // 课时行高度设置
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("课时行高度")
+                            Text(
+                                text = "${rowHeight.toInt()} dp",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Slider(
+                            value = rowHeight,
+                            onValueChange = { rowHeight = it },
+                            valueRange = 40f..240f,
+                            steps = 19
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "40 dp",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "240 dp",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
                     Button(
                         onClick = {
                             // 数据验证
@@ -1379,7 +1421,8 @@ fun TimetableDetailSheet(
                                         name = name,
                                         startDate = startDate,
                                         showWeekend = showWeekend,
-                                        showFuture = showFuture
+                                        showFuture = showFuture,
+                                        rowHeight = rowHeight.toInt()
                                     )
                                 )
                             }

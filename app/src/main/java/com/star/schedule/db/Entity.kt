@@ -9,7 +9,7 @@ import androidx.room.TypeConverters
 // 偏好设置
 @Entity(tableName = "preference")
 data class PreferenceEntity(
-    @PrimaryKey val prefKey: String,   // 例如 "current_timetable"
+    @PrimaryKey val prefKey: String,
     val value: String
 )
 
@@ -20,7 +20,8 @@ data class TimetableEntity(
     val name: String,            // 课程表名
     val showWeekend: Boolean,    // 是否显示周六周日
     val startDate: String,       // 学期开始日期
-    val showFuture: Boolean = false // 是否显示未来的课程
+    val showFuture: Boolean = false, // 是否显示未来的课程
+    val rowHeight: Int = 60      // 课时行高度，默认60dp
 )
 
 // 一节课的时间范围（依赖课程表）

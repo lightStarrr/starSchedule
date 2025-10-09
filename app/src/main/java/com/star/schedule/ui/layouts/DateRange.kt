@@ -196,6 +196,7 @@ fun DateRange(
                     endTime = entity.endTime
                 )
             },
+            cellHeight = timetable?.rowHeight?.dp ?: 60.dp,
             showWeekend = timetable?.showWeekend ?: true,
             currentWeek = currentWeekNumber,
             realCurrentWeek = calculatedWeekNumber,
