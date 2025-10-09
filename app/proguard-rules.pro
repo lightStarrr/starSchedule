@@ -1,21 +1,27 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Please add these rules to your existing keep rules in order to suppress warnings.
+# This is generated automatically by the Android Gradle plugin.
+-dontwarn java.awt.Color
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Apache POI library rules
+-dontwarn org.apache.poi.**
+-keep class org.apache.poi.** { *; }
+-keepclassmembers class org.apache.poi.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep HSSFWorkbook and related classes
+-keep class org.apache.poi.hssf.usermodel.HSSFWorkbook { *; }
+-keep class org.apache.poi.ss.usermodel.CellType { *; }
+-keep class org.apache.poi.hssf.** { *; }
+-keep class org.apache.poi.ss.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep all POI model classes
+-keep class * extends org.apache.poi.** { *; }
+-keepclassmembers class * extends org.apache.poi.** { *; }
+
+# R8 generated missing rules
+-dontwarn org.etsi.uri.x01903.v13.SignaturePolicyIdType
+-dontwarn org.etsi.uri.x01903.v13.SignedDataObjectPropertiesType
+-dontwarn org.etsi.uri.x01903.v13.SignerRoleType
+-dontwarn org.openxmlformats.schemas.drawingml.x2006.chart.CTChartLines
+-dontwarn org.openxmlformats.schemas.drawingml.x2006.main.CTEffectContainer
+-dontwarn org.openxmlformats.schemas.drawingml.x2006.main.CTTableStyleTextStyle
+-dontwarn org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSignedTwipsMeasure

@@ -2004,7 +2004,15 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             val courseInfoObject = jsonElement.jsonObject
             val startWeek = courseInfoObject["startWeek"]?.jsonPrimitive?.int ?: return@forEach
             val endWeek = courseInfoObject["endWeek"]?.jsonPrimitive?.int ?: return@forEach
-            val weeks = (startWeek..endWeek).toList()
+            val type = courseInfoObject["type"]?.jsonPrimitive?.int ?: return@forEach
+            val weeks = (startWeek..endWeek).toList().let { range ->
+                when (type) {
+                    1 -> range.filter { it and 1 == 1 }
+                    2 -> range.filter { it and 1 == 0 }
+                    else -> range
+                }
+            }
+
             val startPeriod = courseInfoObject["startNode"]?.jsonPrimitive?.int ?: return@forEach
             val endPeriod =
                 startPeriod + (courseInfoObject["step"]?.jsonPrimitive?.int ?: return@forEach) - 1
@@ -2232,11 +2240,8 @@ suspend fun importFromXuexitong(
         val workbook = HSSFWorkbook(inputStream)
         val sheet = workbook.getSheetAt(0)
 
-        @Serializable
         data class TimeSlot(val row: Int, val start: String, val end: String)
-        @Serializable
         data class WeekInfo(val col: Int, val weekDay: Int)
-        @Serializable
         data class Course(
             val name: String,
             val teacher: String,
@@ -2380,13 +2385,6 @@ suspend fun importFromXuexitong(
 
         workbook.close()
         inputStream.close()
-
-        val jsonTimeList = Json.encodeToString(timeList)
-        val jsonWeekList = Json.encodeToString(weekList)
-        val jsonCourses = Json.encodeToString(courses)
-        Log.d("XuexitongImport", "TimeList: $jsonTimeList")
-        Log.d("XuexitongImport", "WeekList: $jsonWeekList")
-        Log.d("XuexitongImport", "Courses: $jsonCourses")
 
         val timetableId = dao.insertTimetableWithReminders(
             TimetableEntity(
