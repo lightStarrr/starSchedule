@@ -16,6 +16,9 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.RemoteViews
 import android.widget.Toast
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -33,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -58,6 +62,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
         const val PREF_REMINDER_ENABLED_TIMETABLE = "reminder_enabled_timetable"
         const val PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS = "notify_only_for_first_continuous_class"
+        const val PREF_LIVE_CAPSULE_BG_COLOR = "live_capsule_bg_color"
     }
 
     init {
@@ -146,6 +151,19 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         startTime: String,
         minutesBefore: Int
     ) {
+        // 获取数据库实例
+        val dao = DatabaseProvider.dao()
+        
+        // 获取自定义背景颜色，默认为原来的颜色
+        val capsuleBgColor = runBlocking {
+            val colorPref = dao.getPreferenceFlow(PREF_LIVE_CAPSULE_BG_COLOR).first()
+            colorPref ?: "#FFE082"
+        }
+        fun autoContentColorFor(background: Color): Color {
+            return if (background.luminance() > 0.7f) Color.Black else Color.White
+        }
+        val textColor = autoContentColorFor(Color(capsuleBgColor.toColorInt()))
+        
         val capsuleBundle = Bundle().apply {
             putInt("notification.live.capsuleStatus", 1)
             putInt("notification.live.capsuleType", 3)
@@ -153,12 +171,12 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
             val drawable = ContextCompat.getDrawable(context, R.drawable.ic_notification)?.mutate()
             if (drawable != null) {
-                drawable.setTint("#BF360C".toColorInt())
+                drawable.setTint(textColor.toArgb())
                 val icon = Icon.createWithBitmap(drawable.toBitmap())
                 putParcelable("notification.live.capsuleIcon", icon)
             }
-            putInt("notification.live.capsuleBgColor", "#FFE082".toColorInt())
-            putInt("notification.live.capsuleContentColor", "#BF360C".toColorInt())
+            putInt("notification.live.capsuleBgColor", capsuleBgColor.toColorInt())
+            putInt("notification.live.capsuleContentColor", textColor.toArgb())
         }
 
         val liveBundle = Bundle().apply {
@@ -166,7 +184,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             putInt("notification.live.operation", 0)
             putInt("notification.live.type", 10)
             putBundle("notification.live.capsule", capsuleBundle)
-            putInt("notification.live.contentColor", "#FFE082".toColorInt())
+            putInt("notification.live.contentColor", textColor.toArgb())
         }
 
         val contentRemoteViews =

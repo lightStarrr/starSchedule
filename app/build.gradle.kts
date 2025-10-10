@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.poi)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.wheelpickercompose)
+    implementation(libs.color.picker)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
