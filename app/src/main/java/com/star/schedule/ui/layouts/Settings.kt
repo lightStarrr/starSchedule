@@ -104,6 +104,9 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
     // 课前提醒开关状态
     var reminderEnabled by remember { mutableStateOf(false) }
+    
+    // 只在连续课程的第一节课前发送通知的开关状态
+    var notifyOnlyForFirstContinuousClass by remember { mutableStateOf(false) }
 
 
     // 控制 BottomSheet 显示
@@ -114,8 +117,17 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
     val startupHintClosedPref by dao.getPreferenceFlow("startup_hint_closed")
         .collectAsState(initial = "false")
+        
+    // 只在连续课程的第一节课前发送通知的偏好设置
+    val notifyOnlyForFirstContinuousClassPref by dao.getPreferenceFlow(UnifiedNotificationManager.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS)
+        .collectAsState(initial = "false")
     LaunchedEffect(startupHintClosedPref) {
         showStartupHint = startupHintClosedPref != "true"
+    }
+    
+    // 同步"只在连续课程的第一节课前发送通知"的偏好设置
+    LaunchedEffect(notifyOnlyForFirstContinuousClassPref) {
+        notifyOnlyForFirstContinuousClass = notifyOnlyForFirstContinuousClassPref == "true"
     }
 
     // 权限申请辅助函数
@@ -401,6 +413,34 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 )
             }
         )
+
+        // 只在连续课程的第一节课前发送通知的开关
+        if (reminderEnabled) {
+            ListItem(
+                headlineContent = { Text("仅第一节连续课程提醒") },
+                supportingContent = { Text("对于连续的课程，只在第一节课前发送通知") },
+                leadingContent = {
+                    Icon(
+                        Icons.Rounded.Notifications,
+                        contentDescription = null
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                            checked = notifyOnlyForFirstContinuousClass,
+                            onCheckedChange = { enabled ->
+                                scope.launch {
+                                    dao.setPreference(UnifiedNotificationManager.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS, enabled.toString())
+                                    // 重新设置提醒以应用新的设置
+                                    if (currentTimetableId != null) {
+                                        notificationManager.enableRemindersForTimetable(currentTimetableId!!)
+                                    }
+                                }
+                            }
+                        )
+                }
+            )
+        }
 
 
         ListItem(

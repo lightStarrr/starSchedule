@@ -57,6 +57,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         const val DAILY_UPDATE_REQUEST_CODE = 9999
 
         const val PREF_REMINDER_ENABLED_TIMETABLE = "reminder_enabled_timetable"
+        const val PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS = "notify_only_for_first_continuous_class"
     }
 
     init {
@@ -264,6 +265,10 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val courses = dao.getCoursesFlow(timetableId).first()
         val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
 
+        // 检查是否只在连续课程的第一节课前发送通知
+        val notifyOnlyForFirstContinuousClassPref = dao.getPreferenceFlow(PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS).first()
+        val notifyOnlyForFirstContinuousClass = notifyOnlyForFirstContinuousClassPref == "true"
+
         val startDate =
             runCatching { LocalDate.parse(timetable.startDate) }.getOrElse { LocalDate.now() }
         val currentDate = LocalDate.now()
@@ -278,6 +283,22 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
             todayCourses.forEach { course ->
                 course.periods.forEach { period ->
+                    // 如果启用了"只在连续课程的第一节课前发送通知"，则需要检查当前课程是否是连续课程的第一节
+                    if (notifyOnlyForFirstContinuousClass) {
+                        // 检查是否有与当前课程连续的前一节课
+                        val previousContinuousClass = todayCourses.find { c ->
+                            c.periods.contains(period - 1)
+                        }
+                        
+                        // 如果有连续的前一节课，并且是同一门课（课程名称和地点都相同），则不为当前课程设置提醒
+                        if (previousContinuousClass != null && 
+                            previousContinuousClass.name == course.name && 
+                            previousContinuousClass.location == course.location) {
+                            Log.d("UnifiedNotification", "跳过同一门连续课程的后续课程提醒: ${course.name}, 节数: $period")
+                            return@forEach
+                        }
+                    }
+                    
                     val lessonTime = lessonTimes.find { it.period == period }
                     if (lessonTime != null) {
                         scheduleReminderForCourse(course, lessonTime, date, timetable.reminderTime)
