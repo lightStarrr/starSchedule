@@ -26,8 +26,7 @@
         </linearGradient>
         <mask id="fade-mask" x="0" y="0" width="457" height="164" maskUnits="userSpaceOnUse">
             <linearGradient id="mask-gradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="white" stop-opacity="0" />
-                <stop offset="0.25" stop-color="white" stop-opacity="1" />
+                <stop offset="0" stop-color="white" stop-opacity="1" />
                 <stop offset="0.75" stop-color="white" stop-opacity="1" />
                 <stop offset="1" stop-color="white" stop-opacity="0" />
             </linearGradient>
