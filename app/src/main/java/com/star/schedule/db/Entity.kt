@@ -64,6 +64,7 @@ data class CourseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val timetableId: Long,        // 属于哪个课程表
     val name: String,             // 课程名称
+    val teacher: String,          // 教师名称（可选）
     val location: String,         // 上课地点
     val dayOfWeek: Int,           // 星期几（1=周一, 7=周日）
     val periods: List<Int>,       // 上课节次，例如 [1,2]

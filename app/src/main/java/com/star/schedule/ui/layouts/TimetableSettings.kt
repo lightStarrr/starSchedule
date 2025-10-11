@@ -72,10 +72,8 @@ import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
@@ -588,6 +586,7 @@ fun EditCourseSheet(
     val filteredCourses = courses.filter { it.id != course.id } // 排除当前正在编辑的课程
 
     var name by remember { mutableStateOf(course.name) }
+    var teacher by remember { mutableStateOf(course.teacher) }
     var location by remember { mutableStateOf(course.location) }
     var dayOfWeek by remember { mutableStateOf(course.dayOfWeek.toString()) }
     var periods by remember {
@@ -648,6 +647,19 @@ fun EditCourseSheet(
                 supportingText = if (errorMessage.contains("课程名称")) {
                     { Text("课程名称不能为空，且不超过50个字符") }
                 } else null
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = teacher,
+                onValueChange = {
+                    teacher = it
+                    errorMessage = "" // 清除错误信息
+                },
+                label = { Text("教师名称（可选）") },
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = { Text("教师名称，不超过50个字符") }
             )
 
             Spacer(Modifier.height(8.dp))
@@ -774,6 +786,7 @@ fun EditCourseSheet(
                             dao.updateCourseWithReminders(
                                 course.copy(
                                     name = name,
+                                    teacher = teacher,
                                     location = location,
                                     dayOfWeek = day,
                                     periods = periodList,
@@ -1017,6 +1030,7 @@ fun AddCourseSheet(
     val courses by dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
 
     var name by remember { mutableStateOf("") }
+    var teacher by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var dayOfWeek by remember { mutableStateOf("1") }
     var periods by remember { mutableStateOf("1") }
@@ -1071,6 +1085,19 @@ fun AddCourseSheet(
                 supportingText = if (errorMessage.contains("课程名称")) {
                     { Text("课程名称不能为空，且不超过50个字符") }
                 } else null
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = teacher,
+                onValueChange = {
+                    teacher = it
+                    errorMessage = "" // 清除错误信息
+                },
+                label = { Text("教师名称（可选）") },
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = { Text("教师名称，不超过50个字符") }
             )
 
             Spacer(Modifier.height(8.dp))
@@ -1198,6 +1225,7 @@ fun AddCourseSheet(
                                 CourseEntity(
                                     timetableId = timetableId,
                                     name = name,
+                                    teacher = teacher,
                                     location = location,
                                     dayOfWeek = day,
                                     periods = periodList,
@@ -1586,7 +1614,7 @@ fun TimetableDetailSheet(
                                     .padding(vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = "${course.name} (周${course.dayOfWeek} 节次:${
+                                    text = "${course.name}${if (course.teacher.isNotEmpty()) " (${course.teacher})" else ""} (周${course.dayOfWeek} 节次:${
                                         ValidationUtils.CourseValidation.formatNumberList(course.periods)
                                     })",
                                     modifier = Modifier.weight(1f),
@@ -2118,6 +2146,7 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             val periods = (startPeriod..endPeriod).toList()
             val location = courseInfoObject["room"]?.jsonPrimitive?.content ?: return@forEach
             val courseId = courseInfoObject["id"]?.jsonPrimitive?.int ?: return@forEach
+            val teacher = courseInfoObject["teacher"]?.jsonPrimitive?.content ?: return@forEach
             val courseInfo = courses.firstOrNull { course ->
                 course.jsonObject["id"]?.jsonPrimitive?.int == courseId
             }
@@ -2134,7 +2163,8 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
                     location = location,
                     dayOfWeek = dayOfWeek,
                     periods = periods,
-                    weeks = weeks
+                    weeks = weeks,
+                    teacher = teacher
                 )
             )
         }
@@ -2509,6 +2539,7 @@ suspend fun importFromXuexitong(
                 CourseEntity(
                     timetableId = timetableId,
                     name = course.name,
+                    teacher = course.teacher,
                     location = course.location,
                     dayOfWeek = course.weekDay,
                     periods = course.timeSlots,

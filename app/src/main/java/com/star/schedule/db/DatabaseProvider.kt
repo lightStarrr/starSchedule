@@ -21,7 +21,7 @@ object DatabaseProvider {
                 AppDatabase::class.java,
                 "schedule.db"
             )
-                .addMigrations(MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
+                .addMigrations(MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
                 .build()
 
             CoroutineScope(Dispatchers.IO).launch {

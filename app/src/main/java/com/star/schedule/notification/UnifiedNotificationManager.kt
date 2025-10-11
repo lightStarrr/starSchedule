@@ -8,7 +8,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.os.Build
@@ -54,7 +53,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         const val CHANNEL_NAME = "课程提醒"
         const val LIVE_CHANNEL_ID = "live_notification_channel"
         const val LIVE_CHANNEL_NAME = "实况通知"
-        const val REMINDER_MINUTES = 15L // 课前15分钟提醒
         const val NOTIFICATION_ID = 1001
 
         // 定期更新提醒的请求码
@@ -488,7 +486,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     fun isReminderEnabledForTimetableSync(timetableId: Long): Boolean {
         return try {
             val dao = DatabaseProvider.dao()
-            kotlinx.coroutines.runBlocking {
+            runBlocking {
                 val enabledTimetableId =
                     dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
                 enabledTimetableId == timetableId.toString()
@@ -721,7 +719,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                             minutesBefore = reminderTime
                         )
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // 如果获取设置失败，使用默认值
                     withContext(Dispatchers.Main) {
                         UnifiedNotificationManager(context).showCourseNotification(
