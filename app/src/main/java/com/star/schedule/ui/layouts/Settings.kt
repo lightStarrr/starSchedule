@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -90,6 +91,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.graphics.toColorInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -204,7 +206,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         Text(
             text = "设置",
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 0.dp),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(16.dp),
         )
 
         Card(
@@ -257,6 +260,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     Text(
                         text = "选择课表",
                         style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
@@ -467,16 +471,16 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             var selectedColor by remember {
                 mutableStateOf(
                     try {
-                        Color(android.graphics.Color.parseColor(liveCapsuleBgColorPref))
-                    } catch (e: Exception) {
-                        Color(0xFFE082)
+                        liveCapsuleBgColorPref?.let { Color(it.toColorInt()) }
+                    } catch (_: Exception) {
+                        Color(0xFFFFE082)
                     }
                 )
             }
             val savedColor = try {
-                Color(android.graphics.Color.parseColor(liveCapsuleBgColorPref))
-            } catch (e: Exception) {
-                Color(0xFFE082)
+                liveCapsuleBgColorPref?.let { Color(it.toColorInt()) }
+            } catch (_: Exception) {
+                Color(0xFFFFE082)
             }
 
             ListItem(
@@ -489,22 +493,24 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     )
                 },
                 trailingContent = {
-                    // 颜色预览圆角长方形 - 显示真实保存的颜色
-
-                    Box(
-                        modifier = Modifier
+                    savedColor?.let {
+                        Modifier
                             .width(48.dp)
                             .height(24.dp)
                             .background(
-                                color = savedColor,
+                                color = it,
                                 shape = RoundedCornerShape(6.dp)
                             )
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                    )
+                    }?.let {
+                        Box(
+                            modifier = it
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                        )
+                    }
                 },
                 modifier = Modifier.clickable {
                     haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -539,6 +545,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         Text(
                             text = "选择颜色",
                             style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
@@ -546,32 +553,34 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             return if (background.luminance() > 0.7f) Color.Black else Color.White
                         }
                         // 胶囊预览卡片
-                        Card(
-                            modifier = Modifier
-                                .wrapContentWidth()
-                                .align(Alignment.CenterHorizontally)
-                                .padding(bottom = 16.dp),
-                            shape = RoundedCornerShape(50),
-                            colors = CardDefaults.cardColors(containerColor = selectedColor)
-                        ) {
-                            Row(
+                        selectedColor?.let {
+                            Card(
                                 modifier = Modifier
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
+                                    .wrapContentWidth()
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(bottom = 16.dp),
+                                shape = RoundedCornerShape(50),
+                                colors = CardDefaults.cardColors(containerColor = it)
                             ) {
-                                Icon(
-                                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
-                                    contentDescription = null,
-                                    tint = autoContentColorFor(selectedColor),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "测试内容",
-                                    color = autoContentColorFor(selectedColor),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
+                                        contentDescription = null,
+                                        tint = autoContentColorFor(selectedColor!!),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "测试内容",
+                                        color = autoContentColorFor(selectedColor!!),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
                             }
                         }
 
@@ -615,15 +624,20 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             // 确定按钮 - 固定样式
                             Button(
                                 onClick = {
-                                    val colorHex = "#${
-                                        Integer.toHexString(selectedColor.toArgb()).substring(2)
-                                            .uppercase()
-                                    }"
+                                    val colorHex = selectedColor?.let { Integer.toHexString(it.toArgb()) }
+                                        ?.substring(2)?.let {
+                                            "#${
+                                                it
+                                                    .uppercase()
+                                            }"
+                                        }
                                     scope.launch {
-                                        dao.setPreference(
-                                            UnifiedNotificationManager.PREF_LIVE_CAPSULE_BG_COLOR,
-                                            colorHex
-                                        )
+                                        colorHex?.let {
+                                            dao.setPreference(
+                                                UnifiedNotificationManager.PREF_LIVE_CAPSULE_BG_COLOR,
+                                                it
+                                            )
+                                        }
                                         colorPickerSheetState.hide()
                                     }.invokeOnCompletion {
                                         if (!colorPickerSheetState.isVisible) {

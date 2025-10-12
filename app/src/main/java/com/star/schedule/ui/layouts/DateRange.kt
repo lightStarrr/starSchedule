@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,8 +50,10 @@ import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
+import com.star.schedule.ui.components.CourseDetailBottomSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material3.rememberModalBottomSheetState
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -199,6 +203,8 @@ fun DateRange(
             showWeekend = timetable?.showWeekend ?: true,
             currentWeek = currentWeekNumber,
             realCurrentWeek = calculatedWeekNumber,
+            courseEntities = visibleEntities,
+            lessonTimeEntities = lessonTimes
         )
     }
 }
@@ -223,7 +229,7 @@ fun buildCourseBlocks(courses: List<Course>): List<CourseBlock> {
 }
 
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
     courses: List<Course>,
@@ -233,7 +239,13 @@ fun ScheduleScreen(
     showWeekend: Boolean = true,
     currentWeek: Int? = null,
     realCurrentWeek: Int? = null,
+    courseEntities: List<CourseEntity> = emptyList(),
+    lessonTimeEntities: List<LessonTimeEntity> = emptyList(),
 ) {
+    val scope = rememberCoroutineScope()
+    var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
+    val courseDetailSheetState = rememberModalBottomSheetState()
+    val showCourseDetail = selectedCourse != null
     val haptic = LocalHapticFeedback.current
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
 
@@ -406,6 +418,18 @@ fun ScheduleScreen(
                     ),
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        // 查找对应的课程实体
+                        val courseEntity = courseEntities.find { entity ->
+                            entity.name == block.course.name &&
+                            entity.location == block.course.location &&
+                            entity.dayOfWeek == block.dayOfWeek &&
+                            entity.periods == block.course.periods &&
+                            entity.weeks == block.course.weeks
+                        }
+                        if (courseEntity != null) {
+                            selectedCourse = courseEntity
+                            scope.launch { courseDetailSheetState.show() }
+                        }
                     }
                 ) {
                     Column(
@@ -436,5 +460,17 @@ fun ScheduleScreen(
                 }
             }
         }
+    }
+
+    if (showCourseDetail) {
+        CourseDetailBottomSheet(
+            course = selectedCourse!!,
+            lessonTimes = lessonTimeEntities,
+            onDismiss = {
+                scope.launch { courseDetailSheetState.hide() }
+                selectedCourse = null
+            },
+            sheetState = courseDetailSheetState
+        )
     }
 }

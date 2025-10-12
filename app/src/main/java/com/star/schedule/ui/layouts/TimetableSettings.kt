@@ -61,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.star.schedule.db.CourseEntity
@@ -128,6 +129,7 @@ fun TimetableSettings(dao: ScheduleDao) {
             Text(
                 text = "课表管理",
                 style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
         }
@@ -402,6 +404,7 @@ fun EditLessonTimeSheet(
         ) {
             Text(
                 text = "编辑课程时间",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -613,6 +616,7 @@ fun EditCourseSheet(
         ) {
             Text(
                 text = "编辑课程",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -844,6 +848,7 @@ fun AddLessonTimeSheet(
         ) {
             Text(
                 text = "新增课程时间",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -1051,6 +1056,7 @@ fun AddCourseSheet(
         ) {
             Text(
                 text = "新增课程",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -1404,16 +1410,16 @@ fun TimetableDetailSheet(
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         Slider(
                             value = rowHeight,
                             onValueChange = { rowHeight = it },
                             valueRange = 40f..240f,
                             steps = 19
                         )
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -1444,16 +1450,16 @@ fun TimetableDetailSheet(
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         Slider(
                             value = reminderTime,
                             onValueChange = { reminderTime = it },
                             valueRange = 5f..60f,
                             steps = 10
                         )
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -1806,6 +1812,7 @@ fun ImportOptionsSheet(
         ) {
             Text(
                 text = "选择导入方式",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -1947,6 +1954,7 @@ fun WakeUpImportSheet(
         ) {
             Text(
                 text = "从WakeUp课程表在线导入",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -2095,7 +2103,7 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
 
         // 用于存储已经处理过的时间段，避免重复
         val processedTimes = mutableSetOf<String>()
-        
+
         lessonTimes.forEach { jsonElement ->
             val lessonObject = jsonElement.jsonObject
             val period = lessonObject["node"]?.jsonPrimitive?.int ?: 1
@@ -2105,15 +2113,15 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             if (startTime == endTime) {
                 return@forEach
             }
-            
+
             // 创建时间段的唯一标识符
             val timeKey = "${startTime}_${endTime}"
-            
+
             // 如果已经处理过相同的时间段，则跳过
             if (processedTimes.contains(timeKey)) {
                 return@forEach
             }
-            
+
             // 将当前时间段添加到已处理集合中
             processedTimes.add(timeKey)
 
@@ -2225,6 +2233,7 @@ fun XuexitongImportSheet(
         ) {
             Text(
                 text = "从超星导出xls文件导入",
+                fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -2397,7 +2406,8 @@ suspend fun importFromXuexitong(
             val text = cell.toString().trim()
             if (text.isEmpty()) continue
 
-            val lines = text.split("\n", "\r\n").map { it.trim() }.filter { it.matches(timeListRegex) }
+            val lines =
+                text.split("\n", "\r\n").map { it.trim() }.filter { it.matches(timeListRegex) }
 
             if (lines.size == 2) {
                 timeList.add(TimeSlot(row = rowIndex + 1, start = lines[0], end = lines[1]))
@@ -2479,7 +2489,8 @@ suspend fun importFromXuexitong(
                     val teacherLine = lines[1]
                     val teacherMatch = Regex("""(.+?)【(.+)】""").find(teacherLine)
                     val teacher = teacherMatch?.groupValues?.get(1)?.trim() ?: ""
-                    val weeks = teacherMatch?.groupValues?.get(2)?.let { parseWeeks(it) } ?: emptyList()
+                    val weeks =
+                        teacherMatch?.groupValues?.get(2)?.let { parseWeeks(it) } ?: emptyList()
                     val location = lines[2]
 
                     val newCourse = Course(
