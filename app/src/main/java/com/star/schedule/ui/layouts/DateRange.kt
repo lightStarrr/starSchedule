@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,6 +52,7 @@ import com.star.schedule.db.TimetableEntity
 import com.star.schedule.ui.components.CourseDetailBottomSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -244,8 +244,6 @@ fun ScheduleScreen(
 ) {
     val scope = rememberCoroutineScope()
     var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
-    val courseDetailSheetState = rememberModalBottomSheetState()
-    val showCourseDetail = selectedCourse != null
     val haptic = LocalHapticFeedback.current
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
 
@@ -428,7 +426,6 @@ fun ScheduleScreen(
                         }
                         if (courseEntity != null) {
                             selectedCourse = courseEntity
-                            scope.launch { courseDetailSheetState.show() }
                         }
                     }
                 ) {
@@ -462,15 +459,12 @@ fun ScheduleScreen(
         }
     }
 
-    if (showCourseDetail) {
+    if (selectedCourse != null) {
         CourseDetailBottomSheet(
             course = selectedCourse!!,
             lessonTimes = lessonTimeEntities,
-            onDismiss = {
-                scope.launch { courseDetailSheetState.hide() }
-                selectedCourse = null
-            },
-            sheetState = courseDetailSheetState
+            onDismiss = { selectedCourse = null },
+            sheetState = rememberModalBottomSheetState()
         )
     }
 }
