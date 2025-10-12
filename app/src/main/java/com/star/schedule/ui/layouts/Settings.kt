@@ -468,20 +468,22 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             var showColorPicker by remember { mutableStateOf(false) }
             val liveCapsuleBgColorPref by dao.getPreferenceFlow(UnifiedNotificationManager.PREF_LIVE_CAPSULE_BG_COLOR)
                 .collectAsState(initial = "#FFE082")
+            val defaultColor = Color(0xFFFFE082)
             var selectedColor by remember {
                 mutableStateOf(
                     try {
-                        liveCapsuleBgColorPref?.let { Color(it.toColorInt()) }
+                        liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
                     } catch (_: Exception) {
-                        Color(0xFFFFE082)
+                        defaultColor
                     }
                 )
             }
             val savedColor = try {
-                liveCapsuleBgColorPref?.let { Color(it.toColorInt()) }
+                liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
             } catch (_: Exception) {
-                Color(0xFFFFE082)
+                defaultColor
             }
+
 
             ListItem(
                 headlineContent = { Text("实况通知胶囊背景颜色") },
