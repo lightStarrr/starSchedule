@@ -1,6 +1,8 @@
 package com.star.schedule
 
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -8,7 +10,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,29 +21,31 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.EditCalendar
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Update
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FabPosition
@@ -58,9 +61,18 @@ import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -70,13 +82,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -92,6 +102,11 @@ import com.star.schedule.ui.components.OptimizedBottomSheet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,6 +124,30 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun Layout(context: Activity) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        val latestTag = fetchLatestReleaseTag()
+        if (latestTag == null) {
+            Log.d("StarSchedule", "Failed to fetch latest release tag")
+            return@LaunchedEffect
+        }
+        Log.d("StarSchedule", "Latest release tag: $latestTag")
+        val currentVersion = getAppVersionName(context)
+        Log.d("StarSchedule", "Current version: $currentVersion")
+        if (isNewerVersion(latestTag, currentVersion)) {
+            Log.d("StarSchedule", "New version available: $latestTag")
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    message = "发现新版本：v$currentVersion => $latestTag",
+                    actionLabel = "更新",
+                    duration = SnackbarDuration.Indefinite
+                )
+            }
+        }
+    }
+
     val scope = rememberCoroutineScope()
     var selectedItem by remember { mutableIntStateOf(0) }
     var realCurrentWeek by remember { mutableIntStateOf(0) }
@@ -153,6 +192,9 @@ fun Layout(context: Activity) {
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(exitAlwaysScrollBehavior),
+        snackbarHost = {
+            UpdateSnackbarHost(snackbarHostState = snackbarHostState, context = context)
+        },
         floatingActionButton = {
             HorizontalFloatingToolbar(
                 expanded = true,
@@ -180,8 +222,8 @@ fun Layout(context: Activity) {
                                                 }
                                             },
                                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                                containerColor = MaterialTheme.colorScheme.secondary,
-                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
                                         ) {
                                             Icon(Icons.Rounded.ChevronLeft, contentDescription = "上一周")
@@ -193,8 +235,8 @@ fun Layout(context: Activity) {
                                                 showWeekSelector = true
                                             },
                                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                                containerColor = MaterialTheme.colorScheme.secondary,
-                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
                                         ) {
                                             Text("第 $currentWeekNumber 周")
@@ -210,8 +252,8 @@ fun Layout(context: Activity) {
                                                 }
                                             },
                                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                                containerColor = MaterialTheme.colorScheme.secondary,
-                                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
                                         ) {
                                             Icon(Icons.Rounded.ChevronRight, contentDescription = "下一周")
@@ -463,6 +505,151 @@ fun WeekSelectorSheet(
                                     maxLines = 1
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun getAppVersionName(context: Context): String {
+    return try {
+        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        pInfo.versionName ?: ""
+    } catch (_: Exception) {
+        ""
+    }
+}
+
+suspend fun fetchLatestReleaseTag(): String? {
+    return withContext(Dispatchers.IO) {
+        try {
+            val client = OkHttpClient()
+            val url = "https://api.github.com/repos/lightStarrr/starSchedule/releases/latest"
+            val request = Request.Builder()
+                .url(url)
+                .header("Accept", "application/vnd.github+json")
+                // GitHub 要求有 User-Agent
+                .header("User-Agent", "StarScheduleApp")
+                .build()
+            val resp = client.newCall(request).execute()
+            if (!resp.isSuccessful) {
+                return@withContext null
+            }
+            val body = resp.body.string()
+            val json = JSONObject(body)
+            val tag = json.optString("tag_name", "v1.0.0")
+            tag
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+}
+
+/** 简单比较版本号（假设格式是 vX.Y.Z） */
+fun isNewerVersion(latestTag: String, currentVersion: String): Boolean {
+    // 去掉前缀 v （如果有）
+    val lt = latestTag.trimStart('v', 'V')
+    val cv = currentVersion.trimStart('v', 'V')
+    val ltParts = lt.split(".")
+    val cvParts = cv.split(".")
+    val len = maxOf(ltParts.size, cvParts.size)
+    for (i in 0 until len) {
+        val lNum = ltParts.getOrNull(i)?.toIntOrNull() ?: 0
+        val cNum = cvParts.getOrNull(i)?.toIntOrNull() ?: 0
+        if (lNum > cNum) return true
+        if (lNum < cNum) return false
+    }
+    return false
+}
+
+@Composable
+fun UpdateSnackbarHost(snackbarHostState: SnackbarHostState, context: Context) {
+    val scope = rememberCoroutineScope()
+
+    SnackbarHost(hostState = snackbarHostState) { data ->
+        val messageText = data.visuals.message
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryFixed,
+                contentColor = MaterialTheme.colorScheme.onPrimaryFixed
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = "发现新版本",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = messageText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.alpha(0.8f)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                            }
+                        },
+                        modifier = Modifier.padding(end = 4.dp).size(40.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "关闭",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                "https://github.com/lightStarrr/starSchedule/releases".toUri()
+                            )
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onPrimary) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                                contentDescription = "更新",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "更新",
+                                style = MaterialTheme.typography.labelMedium
+                            )
                         }
                     }
                 }
