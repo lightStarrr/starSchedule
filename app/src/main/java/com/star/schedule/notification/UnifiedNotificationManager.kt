@@ -108,6 +108,64 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         return match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: -1
     }
 
+    /**
+     * 使用 WorkManager 的可靠通知方法
+     * 推荐使用此方法替代旧的协程方法
+     */
+    fun showCourseNotificationWithWorkManager(
+        courseName: String = "课程提醒",
+        location: String = "",
+        startTime: String = "",
+        minutesBefore: Int = 15
+    ) {
+        CourseNotificationWorker.scheduleCourseNotification(
+            context,
+            courseName,
+            location,
+            startTime,
+            minutesBefore
+        )
+    }
+
+    /**
+     * 立即显示通知（用于 WorkManager 调用）
+     */
+    fun showCourseNotificationImmediate(
+        courseName: String = "课程提醒",
+        location: String = "",
+        startTime: String = "",
+        minutesBefore: Int = 15
+    ) {
+        when (Build.MANUFACTURER) {
+            "meizu" -> {
+                if (getFlymeVersion() >= 12) {
+                    showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
+                } else {
+                    showNormalNotification(courseName, location, startTime, minutesBefore)
+                }
+            }
+
+            else -> {
+                showNormalNotification(courseName, location, startTime, minutesBefore)
+            }
+        }
+    }
+
+    /**
+     * 取消通知（用于 WorkManager 调用）
+     */
+    fun cancelCourseNotification() {
+        notificationManager.cancel(NOTIFICATION_ID)
+    }
+
+    /**
+     * 旧的协程方法（不推荐，但保留用于向后兼容）
+     * 注意：此方法在应用被杀死或设备休眠时可能无法可靠执行
+     */
+    @Deprecated(
+        "使用 showCourseNotificationWithWorkManager 替代",
+        ReplaceWith("showCourseNotificationWithWorkManager(courseName, location, startTime, minutesBefore)")
+    )
     fun showCourseNotification(
         courseName: String = "课程提醒",
         location: String = "",
@@ -409,12 +467,21 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val startTime = LocalTime.now().plusMinutes(15)
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
-        showCourseNotification(
+        // 使用 WorkManager 进行测试
+        showCourseNotificationWithWorkManager(
             courseName = "测试课程",
             location = "测试教室A101",
             startTime = startTime,
-            minutesBefore = 15
+            minutesBefore = 1 // 测试时改为1分钟
         )
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            Toast.makeText(
+                context,
+                "测试通知已设置，将在1分钟后显示",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     fun scheduleTestReminder() {
@@ -708,7 +775,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     Log.w("UnifiedNotification", "未找到启用的课表提醒设置")
                     // 如果没有启用的课表，使用默认值
                     withContext(Dispatchers.Main) {
-                        UnifiedNotificationManager(context).showCourseNotification(
+                        UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
                             courseName = courseName,
                             location = courseLocation,
                             startTime = courseTime,
@@ -723,7 +790,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     Log.e("UnifiedNotification", "启用的课表ID格式错误: $enabledTimetableId")
                     // 如果ID格式错误，使用默认值
                     withContext(Dispatchers.Main) {
-                        UnifiedNotificationManager(context).showCourseNotification(
+                        UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
                             courseName = courseName,
                             location = courseLocation,
                             startTime = courseTime,
@@ -743,20 +810,18 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     15 // 默认15分钟
                 }
 
-                // 在主线程显示通知
-                withContext(Dispatchers.Main) {
-                    UnifiedNotificationManager(context).showCourseNotification(
-                        courseName = courseName,
-                        location = courseLocation,
-                        startTime = courseTime,
-                        minutesBefore = reminderTime
-                    )
-                }
+                // 使用 WorkManager 显示通知（更可靠）
+                UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
+                    courseName = courseName,
+                    location = courseLocation,
+                    startTime = courseTime,
+                    minutesBefore = reminderTime
+                )
             } catch (e: Exception) {
                 Log.e("UnifiedNotification", "处理课程提醒时出错", e)
                 // 如果获取设置失败，使用默认值
                 withContext(Dispatchers.Main) {
-                    UnifiedNotificationManager(context).showCourseNotification(
+                    UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
                         courseName = courseName,
                         location = courseLocation,
                         startTime = courseTime,

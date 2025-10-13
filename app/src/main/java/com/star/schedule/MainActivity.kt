@@ -43,9 +43,7 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.EditCalendar
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FabPosition
@@ -70,7 +68,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -94,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.notification.WorkManagerConfig
 import com.star.schedule.ui.layouts.DateRange
 import com.star.schedule.ui.layouts.Settings
 import com.star.schedule.ui.layouts.TimetableSettings
@@ -112,6 +110,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DatabaseProvider.init(this)
+        WorkManagerConfig.initialize(this) // 初始化 WorkManager
         enableEdgeToEdge()
         setContent {
             StarScheduleTheme {
