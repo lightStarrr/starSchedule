@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">星课表</string>
+    <string name="alreadyClassText">已上课 | 上课时间</string>
     <string name="upcomingClassText">即将上课 | 上课时间</string>
     <string name="timeUntilClass">15分钟</string>
     <string name="location">地点</string>

@@ -240,8 +240,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             putInt("notification.live.contentColor", textColor.toArgb())
         }
 
+        val layout = if(minutesBefore >0) RemoteViews(context.packageName, R.layout.live_notification_card)
+        else RemoteViews(context.packageName, R.layout.live_notification_card_ok)
+
         val contentRemoteViews =
-            RemoteViews(context.packageName, R.layout.live_notification_card).apply {
+            layout.apply {
                 setTextViewText(R.id.live_title, courseName)
                 setTextViewText(R.id.location, location)
                 setTextViewText(R.id.live_time, startTime)
@@ -474,11 +477,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             startTime = startTime,
             minutesBefore = 1 // 测试时改为1分钟
         )
-        
+
         CoroutineScope(Dispatchers.Main).launch {
             Toast.makeText(
                 context,
-                "测试通知已设置，将在1分钟后显示",
+                "测试通知已设置，更新时间为1分钟",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -502,8 +505,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 设置1分钟后的提醒
-        val triggerTime = System.currentTimeMillis() + 10 * 1000L // 1分钟后
+        val triggerTime = System.currentTimeMillis() + 10 * 1000L
 
         try {
             if (alarmManager.canScheduleExactAlarms()) {
