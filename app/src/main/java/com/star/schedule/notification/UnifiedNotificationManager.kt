@@ -25,6 +25,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.toColorInt
 import com.star.schedule.MainActivity
 import com.star.schedule.R
+import com.star.schedule.Constants
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.LessonTimeEntity
@@ -57,10 +58,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
         // 定期更新提醒的请求码
         const val DAILY_UPDATE_REQUEST_CODE = 9999
-
-        const val PREF_REMINDER_ENABLED_TIMETABLE = "reminder_enabled_timetable"
-        const val PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS = "notify_only_for_first_continuous_class"
-        const val PREF_LIVE_CAPSULE_BG_COLOR = "live_capsule_bg_color"
     }
 
     init {
@@ -154,7 +151,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         
         // 获取自定义背景颜色，默认为原来的颜色
         val capsuleBgColor = runBlocking {
-            val colorPref = dao.getPreferenceFlow(PREF_LIVE_CAPSULE_BG_COLOR).first()
+            val colorPref = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
             colorPref ?: "#FFE082"
         }
         fun autoContentColorFor(background: Color): Color {
@@ -263,7 +260,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
     override suspend fun enableRemindersForTimetable(timetableId: Long) {
         val dao = DatabaseProvider.dao()
-        dao.setPreference(PREF_REMINDER_ENABLED_TIMETABLE, timetableId.toString())
+        dao.setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, timetableId.toString())
 
         cancelAllReminders()
         scheduleRemindersForTimetable(timetableId)
@@ -271,7 +268,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
     suspend fun disableReminders() {
         val dao = DatabaseProvider.dao()
-        dao.setPreference(PREF_REMINDER_ENABLED_TIMETABLE, "")
+        dao.setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, "")
         cancelAllReminders()
     }
 
@@ -282,7 +279,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
 
         // 检查是否只在连续课程的第一节课前发送通知
-        val notifyOnlyForFirstContinuousClassPref = dao.getPreferenceFlow(PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS).first()
+        val notifyOnlyForFirstContinuousClassPref = dao.getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS).first()
         val notifyOnlyForFirstContinuousClass = notifyOnlyForFirstContinuousClassPref == "true"
 
         val startDate =
@@ -488,7 +485,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             val dao = DatabaseProvider.dao()
             runBlocking {
                 val enabledTimetableId =
-                    dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
+                    dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
                 enabledTimetableId == timetableId.toString()
             }
         } catch (e: Exception) {
@@ -507,7 +504,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
             // 检查是否有启用的课表提醒
             val dao = DatabaseProvider.dao()
-            val enabledTimetableId = dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -546,7 +543,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             }
 
             val dao = DatabaseProvider.dao()
-            val enabledTimetableId = dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -581,7 +578,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             Log.d("UnifiedNotification", "开始定期更新提醒")
 
             val dao = DatabaseProvider.dao()
-            val enabledTimetableId = dao.getPreferenceFlow(PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -695,32 +692,21 @@ class CourseReminderReceiver : BroadcastReceiver() {
         val courseLocation = intent.getStringExtra("course_location") ?: ""
         val courseTime = intent.getStringExtra("course_time") ?: ""
 
-        // 获取当前启用的课表ID
-        val sharedPreferences = context.getSharedPreferences("star_schedule_prefs", Context.MODE_PRIVATE)
-        val timetableId = sharedPreferences.getString("reminder_enabled_timetable", "")?.toLongOrNull()
-        
-        // 获取课前提醒时间设置
-        var reminderTime = 15 // 默认15分钟
-        if (timetableId != null) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val dao = DatabaseProvider.dao()
-                    val timetable = dao.getTimetableFlow(timetableId).first()
-                    if (timetable != null) {
-                        reminderTime = timetable.reminderTime
-                    }
-                    
-                    // 在主线程显示通知
-                    withContext(Dispatchers.Main) {
-                        UnifiedNotificationManager(context).showCourseNotification(
-                            courseName = courseName,
-                            location = courseLocation,
-                            startTime = courseTime,
-                            minutesBefore = reminderTime
-                        )
-                    }
-                } catch (_: Exception) {
-                    // 如果获取设置失败，使用默认值
+        // 确保数据库已初始化
+        if (!DatabaseProvider.isInitialized()) {
+            DatabaseProvider.init(context)
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val dao = DatabaseProvider.dao()
+                
+                // 从数据库获取当前启用的课表ID（使用正确的偏好键）
+                val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
+                
+                if (enabledTimetableId.isNullOrEmpty()) {
+                    Log.w("UnifiedNotification", "未找到启用的课表提醒设置")
+                    // 如果没有启用的课表，使用默认值
                     withContext(Dispatchers.Main) {
                         UnifiedNotificationManager(context).showCourseNotification(
                             courseName = courseName,
@@ -729,16 +715,55 @@ class CourseReminderReceiver : BroadcastReceiver() {
                             minutesBefore = 15
                         )
                     }
+                    return@launch
+                }
+
+                val timetableId = enabledTimetableId.toLongOrNull()
+                if (timetableId == null) {
+                    Log.e("UnifiedNotification", "启用的课表ID格式错误: $enabledTimetableId")
+                    // 如果ID格式错误，使用默认值
+                    withContext(Dispatchers.Main) {
+                        UnifiedNotificationManager(context).showCourseNotification(
+                            courseName = courseName,
+                            location = courseLocation,
+                            startTime = courseTime,
+                            minutesBefore = 15
+                        )
+                    }
+                    return@launch
+                }
+
+                // 获取课前提醒时间设置
+                val timetable = dao.getTimetableFlow(timetableId).first()
+                val reminderTime = if (timetable != null) {
+                    Log.d("UnifiedNotification", "课前提醒时间设置: ${timetable.reminderTime} 分钟")
+                    timetable.reminderTime
+                } else {
+                    Log.w("UnifiedNotification", "未找到课表ID $timetableId 的详细信息，使用默认提醒时间")
+                    15 // 默认15分钟
+                }
+
+                // 在主线程显示通知
+                withContext(Dispatchers.Main) {
+                    UnifiedNotificationManager(context).showCourseNotification(
+                        courseName = courseName,
+                        location = courseLocation,
+                        startTime = courseTime,
+                        minutesBefore = reminderTime
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("UnifiedNotification", "处理课程提醒时出错", e)
+                // 如果获取设置失败，使用默认值
+                withContext(Dispatchers.Main) {
+                    UnifiedNotificationManager(context).showCourseNotification(
+                        courseName = courseName,
+                        location = courseLocation,
+                        startTime = courseTime,
+                        minutesBefore = 15
+                    )
                 }
             }
-        } else {
-            // 如果没有启用的课表，使用默认值
-            UnifiedNotificationManager(context).showCourseNotification(
-                courseName = courseName,
-                location = courseLocation,
-                startTime = courseTime,
-                minutesBefore = 15
-            )
         }
     }
 }

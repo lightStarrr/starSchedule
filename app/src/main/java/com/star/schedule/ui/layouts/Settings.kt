@@ -92,6 +92,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.core.graphics.toColorInt
+import com.star.schedule.Constants
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -110,7 +111,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
     // 所有课表
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
-    val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable")
+    val currentTimetableIdPref by dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
         .collectAsState(initial = null)
 
     // 当前课表ID
@@ -133,7 +134,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         .collectAsState(initial = "false")
 
     // 只在连续课程的第一节课前发送通知的偏好设置
-    val notifyOnlyForFirstContinuousClassPref by dao.getPreferenceFlow(UnifiedNotificationManager.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS)
+    val notifyOnlyForFirstContinuousClassPref by dao.getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS)
         .collectAsState(initial = "false")
     LaunchedEffect(startupHintClosedPref) {
         showStartupHint = startupHintClosedPref != "true"
@@ -275,7 +276,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                                     scope.launch {
                                         dao.setPreference(
-                                            "current_timetable",
+                                            Constants.PREF_CURRENT_TIMETABLE,
                                             timetable.id.toString()
                                         )
                                     }
@@ -447,7 +448,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         onCheckedChange = { enabled ->
                             scope.launch {
                                 dao.setPreference(
-                                    UnifiedNotificationManager.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS,
+                                    Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS,
                                     enabled.toString()
                                 )
                                 // 重新设置提醒以应用新的设置
@@ -466,8 +467,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         // 实况通知胶囊背景颜色设置
         if (reminderEnabled) {
             var showColorPicker by remember { mutableStateOf(false) }
-            val liveCapsuleBgColorPref by dao.getPreferenceFlow(UnifiedNotificationManager.PREF_LIVE_CAPSULE_BG_COLOR)
-                .collectAsState(initial = "#FFE082")
+            val liveCapsuleBgColorPref by dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR)
+        .collectAsState(initial = "#FFE082")
             val defaultColor = Color(0xFFFFE082)
             var selectedColor by remember {
                 mutableStateOf(
@@ -495,24 +496,21 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     )
                 },
                 trailingContent = {
-                    savedColor?.let {
-                        Modifier
-                            .width(48.dp)
-                            .height(24.dp)
-                            .background(
-                                color = it,
+                    val modifier = Modifier
+                        .width(48.dp)
+                        .height(24.dp)
+                        .background(
+                            color = savedColor,
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                    Box(
+                        modifier = modifier
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary,
                                 shape = RoundedCornerShape(6.dp)
                             )
-                    }?.let {
-                        Box(
-                            modifier = it
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    shape = RoundedCornerShape(6.dp)
-                                )
-                        )
-                    }
+                    )
                 },
                 modifier = Modifier.clickable {
                     haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -555,7 +553,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             return if (background.luminance() > 0.7f) Color.Black else Color.White
                         }
                         // 胶囊预览卡片
-                        selectedColor?.let {
+                        selectedColor.let {
                             Card(
                                 modifier = Modifier
                                     .wrapContentWidth()
@@ -573,13 +571,13 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     Icon(
                                         painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
                                         contentDescription = null,
-                                        tint = autoContentColorFor(selectedColor!!),
+                                        tint = autoContentColorFor(selectedColor),
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "测试内容",
-                                        color = autoContentColorFor(selectedColor!!),
+                                        color = autoContentColorFor(selectedColor),
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
@@ -626,20 +624,12 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             // 确定按钮 - 固定样式
                             Button(
                                 onClick = {
-                                    val colorHex = selectedColor?.let { Integer.toHexString(it.toArgb()) }
-                                        ?.substring(2)?.let {
-                                            "#${
-                                                it
-                                                    .uppercase()
-                                            }"
-                                        }
+                                    val colorHex = "#${Integer.toHexString(selectedColor.toArgb()).substring(2).uppercase()}"
                                     scope.launch {
-                                        colorHex?.let {
-                                            dao.setPreference(
-                                                UnifiedNotificationManager.PREF_LIVE_CAPSULE_BG_COLOR,
-                                                it
-                                            )
-                                        }
+                                        dao.setPreference(
+                                            Constants.PREF_LIVE_CAPSULE_BG_COLOR,
+                                            colorHex
+                                        )
                                         colorPickerSheetState.hide()
                                     }.invokeOnCompletion {
                                         if (!colorPickerSheetState.isVisible) {

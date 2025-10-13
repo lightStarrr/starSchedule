@@ -2140,12 +2140,10 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
             val startWeek = courseInfoObject["startWeek"]?.jsonPrimitive?.int ?: return@forEach
             val endWeek = courseInfoObject["endWeek"]?.jsonPrimitive?.int ?: return@forEach
             val type = courseInfoObject["type"]?.jsonPrimitive?.int ?: return@forEach
-            val weeks = (startWeek..endWeek).toList().let { range ->
-                when (type) {
-                    1 -> range.filter { it and 1 == 1 }
-                    2 -> range.filter { it and 1 == 0 }
-                    else -> range
-                }
+            val weeks = when (type) {
+                1 -> (startWeek..endWeek).toList().filter { it and 1 == 1 }
+                2 -> (startWeek..endWeek).toList().filter { it and 1 == 0 }
+                else -> (startWeek..endWeek).toList()
             }
 
             val startPeriod = courseInfoObject["startNode"]?.jsonPrimitive?.int ?: return@forEach

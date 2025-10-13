@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.TypeConverter
 import androidx.room.Update
+import com.star.schedule.Constants
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -60,7 +61,7 @@ abstract class ScheduleDao {
     // 自动初始化默认课表
     @Transaction
     open suspend fun initializeDefaultTimetable(): Long {
-        val prefIdStr = getPreferenceFlow("current_timetable")
+        val prefIdStr = getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
             .map { it?.toLongOrNull() }
             .firstOrNull()
         if (prefIdStr != null) return prefIdStr
@@ -77,7 +78,7 @@ abstract class ScheduleDao {
         } else {
             timetables.first().id
         }
-        setPreference("current_timetable", timetableId.toString())
+        setPreference(Constants.PREF_CURRENT_TIMETABLE, timetableId.toString())
         return timetableId
     }
 
@@ -136,7 +137,7 @@ abstract class ScheduleDao {
 
     // ------------------ 自动排序和提醒 ------------------
     private suspend fun checkAndEnableReminders(timetableId: Long) {
-        val currentId = getPreferenceFlow("current_timetable").firstOrNull()?.toLongOrNull()
+        val currentId = getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE).firstOrNull()?.toLongOrNull()
         android.util.Log.d(
             "ScheduleDao",
             "checkAndEnableReminders: timetableId=$timetableId, currentId=$currentId, notificationManager=$notificationManager"
@@ -144,7 +145,7 @@ abstract class ScheduleDao {
 
         if (currentId == timetableId) {
             // 检查用户是否已经启用了课前提醒
-            val enabledTimetableId = getPreferenceFlow("reminder_enabled_timetable").firstOrNull()
+            val enabledTimetableId = getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).firstOrNull()
             val isReminderEnabled = enabledTimetableId?.toLongOrNull() == currentId
 
             if (isReminderEnabled) {

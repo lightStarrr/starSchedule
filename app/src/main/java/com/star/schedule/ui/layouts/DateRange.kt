@@ -31,7 +31,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +53,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.star.schedule.Constants
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -90,7 +90,7 @@ fun DateRange(
     upDateRealCurrentWeek: (Int) -> Unit
 ) {
     // 当前课表ID
-    val currentTimetableIdPref by dao.getPreferenceFlow("current_timetable")
+    val currentTimetableIdPref by dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
         .collectAsState(initial = null)
     val timetableId = currentTimetableIdPref?.toLongOrNull()
 
@@ -104,12 +104,12 @@ fun DateRange(
     val courses by if (timetableId != null) {
         // 总是加载所有课程，后续根据showNonCurrent设置来决定显示哪些课程
         dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
-    } else emptyList<CourseEntity>().let { mutableStateOf(it) }
+    } else remember { mutableStateOf(emptyList<CourseEntity>()) }
 
     // 当前课表的作息时间
     val lessonTimes by if (timetableId != null) {
         dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
-    } else emptyList<LessonTimeEntity>().let { mutableStateOf(it) }
+    } else remember { mutableStateOf(emptyList<LessonTimeEntity>()) }
 
     // 计算有课的周数
     val weeksWithCourses = courses.flatMap { it.weeks }.distinct().sorted()
@@ -242,7 +242,6 @@ fun ScheduleScreen(
     courseEntities: List<CourseEntity> = emptyList(),
     lessonTimeEntities: List<LessonTimeEntity> = emptyList(),
 ) {
-    val scope = rememberCoroutineScope()
     var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
     val haptic = LocalHapticFeedback.current
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
