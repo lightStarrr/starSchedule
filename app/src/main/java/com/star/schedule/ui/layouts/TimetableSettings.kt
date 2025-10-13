@@ -69,6 +69,7 @@ import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
 import com.star.schedule.ui.components.OptimizedBottomSheet
+import com.star.schedule.utils.ImportManager.importTimetable
 import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,9 +83,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.apache.poi.hssf.usermodel.HSSFWorkbook
-import org.apache.poi.ss.usermodel.CellType
-import java.io.InputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -1868,11 +1866,11 @@ fun ImportOptionsSheet(
                     )
                     Column {
                         Text(
-                            text = "学习通",
+                            text = "从xls文件导入",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "从学习通导出xls导入",
+                            text = "自动匹配xls内容格式，如无法导入请联系作者",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2230,14 +2228,14 @@ fun XuexitongImportSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "从超星导出xls文件导入",
+                text = "从xls文件导入",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
             Text(
-                text = "请选择从超星导出的xls文件",
+                text = "自动匹配xls内容格式，如无法导入请联系作者",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -2248,7 +2246,7 @@ fun XuexitongImportSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "从超星APP或网页版导出课程表xls文件，然后在此处选择该文件进行导入。",
+                    text = "从教务系统导出课程表为xls文件，然后在此处选择该文件进行导入。",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(12.dp)
                 )
@@ -2328,8 +2326,8 @@ fun XuexitongImportSheet(
                         isLoading = true
                         scope.launch {
                             try {
-                                // 调用超星导入函数
-                                val result = importFromXuexitong(selectedFileUri!!, context, dao)
+                                // 调用导入函数
+                                val result = importTimetable(selectedFileUri!!, context, dao)
                                 if (result) {
                                     onDismiss()
                                 } else {
@@ -2362,204 +2360,4 @@ fun getFileNameFromUri(context: Context, uri: Uri): String? {
         }
     }
     return fileName
-}
-
-// 超星导入函数
-suspend fun importFromXuexitong(
-    fileUri: Uri,
-    context: Context,
-    dao: ScheduleDao
-): Boolean = withContext(Dispatchers.IO) {
-    try {
-        val inputStream: InputStream = context.contentResolver.openInputStream(fileUri)
-            ?: return@withContext false
-        val workbook = HSSFWorkbook(inputStream)
-        val sheet = workbook.getSheetAt(0)
-
-        data class TimeSlot(val row: Int, val start: String, val end: String)
-        data class WeekInfo(val col: Int, val weekDay: Int)
-        data class Course(
-            val name: String,
-            val teacher: String,
-            val weeks: List<Int>,
-            val location: String,
-            val timeSlots: MutableList<Int>,
-            val weekDay: Int
-        )
-
-        val timeListRegex = Regex("""\d{1,2}:\d{2}""")
-        val weekRegex = Regex("""星期\s*([一二三四五六日])""")
-
-        val timeList = mutableListOf<TimeSlot>()
-        val weekList = mutableListOf<WeekInfo>()
-        val courses = mutableListOf<Course>()
-
-        // 创建公式计算器
-        val evaluator = workbook.creationHelper.createFormulaEvaluator()
-
-        // 解析所有行的时间段（第5列）
-        for (rowIndex in 0..sheet.lastRowNum) {
-            val row = sheet.getRow(rowIndex) ?: continue
-            val cell = row.getCell(4) ?: continue
-            val text = cell.toString().trim()
-            if (text.isEmpty()) continue
-
-            val lines =
-                text.split("\n", "\r\n").map { it.trim() }.filter { it.matches(timeListRegex) }
-
-            if (lines.size == 2) {
-                timeList.add(TimeSlot(row = rowIndex + 1, start = lines[0], end = lines[1]))
-            }
-        }
-
-        // 解析第六行（索引5）的星期列
-        val weekRow = sheet.getRow(5)
-        if (weekRow != null) {
-            for (colIndex in 0 until weekRow.lastCellNum) {
-                val cell = weekRow.getCell(colIndex) ?: continue
-
-                val cellValue = when (cell.cellTypeEnum) {
-                    CellType.FORMULA -> evaluator.evaluate(cell).formatAsString()
-                    CellType.STRING -> cell.stringCellValue
-                    CellType.NUMERIC -> cell.numericCellValue.toInt().toString()
-                    else -> cell.toString()
-                }.replace("\n", "").replace("\r", "").trim()
-
-                val match = weekRegex.find(cellValue)
-                if (match != null) {
-                    val weekStr = match.groupValues[1]
-                    val weekNum = when (weekStr) {
-                        "一" -> 1
-                        "二" -> 2
-                        "三" -> 3
-                        "四" -> 4
-                        "五" -> 5
-                        "六" -> 6
-                        "日" -> 7
-                        else -> return@withContext false
-                    }
-                    weekList.add(WeekInfo(col = colIndex + 1, weekDay = weekNum))
-                }
-            }
-        }
-
-        // 解析课程信息
-        fun parseWeeks(weekStr: String): List<Int> {
-            val result = mutableListOf<Int>()
-            val regex = Regex("""(\d+)(?:-(\d+))?""")
-            regex.findAll(weekStr).forEach {
-                val start = it.groupValues[1].toInt()
-                val end = it.groupValues[2].takeIf { it.isNotEmpty() }?.toInt() ?: start
-                for (w in start..end) result.add(w)
-            }
-            return result
-        }
-
-        fun mergeOrCreateCourse(newCourse: Course, slot: Int) {
-            val existing = courses.find {
-                it.name == newCourse.name &&
-                        it.teacher == newCourse.teacher &&
-                        it.weeks == newCourse.weeks &&
-                        it.location == newCourse.location &&
-                        it.weekDay == newCourse.weekDay
-            }
-            if (existing != null) {
-                existing.timeSlots.add(slot)
-            } else {
-                newCourse.timeSlots.add(slot)
-                courses.add(newCourse)
-            }
-        }
-
-        for (week in weekList) {
-            for ((i, time) in timeList.withIndex()) {
-                val row = sheet.getRow(time.row - 1) ?: continue
-                val cell = row.getCell(week.col - 1) ?: continue
-                val cellText = cell.toString().trim()
-                if (cellText.isEmpty()) continue
-
-                val records = cellText.split("………………").map { it.trim() }.filter { it.isNotEmpty() }
-                for (record in records) {
-                    val lines = record.lines().map { it.trim() }.filter { it.isNotEmpty() }
-                    if (lines.size < 3) continue
-
-                    val name = lines[0]
-                    val teacherLine = lines[1]
-                    val teacherMatch = Regex("""(.+?)【(.+)】""").find(teacherLine)
-                    val teacher = teacherMatch?.groupValues?.get(1)?.trim() ?: ""
-                    val weeks =
-                        teacherMatch?.groupValues?.get(2)?.let { parseWeeks(it) } ?: emptyList()
-                    val location = lines[2]
-
-                    val newCourse = Course(
-                        name = name,
-                        teacher = teacher,
-                        weeks = weeks,
-                        location = location,
-                        timeSlots = mutableListOf(),
-                        weekDay = week.weekDay
-                    )
-
-                    mergeOrCreateCourse(newCourse, i + 1)
-                }
-            }
-        }
-
-        fun <T> List<T>.hasNoData(): Boolean = this.isEmpty() || this.all {
-            when (it) {
-                is TimeSlot -> it.start.isEmpty() || it.end.isEmpty()
-                is WeekInfo -> false // WeekInfo 只有 col 和 weekDay，基本不会空
-                is Course -> it.name.isEmpty() || it.teacher.isEmpty() || it.weeks.isEmpty() || it.location.isEmpty() || it.timeSlots.isEmpty()
-                else -> false
-            }
-        }
-
-        if (timeList.hasNoData() || weekList.hasNoData() || courses.hasNoData()) {
-            Log.e("XuexitongImport", "解析失败: timeList, weekList 或 courses 内部数据无效")
-            workbook.close()
-            inputStream.close()
-            return@withContext false
-        }
-
-        workbook.close()
-        inputStream.close()
-
-        val timetableId = dao.insertTimetableWithReminders(
-            TimetableEntity(
-                name = "学习通导入的课表",
-                showWeekend = true,
-                startDate = LocalDate.now().toString()
-            )
-        )
-
-        for (time in timeList) {
-            dao.insertOrUpdateLessonTimeAutoSort(
-                LessonTimeEntity(
-                    timetableId = timetableId,
-                    period = 1,
-                    startTime = time.start,
-                    endTime = time.end
-                )
-            )
-        }
-
-        for (course in courses) {
-            dao.insertCourseWithReminders(
-                CourseEntity(
-                    timetableId = timetableId,
-                    name = course.name,
-                    teacher = course.teacher,
-                    location = course.location,
-                    dayOfWeek = course.weekDay,
-                    periods = course.timeSlots,
-                    weeks = course.weeks
-                )
-            )
-        }
-
-        true
-    } catch (e: Exception) {
-        Log.e("XuexitongImport", "解析失败: ${e.message}", e)
-        false
-    }
 }
