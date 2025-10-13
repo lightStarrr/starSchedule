@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -181,7 +182,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                     modifier = Modifier.weight(0.5f)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
+                        Icon(Icons.Rounded.FileDownload, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text("导入")
                     }

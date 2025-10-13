@@ -42,18 +42,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LooksOne
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -432,19 +432,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 }
             },
             trailingContent = {
-                AnimatedContent(
-                    targetState = reminderEnabled,
-                    transitionSpec = {
-                        (scaleIn(
-                            animationSpec = tween(150)
-                        ) + fadeIn() togetherWith
-                                scaleOut(
-                                    animationSpec = tween(150)
-                                ) + fadeOut())
-                    }, label = "NotificationSwitch"
-                ) { enabled ->
                     Switch(
-                        checked = enabled,
+                        checked = reminderEnabled,
                         enabled = currentTimetableId != null,
                         onCheckedChange = { checked ->
                             haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -465,7 +454,6 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             }
                         }
                     )
-                }
             }
         )
 
@@ -492,7 +480,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     supportingContent = { Text("对于连续的课程，只在第一节课前发送通知") },
                     leadingContent = {
                         Icon(
-                            Icons.Rounded.Notifications,
+                            Icons.Rounded.LooksOne,
                             contentDescription = null
                         )
                     },
@@ -543,7 +531,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     supportingContent = { Text("自定义实况通知胶囊的背景颜色") },
                     leadingContent = {
                         Icon(
-                            Icons.Rounded.Notifications,
+                            Icons.Rounded.ColorLens,
                             contentDescription = null
                         )
                     },
@@ -702,7 +690,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 ListItem(
                     headlineContent = { Text("通知测试") },
                     supportingContent = { Text("测试通知功能（即时）") },
-                    leadingContent = { Icon(Icons.Rounded.PhoneAndroid, contentDescription = null) },
+                    leadingContent = { Icon(Icons.Rounded.Science, contentDescription = null) },
                     modifier = Modifier.clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         requestNotificationPermissionIfNeeded {
@@ -716,7 +704,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 ListItem(
                     headlineContent = { Text("通知测试") },
                     supportingContent = { Text("测试通知功能（延迟）") },
-                    leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
+                    leadingContent = { Icon(Icons.Rounded.Science, contentDescription = null) },
                     modifier = Modifier.clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         requestNotificationPermissionIfNeeded {
