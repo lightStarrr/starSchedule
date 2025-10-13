@@ -13,6 +13,8 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -104,6 +106,7 @@ fun WebCaptureScreen(context: WebActivity, url: String, onHtmlReceived: (String)
                     .fillMaxWidth()
                     .padding(16.dp)
                     .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState())
             ) {
                 Text(
                     text = "下载选项",

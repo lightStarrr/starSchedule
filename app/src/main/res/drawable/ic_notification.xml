@@ -4,7 +4,7 @@
     android:viewportWidth="24.0"
     android:viewportHeight="24.0">
     <group
-        android:translateY="1">
+        android:translateY="0.75">
         <path
             android:strokeWidth="2"
             android:strokeLineCap="round"

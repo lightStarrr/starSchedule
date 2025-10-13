@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -271,7 +273,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     )
 
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
                         items(timetables) { timetable ->
                             Card(
@@ -590,6 +593,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                 .fillMaxWidth()
                                 .padding(16.dp)
                                 .navigationBarsPadding()
+                                .verticalScroll(rememberScrollState())
                         ) {
                             Text(
                                 text = "选择颜色",

@@ -1807,6 +1807,7 @@ fun ImportOptionsSheet(
                 .fillMaxWidth()
                 .padding(16.dp)
                 .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
         ) {
             Text(
                 text = "选择导入方式",
