@@ -10,12 +10,17 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -400,39 +405,83 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 Text("为当前课表（$currentName）开启课前${reminderTime}分钟提醒")
             },
             leadingContent = {
-                Icon(
-                    if (reminderEnabled) Icons.Rounded.NotificationsActive else Icons.Rounded.Notifications,
-                    contentDescription = null
-                )
+                AnimatedContent(
+                    targetState = reminderEnabled,
+                    transitionSpec = {
+                        (scaleIn(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            ),
+                            initialScale = 0.8f
+                        ) + fadeIn() togetherWith
+                                scaleOut(
+                                    animationSpec = tween(100),
+                                    targetScale = 0.8f
+                                ) + fadeOut())
+                    }, label = "NotificationIcon"
+                ) { enabled ->
+                    Icon(
+                        imageVector = if (enabled) Icons.Rounded.NotificationsActive else Icons.Rounded.Notifications,
+                        contentDescription = null,
+                        tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                }
             },
             trailingContent = {
-                Switch(
-                    checked = reminderEnabled,
-                    enabled = currentTimetableId != null,
-                    onCheckedChange = { enabled ->
-                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                        if (enabled && currentTimetableId != null) {
-                            requestNotificationPermissionIfNeeded {
+                AnimatedContent(
+                    targetState = reminderEnabled,
+                    transitionSpec = {
+                        (scaleIn(
+                            animationSpec = tween(150)
+                        ) + fadeIn() togetherWith
+                                scaleOut(
+                                    animationSpec = tween(150)
+                                ) + fadeOut())
+                    }, label = "NotificationSwitch"
+                ) { enabled ->
+                    Switch(
+                        checked = enabled,
+                        enabled = currentTimetableId != null,
+                        onCheckedChange = { checked ->
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            if (checked && currentTimetableId != null) {
+                                requestNotificationPermissionIfNeeded {
+                                    scope.launch {
+                                        notificationManager.enableRemindersForTimetable(
+                                            currentTimetableId!!
+                                        )
+                                        reminderEnabled = true
+                                    }
+                                }
+                            } else {
                                 scope.launch {
-                                    notificationManager.enableRemindersForTimetable(
-                                        currentTimetableId!!
-                                    )
-                                    reminderEnabled = true
+                                    notificationManager.disableReminders()
+                                    reminderEnabled = false
                                 }
                             }
-                        } else {
-                            scope.launch {
-                                notificationManager.disableReminders()
-                                reminderEnabled = false
-                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         )
 
         // 只在连续课程的第一节课前发送通知的开关
-        if (reminderEnabled) {
+        AnimatedVisibility(
+            visible = reminderEnabled,
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 300, delayMillis = 200),
+                expandFrom = Alignment.Top
+            ) + fadeIn(
+                animationSpec = tween(durationMillis = 200, delayMillis = 200)
+            ),
+            exit = shrinkVertically(
+                animationSpec = tween(durationMillis = 300),
+                shrinkTowards = Alignment.Top
+            ) + fadeOut(
+                animationSpec = tween(durationMillis = 200)
+            )
+        ) {
             ListItem(
                 headlineContent = { Text("仅第一节连续课程提醒") },
                 supportingContent = { Text("对于连续的课程，只在第一节课前发送通知") },
@@ -465,7 +514,21 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         }
 
         // 实况通知胶囊背景颜色设置
-        if (reminderEnabled) {
+        AnimatedVisibility(
+            visible = reminderEnabled,
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 300, delayMillis = 100),
+                expandFrom = Alignment.Top
+            ) + fadeIn(
+                animationSpec = tween(durationMillis = 200, delayMillis = 100)
+            ),
+            exit = shrinkVertically(
+                animationSpec = tween(durationMillis = 300),
+                shrinkTowards = Alignment.Top
+            ) + fadeOut(
+                animationSpec = tween(durationMillis = 200)
+            )
+        ) {
             var showColorPicker by remember { mutableStateOf(false) }
             val liveCapsuleBgColorPref by dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR)
         .collectAsState(initial = "#FFE082")
@@ -602,7 +665,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(end = 8.dp),
+                            .padding(end = 8.dp),
                             horizontalArrangement = Arrangement.End
                         ) {
                             // 取消按钮 - 无边框样式
@@ -647,33 +710,51 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         }
 
 
-        ListItem(
-            headlineContent = { Text("通知测试") },
-            supportingContent = { Text("测试通知功能（即时）") },
-            leadingContent = { Icon(Icons.Rounded.PhoneAndroid, contentDescription = null) },
-            modifier = Modifier.clickable {
-                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                requestNotificationPermissionIfNeeded {
-                    scope.launch {
-                        notificationManager.sendTestNotification()
+        AnimatedVisibility(
+            visible = reminderEnabled,
+            enter = expandVertically(
+                animationSpec = tween(durationMillis = 300),
+                expandFrom = Alignment.Top
+            ) + fadeIn(
+                animationSpec = tween(durationMillis = 200)
+            ),
+            exit = shrinkVertically(
+                animationSpec = tween(durationMillis = 300),
+                shrinkTowards = Alignment.Top
+            ) + fadeOut(
+                animationSpec = tween(durationMillis = 200)
+            )
+        ) {
+            Column {
+                ListItem(
+                    headlineContent = { Text("通知测试") },
+                    supportingContent = { Text("测试通知功能（即时）") },
+                    leadingContent = { Icon(Icons.Rounded.PhoneAndroid, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        requestNotificationPermissionIfNeeded {
+                            scope.launch {
+                                notificationManager.sendTestNotification()
+                            }
+                        }
                     }
-                }
-            }
-        )
+                )
 
-        ListItem(
-            headlineContent = { Text("通知测试") },
-            supportingContent = { Text("测试通知功能（延迟）") },
-            leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
-            modifier = Modifier.clickable {
-                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                requestNotificationPermissionIfNeeded {
-                    scope.launch {
-                        notificationManager.scheduleTestReminder()
+                ListItem(
+                    headlineContent = { Text("通知测试") },
+                    supportingContent = { Text("测试通知功能（延迟）") },
+                    leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        requestNotificationPermissionIfNeeded {
+                            scope.launch {
+                                notificationManager.scheduleTestReminder()
+                            }
+                        }
                     }
-                }
+                )
             }
-        )
+        }
 
         ListItem(
             headlineContent = { Text("关于应用") },
