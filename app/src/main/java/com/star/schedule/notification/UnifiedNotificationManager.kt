@@ -488,7 +488,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
     fun sendTestNotification() {
-        val startTime = LocalTime.now().plusMinutes(15)
+        val startTime = LocalTime.now().plusMinutes(1)
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
         showCourseNotification(
@@ -508,7 +508,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
     fun scheduleTestReminder() {
-        val startTime = LocalTime.now().plusMinutes(15)
+        val startTime = LocalTime.now().plusMinutes(1)
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
         val intent = Intent(context, CourseReminderReceiver::class.java).apply {
