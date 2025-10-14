@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.os.Build
@@ -23,6 +24,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import com.star.schedule.MainActivity
 import com.star.schedule.R
 import com.star.schedule.Constants
@@ -33,7 +35,6 @@ import com.star.schedule.db.NotificationManagerProvider
 import com.star.schedule.db.ReminderEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -108,28 +109,30 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         return match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: -1
     }
 
-    /**
-     * 使用 WorkManager 的可靠通知方法
-     * 推荐使用此方法替代旧的协程方法
-     */
-    fun showCourseNotificationWithWorkManager(
-        courseName: String = "课程提醒",
-        location: String = "",
-        startTime: String = "",
-        minutesBefore: Int = 15
-    ) {
-        CourseNotificationWorker.scheduleCourseNotification(
-            context,
-            courseName,
-            location,
-            startTime,
-            minutesBefore
+    fun isFlymeLiveNotificationEnabled(context: Context): Boolean {
+        try {
+        } catch (_: java.lang.Exception) {
+            Log.d("LiveUtil", "isNotificationAllowed  error")
+        }
+        if (context.checkSelfPermission("flyme.permission.READ_NOTIFICATION_LIVE_STATE") != PackageManager.PERMISSION_GRANTED) {
+            Log.e("LiveUtil", "Missing permission: flyme.permission.READ_NOTIFICATION_LIVE_STATE")
+            return false
+        }
+        val call: Bundle? = context.contentResolver.call(
+            "content://com.android.systemui.notification.provider".toUri(),
+            "isNotificationLiveEnabled",
+            null as String?,
+            null as Bundle?
         )
+        Log.d("LiveUtil", "result=" + call + ", context package=" + context.getPackageName())
+        if (call != null) {
+            val z = call.getBoolean("result", false)
+            Log.d("LiveUtil", "result1 = $z")
+            return z
+        }
+        return false
     }
 
-    /**
-     * 立即显示通知（用于 WorkManager 调用）
-     */
     fun showCourseNotificationImmediate(
         courseName: String = "课程提醒",
         location: String = "",
@@ -138,7 +141,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     ) {
         when (Build.MANUFACTURER) {
             "meizu" -> {
-                if (getFlymeVersion() >= 12) {
+                if (getFlymeVersion() >= 11 && isFlymeLiveNotificationEnabled(context)) {
                     showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
                 } else {
                     showNormalNotification(courseName, location, startTime, minutesBefore)
@@ -151,51 +154,69 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         }
     }
 
-    /**
-     * 取消通知（用于 WorkManager 调用）
-     */
     fun cancelCourseNotification() {
         notificationManager.cancel(NOTIFICATION_ID)
     }
 
-    /**
-     * 旧的协程方法（不推荐，但保留用于向后兼容）
-     * 注意：此方法在应用被杀死或设备休眠时可能无法可靠执行
-     */
-    @Deprecated(
-        "使用 showCourseNotificationWithWorkManager 替代",
-        ReplaceWith("showCourseNotificationWithWorkManager(courseName, location, startTime, minutesBefore)")
-    )
     fun showCourseNotification(
         courseName: String = "课程提醒",
         location: String = "",
         startTime: String = "",
         minutesBefore: Int = 15
     ) {
-        CoroutineScope(Dispatchers.Default).launch {
-            when (Build.MANUFACTURER) {
-                "meizu" -> {
-                    if (getFlymeVersion() >= 12) {
-                        showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
-                    } else {
-                        showNormalNotification(courseName, location, startTime, minutesBefore)
-                    }
-                }
+        showCourseNotificationImmediate(courseName, location, startTime, minutesBefore)
 
-                else -> {
-                    showNormalNotification(courseName, location, startTime, minutesBefore)
-                }
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            val formatter = DateTimeFormatter.ofPattern("HH:mm")
+            val courseStart = LocalTime.parse(startTime, formatter)
+            val triggerTime = courseStart.atDate(LocalDate.now())
+                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+            val updateIntent = Intent(context, CourseNotificationUpdateReceiver::class.java).apply {
+                putExtra("course_name", courseName)
+                putExtra("course_location", location)
+                putExtra("course_time", startTime)
             }
 
-            delay(minutesBefore * 60 * 1000L)
+            val updatePendingIntent = PendingIntent.getBroadcast(
+                context,
+                courseName.hashCode(),
+                updateIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
 
-            showNormalNotification(courseName, location, startTime, 0)
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                updatePendingIntent
+            )
 
-            delay(60 * 1000L)
+            Log.d("UnifiedNotification", "已设置更新通知闹钟，时间: $startTime")
 
-            notificationManager.cancel(NOTIFICATION_ID)
+            // 🔹 安排“取消通知”闹钟（课程开始后1分钟触发）
+            val cancelIntent = Intent(context, CourseNotificationCancelReceiver::class.java)
+            val cancelPendingIntent = PendingIntent.getBroadcast(
+                context,
+                (courseName + "_cancel").hashCode(),
+                cancelIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime + 60_000,
+                cancelPendingIntent
+            )
+
+            Log.d("UnifiedNotification", "已设置取消通知闹钟，延迟1分钟触发")
+
+        } catch (e: Exception) {
+            Log.e("UnifiedNotification", "设置更新/取消闹钟失败", e)
         }
     }
+
 
 
     private fun showMeizuLiveNotification(
@@ -470,12 +491,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val startTime = LocalTime.now().plusMinutes(15)
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
-        // 使用 WorkManager 进行测试
-        showCourseNotificationWithWorkManager(
+        showCourseNotification(
             courseName = "测试课程",
             location = "测试教室A101",
             startTime = startTime,
-            minutesBefore = 1 // 测试时改为1分钟
+            minutesBefore = 1
         )
 
         CoroutineScope(Dispatchers.Main).launch {
@@ -777,7 +797,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     Log.w("UnifiedNotification", "未找到启用的课表提醒设置")
                     // 如果没有启用的课表，使用默认值
                     withContext(Dispatchers.Main) {
-                        UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
+                        UnifiedNotificationManager(context).showCourseNotification(
                             courseName = courseName,
                             location = courseLocation,
                             startTime = courseTime,
@@ -792,7 +812,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     Log.e("UnifiedNotification", "启用的课表ID格式错误: $enabledTimetableId")
                     // 如果ID格式错误，使用默认值
                     withContext(Dispatchers.Main) {
-                        UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
+                        UnifiedNotificationManager(context).showCourseNotification(
                             courseName = courseName,
                             location = courseLocation,
                             startTime = courseTime,
@@ -812,8 +832,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     15 // 默认15分钟
                 }
 
-                // 使用 WorkManager 显示通知（更可靠）
-                UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
+                UnifiedNotificationManager(context).showCourseNotification(
                     courseName = courseName,
                     location = courseLocation,
                     startTime = courseTime,
@@ -821,9 +840,8 @@ class CourseReminderReceiver : BroadcastReceiver() {
                 )
             } catch (e: Exception) {
                 Log.e("UnifiedNotification", "处理课程提醒时出错", e)
-                // 如果获取设置失败，使用默认值
                 withContext(Dispatchers.Main) {
-                    UnifiedNotificationManager(context).showCourseNotificationWithWorkManager(
+                    UnifiedNotificationManager(context).showCourseNotification(
                         courseName = courseName,
                         location = courseLocation,
                         startTime = courseTime,
@@ -881,5 +899,32 @@ class DailyUpdateReceiver : BroadcastReceiver() {
                 Log.e("DailyUpdate", "定期更新提醒失败", e)
             }
         }
+    }
+}
+
+/**
+ * 课程开始时更新通知内容（从“即将上课”→“已上课”）
+ */
+class CourseNotificationUpdateReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val courseName = intent.getStringExtra("course_name") ?: return
+        val location = intent.getStringExtra("course_location") ?: ""
+        val startTime = intent.getStringExtra("course_time") ?: ""
+
+        Log.d("CourseUpdateReceiver", "收到更新通知广播: $courseName")
+
+        UnifiedNotificationManager(context).showCourseNotificationImmediate(
+            courseName, location, startTime, minutesBefore = 0
+        )
+    }
+}
+
+/**
+ * 课程开始1分钟后取消通知
+ */
+class CourseNotificationCancelReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        Log.d("CourseCancelReceiver", "收到取消通知广播")
+        UnifiedNotificationManager(context).cancelCourseNotification()
     }
 }

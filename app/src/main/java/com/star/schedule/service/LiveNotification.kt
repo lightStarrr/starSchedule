@@ -17,6 +17,7 @@ class LiveNotification : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
+        Log.d("LiveNotification", "Service bound")
         return null
     }
 
