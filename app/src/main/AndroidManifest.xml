@@ -58,6 +58,18 @@
             android:name=".notification.DailyUpdateReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <service
+            android:name=".service.LiveNotification"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.android.systemui.LIVE_NOTIFICATION_SERVICE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="live_notification_config"
+                android:resource="@xml/live_notification_config" />
+        </service>
     </application>
 
 </manifest>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<liveNotification>
+    <title>星课表</title>
+    <description>课前提醒</description>
+    <icon>@mipmap/ic_launcher</icon>
+    <isService>false</isService>
+</liveNotification>
