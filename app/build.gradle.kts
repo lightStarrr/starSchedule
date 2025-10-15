@@ -13,8 +13,8 @@ android {
         applicationId = "com.star.schedule"
         minSdk = 33
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.0.23"
+        versionCode = 24
+        versionName = "1.0.24"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
