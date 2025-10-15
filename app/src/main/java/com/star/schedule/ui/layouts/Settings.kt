@@ -164,6 +164,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     else -> {
                         val intent =
                             Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                data = "package:${context.packageName}".toUri()
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                         context.startActivity(intent)

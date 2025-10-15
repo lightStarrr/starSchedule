@@ -137,19 +137,19 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         courseName: String = "课程提醒",
         location: String = "",
         startTime: String = "",
-        minutesBefore: Int = 15
+        finish: Boolean
     ) {
         when (Build.MANUFACTURER) {
             "meizu" -> {
                 if (getFlymeVersion() >= 11 && isFlymeLiveNotificationEnabled(context)) {
-                    showMeizuLiveNotification(courseName, location, startTime, minutesBefore)
+                    showMeizuLiveNotification(courseName, location, startTime, finish)
                 } else {
-                    showNormalNotification(courseName, location, startTime, minutesBefore)
+                    showNormalNotification(courseName, location, startTime, finish)
                 }
             }
 
             else -> {
-                showNormalNotification(courseName, location, startTime, minutesBefore)
+                showNormalNotification(courseName, location, startTime, finish)
             }
         }
     }
@@ -161,10 +161,9 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     fun showCourseNotification(
         courseName: String = "课程提醒",
         location: String = "",
-        startTime: String = "",
-        minutesBefore: Int = 15
+        startTime: String = ""
     ) {
-        showCourseNotificationImmediate(courseName, location, startTime, minutesBefore)
+        showCourseNotificationImmediate(courseName, location, startTime, false)
 
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -223,7 +222,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         courseName: String,
         location: String,
         startTime: String,
-        minutesBefore: Int
+        finish: Boolean
     ) {
         // 获取数据库实例
         val dao = DatabaseProvider.dao()
@@ -261,8 +260,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             putInt("notification.live.contentColor", textColor.toArgb())
         }
 
-        val layout = if(minutesBefore >0) RemoteViews(context.packageName, R.layout.live_notification_card)
-        else RemoteViews(context.packageName, R.layout.live_notification_card_ok)
+        val layout = if(finish) RemoteViews(context.packageName, R.layout.live_notification_card_ok)
+        else RemoteViews(context.packageName, R.layout.live_notification_card)
 
         val contentRemoteViews =
             layout.apply {
@@ -278,7 +277,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             .setContentText("${startTime}开始上课")
             .addExtras(liveBundle)
             .setCustomContentView(contentRemoteViews)
-            .setAutoCancel(true)
+            .setAutoCancel(false)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
@@ -289,7 +288,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         courseName: String,
         location: String,
         startTime: String,
-        minutesBefore: Int
+        finish: Boolean
     ) {
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -301,17 +300,17 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val contentText = if (minutesBefore > 0) {
-            if (location.isNotEmpty()) {
-                "$courseName 即将上课\n地点: $location"
-            } else {
-                "$courseName 即将上课"
-            }
-        } else {
+        val contentText = if (finish) {
             if (location.isNotEmpty()) {
                 "$courseName 已上课\n地点: $location"
             } else {
                 "$courseName 已上课"
+            }
+        } else {
+            if (location.isNotEmpty()) {
+                "$courseName 即将上课\n地点: $location"
+            } else {
+                "$courseName 即将上课"
             }
         }
 
@@ -329,7 +328,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 )
             )
             .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
+            .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
@@ -495,7 +494,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             courseName = "测试课程",
             location = "测试教室A101",
             startTime = startTime,
-            minutesBefore = 1
         )
 
         CoroutineScope(Dispatchers.Main).launch {
@@ -800,8 +798,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                         UnifiedNotificationManager(context).showCourseNotification(
                             courseName = courseName,
                             location = courseLocation,
-                            startTime = courseTime,
-                            minutesBefore = 15
+                            startTime = courseTime
                         )
                     }
                     return@launch
@@ -815,28 +812,16 @@ class CourseReminderReceiver : BroadcastReceiver() {
                         UnifiedNotificationManager(context).showCourseNotification(
                             courseName = courseName,
                             location = courseLocation,
-                            startTime = courseTime,
-                            minutesBefore = 15
+                            startTime = courseTime
                         )
                     }
                     return@launch
                 }
 
-                // 获取课前提醒时间设置
-                val timetable = dao.getTimetableFlow(timetableId).first()
-                val reminderTime = if (timetable != null) {
-                    Log.d("UnifiedNotification", "课前提醒时间设置: ${timetable.reminderTime} 分钟")
-                    timetable.reminderTime
-                } else {
-                    Log.w("UnifiedNotification", "未找到课表ID $timetableId 的详细信息，使用默认提醒时间")
-                    15 // 默认15分钟
-                }
-
                 UnifiedNotificationManager(context).showCourseNotification(
                     courseName = courseName,
                     location = courseLocation,
-                    startTime = courseTime,
-                    minutesBefore = reminderTime
+                    startTime = courseTime
                 )
             } catch (e: Exception) {
                 Log.e("UnifiedNotification", "处理课程提醒时出错", e)
@@ -844,8 +829,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     UnifiedNotificationManager(context).showCourseNotification(
                         courseName = courseName,
                         location = courseLocation,
-                        startTime = courseTime,
-                        minutesBefore = 15
+                        startTime = courseTime
                     )
                 }
             }
@@ -911,16 +895,20 @@ class CourseNotificationUpdateReceiver : BroadcastReceiver() {
         val location = intent.getStringExtra("course_location") ?: ""
         val startTime = intent.getStringExtra("course_time") ?: ""
 
+        if (!DatabaseProvider.isInitialized()) {
+            DatabaseProvider.init(context)
+        }
+
         Log.d("CourseUpdateReceiver", "收到更新通知广播: $courseName")
 
         UnifiedNotificationManager(context).showCourseNotificationImmediate(
-            courseName, location, startTime, minutesBefore = 0
+            courseName, location, startTime, true
         )
     }
 }
 
 /**
- * 课程开始1分钟后取消通知
+ * 课程开始5分钟后取消通知
  */
 class CourseNotificationCancelReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
