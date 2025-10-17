@@ -106,12 +106,18 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DatabaseProvider.init(this)
         enableEdgeToEdge()
+        
+        // 启动小组件初始化服务
+        val initIntent = Intent(this, com.star.schedule.service.WidgetInitializationService::class.java)
+        startService(initIntent)
+        
         setContent {
             StarScheduleTheme {
                 Layout(context = this)
@@ -525,24 +531,48 @@ fun getAppVersionName(context: Context): String {
 suspend fun fetchLatestReleaseTag(): String? {
     return withContext(Dispatchers.IO) {
         try {
-            val client = OkHttpClient()
+            // 创建带有超时和重试机制的OkHttpClient
+            val client = OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .build()
+            
             val url = "https://api.github.com/repos/lightStarrr/starSchedule/releases/latest"
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/vnd.github+json")
-                // GitHub 要求有 User-Agent
                 .header("User-Agent", "StarScheduleApp")
                 .build()
+            
             val resp = client.newCall(request).execute()
             if (!resp.isSuccessful) {
+                Log.w("StarSchedule", "GitHub API request failed with code: ${resp.code}")
                 return@withContext null
             }
+            
             val body = resp.body.string()
+            if (body.isBlank()) {
+                Log.w("StarSchedule", "Empty response from GitHub API")
+                return@withContext null
+            }
+            
             val json = JSONObject(body)
             val tag = json.optString("tag_name", "v1.0.0")
+            Log.d("StarSchedule", "Successfully fetched latest release tag: $tag")
             tag
+        } catch (e: javax.net.ssl.SSLHandshakeException) {
+            Log.w("StarSchedule", "SSL handshake failed, network may be unstable", e)
+            null
+        } catch (e: java.net.SocketTimeoutException) {
+            Log.w("StarSchedule", "Request timeout, network may be slow", e)
+            null
+        } catch (e: java.net.UnknownHostException) {
+            Log.w("StarSchedule", "Cannot resolve host, network unavailable", e)
+            null
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.w("StarSchedule", "Failed to fetch latest release tag", e)
             null
         }
     }

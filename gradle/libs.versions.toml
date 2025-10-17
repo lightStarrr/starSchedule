@@ -18,6 +18,8 @@ okhttp = "5.2.1"
 okhttpBom = "5.2.1"
 colorPicker = "1.1.2"
 workRuntime = "2.10.5"
+glanceAppwidget = "1.2.0-beta01"
+glanceMaterial3 = "1.2.0-beta01"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +47,8 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 okhttp-bom = { group = "com.squareup.okhttp3", name = "okhttp-bom", version.ref = "okhttpBom" }
 color-picker = { module = "com.github.skydoves:colorpicker-compose", version.ref = "colorPicker" }
 androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntime" }
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glanceAppwidget" }
+androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glanceMaterial3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

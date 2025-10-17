@@ -72,6 +72,9 @@ object ImportManager {
                 )
             }
 
+            // 课表导入完成后立即刷新小组件
+            com.star.schedule.service.WidgetRefreshManager.onTimetableSwitched(context)
+
             true
         }
 }

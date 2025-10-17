@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.okhttp)
     implementation(platform(libs.okhttp.bom))
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
     kapt(libs.androidx.room.compiler) {
         exclude(group = "com.intellij", module = "annotations")
     }

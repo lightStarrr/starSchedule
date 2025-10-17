@@ -69,6 +69,7 @@ import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
+import com.star.schedule.service.WidgetRefreshManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.utils.ImportManager.importTimetable
 import com.star.schedule.utils.ValidationUtils
@@ -390,6 +391,8 @@ fun EditLessonTimeSheet(
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+
     OptimizedBottomSheet(
         onDismiss = onDismiss,
         sheetState = sheetState
@@ -533,6 +536,8 @@ fun EditLessonTimeSheet(
                                 isInsert = false
                             )
                             Log.d("EditLessonTimeSheet", "更新课程时间成功，ID: $result")
+                            // 课程时间编辑后立即刷新小组件
+                            WidgetRefreshManager.onCourseDataChanged(context)
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("EditLessonTimeSheet", "更新课程时间失败", e)
@@ -583,6 +588,8 @@ fun EditCourseSheet(
     dao: ScheduleDao,
     sheetState: androidx.compose.material3.SheetState
 ) {
+    val context = LocalContext.current
+
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(course.timetableId).collectAsState(initial = emptyList())
     val filteredCourses = courses.filter { it.id != course.id } // 排除当前正在编辑的课程
@@ -797,6 +804,8 @@ fun EditCourseSheet(
                                 )
                             )
                             Log.d("EditCourseSheet", "更新课程成功，ID: ${course.id}")
+                            // 课程编辑后立即刷新小组件
+                            WidgetRefreshManager.onCourseDataChanged(context)
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("EditCourseSheet", "更新课程失败", e)
@@ -822,6 +831,8 @@ fun AddLessonTimeSheet(
     dao: ScheduleDao,
     sheetState: androidx.compose.material3.SheetState
 ) {
+    val context = LocalContext.current
+
     // 获取当前课表的所有课程时间，用于重叠检测
     val lessonTimes by dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
 
@@ -978,6 +989,8 @@ fun AddLessonTimeSheet(
                                 )
                             )
                             Log.d("AddLessonTimeSheet", "新增课程时间成功，ID: $result")
+                            // 课程时间添加后立即刷新小组件
+                            WidgetRefreshManager.onCourseDataChanged(context)
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("AddLessonTimeSheet", "新增课程时间失败", e)
@@ -1030,6 +1043,8 @@ fun AddCourseSheet(
     dao: ScheduleDao,
     sheetState: androidx.compose.material3.SheetState
 ) {
+    val context = LocalContext.current
+
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
 
@@ -1238,6 +1253,8 @@ fun AddCourseSheet(
                                 )
                             )
                             Log.d("AddCourseSheet", "新增课程成功，ID: $result")
+                            // 课程添加后立即刷新小组件
+                            WidgetRefreshManager.onCourseDataChanged(context)
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("AddCourseSheet", "新增课程失败", e)
@@ -1262,6 +1279,8 @@ fun TimetableDetailSheet(
     dao: ScheduleDao,
     sheetState: androidx.compose.material3.SheetState
 ) {
+    val context = LocalContext.current
+
     val scope = rememberCoroutineScope()
 
     // 课表信息状态
@@ -1500,6 +1519,9 @@ fun TimetableDetailSheet(
                                         reminderTime = reminderTime.toInt()
                                     )
                                 )
+                                
+                                // 课表设置修改后立即刷新小组件
+                                WidgetRefreshManager.onTimetableSettingsChanged(context)
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -1567,6 +1589,8 @@ fun TimetableDetailSheet(
                                             dao.deleteLessonTimeAutoSort(
                                                 lesson
                                             )
+                                            // 课程时间删除后立即刷新小组件
+                                            WidgetRefreshManager.onCourseDataChanged(context)
                                         }
                                     }) {
                                         Icon(
@@ -1638,6 +1662,8 @@ fun TimetableDetailSheet(
                                             dao.deleteCourseWithReminders(
                                                 course
                                             )
+                                            // 课程删除后立即刷新小组件
+                                            WidgetRefreshManager.onCourseDataChanged(context)
                                         }
                                     }) {
                                         Icon(Icons.Rounded.Delete, contentDescription = "删除课程")
@@ -2331,6 +2357,8 @@ fun XuexitongImportSheet(
                                 // 调用导入函数
                                 val result = importTimetable(selectedFileUri!!, context, dao)
                                 if (result) {
+                                    // 课表导入成功后立即刷新小组件
+                                    WidgetRefreshManager.onTimetableSwitched(context)
                                     onDismiss()
                                 } else {
                                     errorMessage = "导入失败，请检查文件格式是否正确"

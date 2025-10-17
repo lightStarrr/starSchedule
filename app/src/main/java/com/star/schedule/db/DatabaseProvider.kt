@@ -9,23 +9,33 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 object DatabaseProvider {
+    private val lock = Any()
     lateinit var db: AppDatabase
         private set
 
     fun isInitialized(): Boolean = ::db.isInitialized
 
     fun init(context: Context) {
-        if (!::db.isInitialized) {
-            db = Room.databaseBuilder(
-                context.applicationContext,
-                AppDatabase::class.java,
-                "schedule.db"
-            )
-                .addMigrations(MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
-                .build()
+        // 使用同步锁确保线程安全
+        synchronized(lock) {
+            if (!::db.isInitialized) {
+                android.util.Log.d("DatabaseProvider", "Initializing database...")
+                
+                db = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "schedule.db"
+                )
+                    .addMigrations(MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
+                    .build()
 
-            CoroutineScope(Dispatchers.IO).launch {
-                db.scheduleDao().initializeDefaultTimetable()
+                CoroutineScope(Dispatchers.IO).launch {
+                    db.scheduleDao().initializeDefaultTimetable()
+                }
+                
+                android.util.Log.d("DatabaseProvider", "Database initialized successfully")
+            } else {
+                android.util.Log.d("DatabaseProvider", "Database already initialized")
             }
         }
     }

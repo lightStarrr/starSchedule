@@ -195,6 +195,9 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             // 课表切换时自动关闭提醒
             notificationManager.disableReminders()
             reminderEnabled = false
+            
+            // 课表切换时立即刷新小组件
+            com.star.schedule.service.WidgetRefreshManager.onTimetableSwitched(context)
         }
 
         currentTimetableId = newTimetableId
