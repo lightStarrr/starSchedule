@@ -55,7 +55,7 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".widget.MyWidgetReceiver"
+        <receiver android:name=".widget.TwoDaysWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

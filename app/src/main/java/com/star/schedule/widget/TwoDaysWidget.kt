@@ -29,6 +29,7 @@ import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
+import androidx.glance.layout.width
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -37,12 +38,14 @@ import com.star.schedule.Constants
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.getWeekOfSemester
-import com.star.schedule.widget.MyWidget.Companion.updateWidgetContent
+import com.star.schedule.widget.TwoDaysWidget.Companion.updateWidgetContent
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -52,6 +55,14 @@ import java.time.format.DateTimeFormatter
 // Widget状态键
 val KEY_COURSES_DATA = stringPreferencesKey("courses_data")
 val KEY_UPDATE_TIME = stringPreferencesKey("update_time")
+val KEY_COURSES_JSON = stringPreferencesKey("courses_json")
+
+// JSON解析器
+private val jsonParser = Json {
+    ignoreUnknownKeys = true
+    coerceInputValues = true
+    encodeDefaults = true
+}
 
 // 课程数据类
 sealed class CourseStatus {
@@ -69,18 +80,44 @@ data class CourseInfo(
     val dayOfWeek: Int
 )
 
-class MyWidget : GlanceAppWidget() {
+// JSON数据模型
+@Serializable
+data class WidgetCourseData(
+    val today: DayCourses,
+    val tomorrow: DayCourses,
+    val updateTime: String
+)
+
+@Serializable
+data class DayCourses(
+    val hasCourses: Boolean,
+    val courses: List<CourseItem>,
+    val noCourseMessage: String = ""
+)
+
+@Serializable
+data class CourseItem(
+    val name: String,
+    val location: String,
+    val teacher: String,
+    val startTime: String,
+    val endTime: String,
+    val status: String? = null,
+    val statusColor: String = "primary"
+)
+
+class TwoDaysWidget : GlanceAppWidget() {
 
     override val stateDefinition = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        Log.d("MyWidget", "provideGlance called for glanceId: $id")
+        Log.d("TwoDaysWidget", "provideGlance called for glanceId: $id")
 
         try {
             // 确保数据库已初始化（不在协程作用域内执行延迟操作）
             if (!DatabaseProvider.isInitialized()) {
                 DatabaseProvider.init(context)
-                Log.d("MyWidget", "Database initialized for glanceId: $id")
+                Log.d("TwoDaysWidget", "Database initialized for glanceId: $id")
             }
 
             provideContent {
@@ -90,7 +127,7 @@ class MyWidget : GlanceAppWidget() {
             }
 
         } catch (e: Exception) {
-            Log.e("MyWidget", "Error in provideGlance for glanceId: $id", e)
+            Log.e("TwoDaysWidget", "Error in provideGlance for glanceId: $id", e)
 
             // 提供错误状态的内容
             provideContent {
@@ -134,49 +171,23 @@ class MyWidget : GlanceAppWidget() {
     @Composable
     private fun Content() {
         val prefs = currentState<Preferences>()
-        val coursesData = prefs[KEY_COURSES_DATA] ?: "暂无课程信息"
+        val coursesJson = prefs[KEY_COURSES_JSON]
         val lastUpdate = prefs[KEY_UPDATE_TIME] ?: ""
 
-        // 拆分今天和明天课程（保持原有逻辑）
-        val lines = coursesData.lines()
-        val todayCourses = mutableListOf<String>()
-        val tomorrowCourses = mutableListOf<String>()
-        var currentDay = ""
-        lines.forEach { line ->
-            when {
-                line.startsWith("今天:") -> {
-                    currentDay = "today"
-                    // 清空今天的课程列表，避免重复添加
-                    if (todayCourses.isNotEmpty()) todayCourses.clear()
-                }
-
-                line.startsWith("明天:") -> {
-                    currentDay = "tomorrow"
-                    // 清空明天的课程列表，避免重复添加
-                    if (tomorrowCourses.isNotEmpty()) tomorrowCourses.clear()
-                }
-
-                line.isNotBlank() -> {
-                    if (currentDay == "today") {
-                        // 只添加非标题行到今天的课程列表
-                        if (!line.startsWith("今天:") && !line.startsWith("明天:")) {
-                            todayCourses.add(line)
-                        }
-                    } else if (currentDay == "tomorrow") {
-                        // 只添加非标题行到明天的课程列表
-                        if (!line.startsWith("今天:") && !line.startsWith("明天:")) {
-                            tomorrowCourses.add(line)
-                        }
-                    }
-                }
+        // 解析JSON数据
+        val widgetData = try {
+            if (coursesJson != null) {
+                jsonParser.decodeFromString<WidgetCourseData>(coursesJson)
+            } else {
+                // 如果没有JSON数据，尝试回退到旧的字符串格式
+                val coursesData = prefs[KEY_COURSES_DATA] ?: "暂无课程信息"
+                parseLegacyData(coursesData, lastUpdate)
             }
+        } catch (e: Exception) {
+            // JSON解析失败，回退到旧格式
+            val coursesData = prefs[KEY_COURSES_DATA] ?: "暂无课程信息"
+            parseLegacyData(coursesData, lastUpdate)
         }
-
-        // 检查今天是否有课程
-        val hasTodayCourses =
-            todayCourses.isNotEmpty() && todayCourses.firstOrNull() != "今天无课" && !todayCourses.all { it == "今天无课" }
-        val hasTomorrowCourses =
-            tomorrowCourses.isNotEmpty() && tomorrowCourses.firstOrNull() != "明天无课" && !tomorrowCourses.all { it == "明天无课" }
 
         // 顶层 Column：上面是两列内容（占满剩余高度），下面是更新时间（固定在底部）
         Column(
@@ -186,7 +197,7 @@ class MyWidget : GlanceAppWidget() {
                 .padding(12.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            if (!hasTodayCourses && !hasTomorrowCourses) {
+            if (!widgetData.today.hasCourses && !widgetData.tomorrow.hasCourses) {
                 Box(
                     modifier = GlanceModifier
                         .fillMaxSize()
@@ -207,8 +218,7 @@ class MyWidget : GlanceAppWidget() {
                 Row(
                     modifier = GlanceModifier
                         .fillMaxWidth()
-                        .defaultWeight() // 使这行占据 Column 的剩余高度，从而把更新时间推到底部
-                    ,
+                        .defaultWeight(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // ========== 今天 ==========
@@ -228,32 +238,93 @@ class MyWidget : GlanceAppWidget() {
                             modifier = GlanceModifier.padding(bottom = 8.dp)
                         )
 
-                        if (hasTodayCourses) {
+                        if (widgetData.today.hasCourses) {
+                            var first = true
                             LazyColumn(modifier = GlanceModifier.fillMaxHeight()) {
-                                items(todayCourses.size) { index ->
-                                    val line = todayCourses[index]
-                                    val topPadding = if (index == 0) 0.dp else 8.dp
+                                items(widgetData.today.courses.size) { index ->
+                                    val course = widgetData.today.courses[index]
+                                    if (course.status == "已结束") {
+                                        return@items
+                                    }
+                                    val topPadding = if (first) {
+                                        0.dp
+                                    } else {
+                                        first = false
+                                        8.dp
+                                    }
 
-                                    // 直接在 items 的 lambda 内输出（不要再嵌套 item { }）
-                                    Box(
+                                    Row(
                                         modifier = GlanceModifier
                                             .fillMaxWidth()
-                                            .padding(top = topPadding) // 外部间距，背景外
+                                            .padding(top = topPadding)
                                     ) {
                                         Box(
                                             modifier = GlanceModifier
+                                                .width(5.dp)
+                                                .fillMaxHeight()
+                                                .background(GlanceTheme.colors.primary)
+                                                .cornerRadius(5.dp),
+                                            content = {},
+                                        )
+                                        Box(
+                                            modifier = GlanceModifier
                                                 .fillMaxWidth()
-                                                .background(GlanceTheme.colors.primaryContainer)
-                                                .padding(8.dp) // 背景内部内边距
+                                                .padding(8.dp)
                                                 .cornerRadius(12.dp)
                                         ) {
-                                            Text(
-                                                text = line,
-                                                style = TextStyle(
-                                                    fontSize = 14.sp,
-                                                    color = GlanceTheme.colors.onSurface
+                                            Column {
+                                                Text(
+                                                    text = course.name,
+                                                    style = TextStyle(
+                                                        fontSize = 14.sp,
+                                                        color = GlanceTheme.colors.onSurface,
+                                                        fontWeight = FontWeight.Medium
+                                                    ),
+                                                    maxLines = 1
                                                 )
-                                            )
+                                                if (course.location.isNotBlank()) {
+                                                    Text(
+                                                        text = course.location,
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            color = GlanceTheme.colors.onSurfaceVariant
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                                if (course.startTime.isNotBlank() && course.endTime.isNotBlank()) {
+                                                    Text(
+                                                        text = "${course.startTime} - ${course.endTime}",
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            color = GlanceTheme.colors.onSurfaceVariant
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = "未设置时间",
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            color = GlanceTheme.colors.onSurfaceVariant
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+
+                                                }
+
+                                                if (course.status != null) {
+                                                    Text(
+                                                        text = course.status,
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            color = GlanceTheme.colors.primary,
+                                                            fontWeight = FontWeight.Bold
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -293,37 +364,82 @@ class MyWidget : GlanceAppWidget() {
                             modifier = GlanceModifier.padding(bottom = 8.dp)
                         )
 
-                        if (hasTomorrowCourses) {
+                        if (widgetData.tomorrow.hasCourses) {
+                            var first = true
                             LazyColumn(modifier = GlanceModifier.fillMaxHeight()) {
-                                items(tomorrowCourses.size) { index ->
-                                    val line = tomorrowCourses[index]
-                                    val topPadding = if (index == 0) 0.dp else 8.dp
+                                items(widgetData.tomorrow.courses.size) { index ->
+                                    val course = widgetData.tomorrow.courses[index]
+                                    val topPadding = if (first) {
+                                        0.dp
+                                    } else {
+                                        first = false
+                                        8.dp
+                                    }
 
-                                    Box(
+                                    Row(
                                         modifier = GlanceModifier
                                             .fillMaxWidth()
                                             .padding(top = topPadding)
                                     ) {
                                         Box(
                                             modifier = GlanceModifier
+                                                .width(5.dp)
+                                                .fillMaxHeight()
+                                                .background(GlanceTheme.colors.secondary)
+                                                .cornerRadius(5.dp),
+                                            content = {},
+                                        )
+                                        Box(
+                                            modifier = GlanceModifier
                                                 .fillMaxWidth()
-                                                .background(GlanceTheme.colors.secondaryContainer)
                                                 .padding(8.dp)
                                                 .cornerRadius(12.dp)
                                         ) {
-                                            Text(
-                                                text = line,
-                                                style = TextStyle(
-                                                    fontSize = 14.sp,
-                                                    color = GlanceTheme.colors.onSurface
+                                            Column {
+                                                Text(
+                                                    text = course.name,
+                                                    style = TextStyle(
+                                                        fontSize = 14.sp,
+                                                        color = GlanceTheme.colors.onSurface,
+                                                        fontWeight = FontWeight.Medium
+                                                    ),
+                                                    maxLines = 1
                                                 )
-                                            )
+                                                if (course.location.isNotBlank()) {
+                                                    Text(
+                                                        text = course.location,
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            color = GlanceTheme.colors.onSurfaceVariant
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                                if (course.startTime.isNotBlank() && course.endTime.isNotBlank()) {
+                                                    Text(
+                                                        text = "${course.startTime} - ${course.endTime}",
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            color = GlanceTheme.colors.onSurfaceVariant
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = "未设置时间",
+                                                        style = TextStyle(
+                                                            fontSize = 12.sp,
+                                                            color = GlanceTheme.colors.onSurfaceVariant
+                                                        ),
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         } else {
-                            // 明天无课时显示居中的"无课"
                             Box(
                                 modifier = GlanceModifier
                                     .fillMaxSize(),
@@ -345,7 +461,7 @@ class MyWidget : GlanceAppWidget() {
             // ========== 底部的更新时间（左下角）==========
             // 使用较小字号和次要色，放在 Column 底部的第 2 个子项，自然位于左下角
             val displayTime =
-                if (lastUpdate.isNotBlank()) "最后更新时间：$lastUpdate" else "最后更新时间：--:--"
+                if (widgetData.updateTime.isNotBlank()) "最后更新时间：${widgetData.updateTime}" else "最后更新时间：--:--"
             Text(
                 text = displayTime,
                 modifier = GlanceModifier
@@ -357,6 +473,102 @@ class MyWidget : GlanceAppWidget() {
                 )
             )
         }
+    }
+
+    private fun parseLegacyData(coursesData: String, updateTime: String): WidgetCourseData {
+        // 拆分今天和明天课程（保持原有逻辑）
+        val lines = coursesData.lines()
+        val todayCourses = mutableListOf<String>()
+        val tomorrowCourses = mutableListOf<String>()
+        var currentDay = ""
+        lines.forEach { line ->
+            when {
+                line.startsWith("今天:") -> {
+                    currentDay = "today"
+                    if (todayCourses.isNotEmpty()) todayCourses.clear()
+                }
+
+                line.startsWith("明天:") -> {
+                    currentDay = "tomorrow"
+                    if (tomorrowCourses.isNotEmpty()) tomorrowCourses.clear()
+                }
+
+                line.isNotBlank() -> {
+                    if (currentDay == "today" && !line.startsWith("今天:") && !line.startsWith("明天:")) {
+                        todayCourses.add(line)
+                    } else if (currentDay == "tomorrow" && !line.startsWith("今天:") && !line.startsWith(
+                            "明天:"
+                        )
+                    ) {
+                        tomorrowCourses.add(line)
+                    }
+                }
+            }
+        }
+
+        val hasTodayCourses =
+            todayCourses.isNotEmpty() && todayCourses.firstOrNull() != "今天无课" && !todayCourses.all { it == "今天无课" }
+        val hasTomorrowCourses =
+            tomorrowCourses.isNotEmpty() && tomorrowCourses.firstOrNull() != "明天无课" && !tomorrowCourses.all { it == "明天无课" }
+
+        val todayCourseItems = if (hasTodayCourses) {
+            todayCourses.map { line ->
+                val parts = line.split(" ")
+                val timeRange = parts.getOrElse(0) { "" }
+                val courseName = parts.getOrElse(1) { "" }
+                val location = parts.find { part -> part.startsWith("@") }?.substring(1) ?: ""
+                val teacher = parts.find { part -> part.startsWith("(") && part.endsWith(")") }
+                    ?.let { p -> p.substring(1, p.length - 1) } ?: ""
+                val status = parts.find { part -> part.startsWith("【") && part.endsWith("】") }
+                    ?.let { p -> p.substring(1, p.length - 1) }
+
+                CourseItem(
+                    name = courseName,
+                    location = location,
+                    teacher = teacher,
+                    startTime = timeRange.split("-").getOrElse(0) { "" },
+                    endTime = timeRange.split("-").getOrElse(1) { "" },
+                    status = status
+                )
+            }
+        } else {
+            emptyList()
+        }
+
+        val tomorrowCourseItems = if (hasTomorrowCourses) {
+            tomorrowCourses.map { line ->
+                val parts = line.split(" ")
+                val timeRange = parts.getOrElse(0) { "" }
+                val courseName = parts.getOrElse(1) { "" }
+                val location = parts.find { part -> part.startsWith("@") }?.substring(1) ?: ""
+                val teacher = parts.find { part -> part.startsWith("(") && part.endsWith(")") }
+                    ?.let { p -> p.substring(1, p.length - 1) } ?: ""
+
+                CourseItem(
+                    name = courseName,
+                    location = location,
+                    teacher = teacher,
+                    startTime = timeRange.split("-").getOrElse(0) { "" },
+                    endTime = timeRange.split("-").getOrElse(1) { "" }
+                )
+            }
+        } else {
+            emptyList()
+        }
+
+        return WidgetCourseData(
+            today = DayCourses(
+                hasCourses = hasTodayCourses,
+                courses = todayCourseItems,
+                noCourseMessage = "今天没课哟~"
+            ),
+            tomorrow = DayCourses(
+                hasCourses = hasTomorrowCourses,
+                courses = tomorrowCourseItems,
+                noCourseMessage = "明天没课哟~"
+            ),
+            updateTime = updateTime
+        )
     }
 
     companion object {
@@ -398,52 +610,118 @@ class MyWidget : GlanceAppWidget() {
                 // 获取当前时间
                 val now = LocalDateTime.now()
                 val currentTime = now.toLocalTime()
+                val updateTimeStr = now.format(DateTimeFormatter.ofPattern("HH:mm"))
 
-                // 构建widget显示内容
+                // 构建今天的课程数据
+                val todayCourseItems = if (todayCourses.isNotEmpty()) {
+                    todayCourses.sortedBy { it.periods.minOrNull() ?: 0 }.map { course ->
+                        val startPeriod = course.periods.minOrNull() ?: 0
+                        val endPeriod = course.periods.maxOrNull() ?: 0
+                        val startLesson = lessonTimes.find { it.period == startPeriod }
+                        val endLesson = lessonTimes.find { it.period == endPeriod }
+
+                        val startTime = startLesson?.startTime ?: ""
+                        val endTime = endLesson?.endTime ?: ""
+
+                        val status = getCourseStatus(course, startTime, endTime, currentTime)
+                        val statusText = when (status) {
+                            is CourseStatus.BeforeClass -> status.timeUntilStart
+                            is CourseStatus.DuringClass -> status.timeUntilEnd
+                            is CourseStatus.AfterClass -> "已结束"
+                            else -> null
+                        }
+
+                        CourseItem(
+                            name = course.name,
+                            location = course.location,
+                            teacher = course.teacher,
+                            startTime = startTime,
+                            endTime = endTime,
+                            status = statusText,
+                            statusColor = when (status) {
+                                is CourseStatus.BeforeClass -> "primary"
+                                is CourseStatus.DuringClass -> "secondary"
+                                is CourseStatus.AfterClass -> "tertiary"
+                                else -> "primary"
+                            }
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+
+                // 构建明天的课程数据（限制显示2门课程）
+                val tomorrowCourseItems = if (tomorrowCourses.isNotEmpty()) {
+                    tomorrowCourses.sortedBy { it.periods.minOrNull() ?: 0 }.take(2).map { course ->
+                        val startPeriod = course.periods.minOrNull() ?: 0
+                        val endPeriod = course.periods.maxOrNull() ?: 0
+                        val startLesson = lessonTimes.find { it.period == startPeriod }
+                        val endLesson = lessonTimes.find { it.period == endPeriod }
+
+                        val startTime = startLesson?.startTime ?: ""
+                        val endTime = endLesson?.endTime ?: ""
+
+                        CourseItem(
+                            name = course.name,
+                            location = course.location,
+                            teacher = course.teacher,
+                            startTime = startTime,
+                            endTime = endTime
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+
+                // 构建JSON数据
+                val widgetData = WidgetCourseData(
+                    today = DayCourses(
+                        hasCourses = todayCourseItems.isNotEmpty(),
+                        courses = todayCourseItems,
+                        noCourseMessage = "今天没课哟~"
+                    ),
+                    tomorrow = DayCourses(
+                        hasCourses = tomorrowCourseItems.isNotEmpty(),
+                        courses = tomorrowCourseItems,
+                        noCourseMessage = "明天没课哟~"
+                    ),
+                    updateTime = updateTimeStr
+                )
+
+                val coursesJson =
+                    jsonParser.encodeToString(WidgetCourseData.serializer(), widgetData)
+
+                // 为了向后兼容，同时生成旧的字符串格式
                 val widgetContent = buildString {
-                    // 今天的课程
-                    if (todayCourses.isNotEmpty()) {
+                    if (todayCourseItems.isNotEmpty()) {
                         appendLine("今天:")
-                        todayCourses.sortedBy { it.periods.minOrNull() ?: 0 }.forEach { course ->
-                            val startPeriod = course.periods.minOrNull() ?: 0
-                            val endPeriod = course.periods.maxOrNull() ?: 0
-                            val startLesson = lessonTimes.find { it.period == startPeriod }
-                            val endLesson = lessonTimes.find { it.period == endPeriod }
-
-                            val startTime = startLesson?.startTime ?: ""
-                            val endTime = endLesson?.endTime ?: ""
-
-                            val status = getCourseStatus(course, startTime, endTime, currentTime)
-
-                            appendLine(formatCourseInfo(course, startTime, endTime, status))
+                        todayCourseItems.forEach { course ->
+                            val baseInfo = "${course.startTime}-${course.endTime} ${course.name}"
+                            val locationInfo =
+                                if (course.location.isNotBlank()) " @${course.location}" else ""
+                            val teacherInfo =
+                                if (course.teacher.isNotBlank()) " (${course.teacher})" else ""
+                            val statusInfo = course.status ?: ""
+                            appendLine("$baseInfo$locationInfo$teacherInfo $statusInfo")
                         }
                     }
-
                     appendLine()
-
-                    // 明天的课程
-                    if (tomorrowCourses.isNotEmpty()) {
+                    if (tomorrowCourseItems.isNotEmpty()) {
                         appendLine("明天:")
-                        tomorrowCourses.sortedBy { it.periods.minOrNull() ?: 0 }.take(2)
-                            .forEach { course ->
-                                val startPeriod = course.periods.minOrNull() ?: 0
-                                val endPeriod = course.periods.maxOrNull() ?: 0
-                                val startLesson = lessonTimes.find { it.period == startPeriod }
-                                val endLesson = lessonTimes.find { it.period == endPeriod }
-
-                                val startTime = startLesson?.startTime ?: ""
-                                val endTime = endLesson?.endTime ?: ""
-
-                                appendLine(formatCourseInfo(course, startTime, endTime, null))
-                            }
+                        tomorrowCourseItems.forEach { course ->
+                            val baseInfo = "${course.startTime}-${course.endTime} ${course.name}"
+                            val locationInfo =
+                                if (course.location.isNotBlank()) " @${course.location}" else ""
+                            val teacherInfo =
+                                if (course.teacher.isNotBlank()) " (${course.teacher})" else ""
+                            appendLine("$baseInfo$locationInfo$teacherInfo")
+                        }
                     }
                 }
 
-                val updateTimeStr = now.format(DateTimeFormatter.ofPattern("HH:mm"))
-
                 // 更新所有widget实例
                 val manager = GlanceAppWidgetManager(context)
-                val glanceIds = manager.getGlanceIds(MyWidget::class.java)
+                val glanceIds = manager.getGlanceIds(TwoDaysWidget::class.java)
 
                 if (glanceIds.isEmpty()) {
                     // 没有有效的小组件实例，跳过更新
@@ -476,7 +754,8 @@ class MyWidget : GlanceAppWidget() {
                             id
                         ) { prefs: Preferences ->
                             val mutable = prefs.toMutablePreferences()
-                            mutable[KEY_COURSES_DATA] = widgetContent
+                            mutable[KEY_COURSES_DATA] = widgetContent  // 保持旧格式兼容
+                            mutable[KEY_COURSES_JSON] = coursesJson  // 新的JSON格式
                             mutable[KEY_UPDATE_TIME] = updateTimeStr
                             mutable
                         }
@@ -487,7 +766,7 @@ class MyWidget : GlanceAppWidget() {
                 }
 
                 try {
-                    MyWidget().updateAll(context)
+                    TwoDaysWidget().updateAll(context)
                 } catch (e: Exception) {
                     // 整体更新失败，但单个实例可能已成功更新
                     e.printStackTrace()
@@ -603,8 +882,8 @@ class MyWidget : GlanceAppWidget() {
     }
 }
 
-class MyWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = MyWidget()
+class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = TwoDaysWidget()
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun onEnabled(context: Context) {
@@ -613,9 +892,9 @@ class MyWidgetReceiver : GlanceAppWidgetReceiver() {
             updateWidgetContent(context)
         }
         if (com.star.schedule.service.WidgetUpdateJobService.isJobScheduled(context)) {
-            Log.d("MyWidgetReceiver", "Widget update job is already scheduled.")
+            Log.d("TwoDaysWidgetReceiver", "Widget update job is already scheduled.")
         } else {
-            Log.d("MyWidgetReceiver", "Scheduling widget update job.")
+            Log.d("TwoDaysWidgetReceiver", "Scheduling widget update job.")
             com.star.schedule.service.WidgetUpdateJobService.scheduleJob(context)
         }
     }
@@ -633,7 +912,7 @@ class MyWidgetReceiver : GlanceAppWidgetReceiver() {
         appWidgetIds: IntArray
     ) {
         Log.d(
-            "MyWidgetReceiver",
+            "TwoDaysWidgetReceiver",
             "onUpdate called with ${appWidgetIds.size} widget IDs: ${appWidgetIds.joinToString()}"
         )
 
@@ -643,23 +922,30 @@ class MyWidgetReceiver : GlanceAppWidgetReceiver() {
                 try {
                     val appWidgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
                     val isValid = appWidgetInfo != null
-                    Log.d("MyWidgetReceiver", "Widget ID $appWidgetId validity check: $isValid")
+                    Log.d(
+                        "TwoDaysWidgetReceiver",
+                        "Widget ID $appWidgetId validity check: $isValid"
+                    )
                     isValid
                 } catch (e: Exception) {
-                    Log.w("MyWidgetReceiver", "Error checking widget ID $appWidgetId validity", e)
+                    Log.w(
+                        "TwoDaysWidgetReceiver",
+                        "Error checking widget ID $appWidgetId validity",
+                        e
+                    )
                     false
                 }
             }
 
             Log.d(
-                "MyWidgetReceiver",
+                "TwoDaysWidgetReceiver",
                 "Valid widget IDs: ${validAppWidgetIds.size} out of ${appWidgetIds.size}"
             )
 
             // 异步处理每个小组件的更新，避免阻塞
             validAppWidgetIds.forEach { appWidgetId ->
                 try {
-                    Log.d("MyWidgetReceiver", "Starting async update for widget: $appWidgetId")
+                    Log.d("TwoDaysWidgetReceiver", "Starting async update for widget: $appWidgetId")
 
                     // 为每个小组件创建独立的更新任务
                     GlobalScope.launch(Dispatchers.IO) {
@@ -668,7 +954,7 @@ class MyWidgetReceiver : GlanceAppWidgetReceiver() {
                             if (!DatabaseProvider.isInitialized()) {
                                 DatabaseProvider.init(context)
                                 Log.d(
-                                    "MyWidgetReceiver",
+                                    "TwoDaysWidgetReceiver",
                                     "Database initialized for widget: $appWidgetId"
                                 )
                             }
@@ -677,12 +963,12 @@ class MyWidgetReceiver : GlanceAppWidgetReceiver() {
                             updateWidgetContent(context)
 
                             Log.d(
-                                "MyWidgetReceiver",
+                                "TwoDaysWidgetReceiver",
                                 "Async update completed for widget: $appWidgetId"
                             )
                         } catch (e: Exception) {
                             Log.e(
-                                "MyWidgetReceiver",
+                                "TwoDaysWidgetReceiver",
                                 "Async update failed for widget: $appWidgetId",
                                 e
                             )
@@ -690,7 +976,7 @@ class MyWidgetReceiver : GlanceAppWidgetReceiver() {
                     }
                 } catch (e: Exception) {
                     Log.e(
-                        "MyWidgetReceiver",
+                        "TwoDaysWidgetReceiver",
                         "Failed to start async update for widget: $appWidgetId",
                         e
                     )
@@ -700,30 +986,30 @@ class MyWidgetReceiver : GlanceAppWidgetReceiver() {
             // 只对有效的小组件ID调用父类方法
             if (validAppWidgetIds.isNotEmpty()) {
                 Log.d(
-                    "MyWidgetReceiver",
+                    "TwoDaysWidgetReceiver",
                     "Calling super.onUpdate with ${validAppWidgetIds.size} valid widget IDs"
                 )
                 super.onUpdate(context, appWidgetManager, validAppWidgetIds.toIntArray())
-                Log.d("MyWidgetReceiver", "super.onUpdate completed successfully")
+                Log.d("TwoDaysWidgetReceiver", "super.onUpdate completed successfully")
             } else {
                 // 如果没有有效的小组件ID，跳过更新操作
-                Log.w("MyWidgetReceiver", "No valid app widget IDs found, skipping update")
+                Log.w("TwoDaysWidgetReceiver", "No valid app widget IDs found, skipping update")
             }
         } catch (e: Exception) {
-            Log.e("MyWidgetReceiver", "Error in onUpdate", e)
+            Log.e("TwoDaysWidgetReceiver", "Error in onUpdate", e)
         }
 
         try {
             if (!com.star.schedule.service.WidgetUpdateJobService.isJobScheduled(context)) {
-                Log.d("MyWidgetReceiver", "Scheduling JobScheduler task")
+                Log.d("TwoDaysWidgetReceiver", "Scheduling JobScheduler task")
                 com.star.schedule.service.WidgetUpdateJobService.scheduleJob(context)
             } else {
-                Log.d("MyWidgetReceiver", "JobScheduler task already scheduled")
+                Log.d("TwoDaysWidgetReceiver", "JobScheduler task already scheduled")
             }
         } catch (e: Exception) {
-            Log.e("MyWidgetReceiver", "Error scheduling JobScheduler task", e)
+            Log.e("TwoDaysWidgetReceiver", "Error scheduling JobScheduler task", e)
         }
 
-        Log.d("MyWidgetReceiver", "onUpdate completed")
+        Log.d("TwoDaysWidgetReceiver", "onUpdate completed")
     }
 }

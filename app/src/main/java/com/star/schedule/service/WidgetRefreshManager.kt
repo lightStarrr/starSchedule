@@ -3,7 +3,7 @@ package com.star.schedule.service
 import android.content.Context
 import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import com.star.schedule.widget.MyWidget
+import com.star.schedule.widget.TwoDaysWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,7 +27,7 @@ object WidgetRefreshManager {
             val manager = GlanceAppWidgetManager(context)
 
             CoroutineScope(Dispatchers.Main).launch {
-                val glanceIds = manager.getGlanceIds(MyWidget::class.java)
+                val glanceIds = manager.getGlanceIds(TwoDaysWidget::class.java)
                 if (glanceIds.isEmpty()) {
                     Log.d(TAG, "没有找到有效的小组件实例，跳过刷新")
                     return@launch
@@ -36,7 +36,7 @@ object WidgetRefreshManager {
                 Log.d(TAG, "找到 ${glanceIds.size} 个小组件实例，开始刷新")
 
                 try {
-                    MyWidget.updateWidgetContent(context)
+                    TwoDaysWidget.updateWidgetContent(context)
                     Log.d(TAG, "小组件刷新完成")
                 } catch (e: Exception) {
                     Log.e(TAG, "刷新小组件失败", e)
