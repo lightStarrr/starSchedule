@@ -35,7 +35,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.star.schedule.Constants
-import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.getWeekOfSemester
 import com.star.schedule.service.WidgetUpdateJobService
@@ -51,11 +50,9 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-// 课程状态枚举
 enum class CourseStatus {
-    ACTIVE,     // 活跃课程（未开始或进行中）
-    ENDED,      // 已结束
-    UPCOMING;   // 即将开始（可选的扩展状态）
+    ACTIVE,
+    ENDED;
     
     companion object {
         fun fromString(status: String?): CourseStatus {
@@ -67,20 +64,15 @@ enum class CourseStatus {
     }
 }
 
-// Widget状态键
 val KEY_COURSES_JSON = stringPreferencesKey("courses_json")
 val KEY_UPDATE_TIME = stringPreferencesKey("update_time")
 
-// JSON解析器 - 优化配置
 private val jsonParser = Json {
     ignoreUnknownKeys = true
     coerceInputValues = true
-    encodeDefaults = false  // 不编码默认值，减少JSON大小
-    prettyPrint = true     // 美化输出
-    prettyPrintIndent = "  "  // 使用2个空格缩进
+    encodeDefaults = false
 }
 
-// JSON数据模型 - 简化结构
 @Serializable
 data class WidgetCourseData(
     val today: DayCourses,
@@ -96,13 +88,13 @@ data class DayCourses(
 @Serializable
 data class CourseItem(
     val name: String,
-    val location: String = "",      // 默认为空字符串
-    val teacher: String = "",      // 默认为空字符串
-    val startTime: String = "",      // 默认为空字符串
-    val endTime: String = "",        // 默认为空字符串
-    val status: String? = null,      // 状态信息（显示文本）
-    val color: String = "primary",   // 简化字段名
-    val courseStatus: CourseStatus = CourseStatus.ACTIVE  // 课程状态枚举
+    val location: String = "",
+    val teacher: String = "",
+    val startTime: String = "",
+    val endTime: String = "",
+    val status: String? = null,
+    val color: String = "primary",
+    val courseStatus: CourseStatus = CourseStatus.ACTIVE
 )
 
 class TwoDaysWidget : GlanceAppWidget() {
@@ -113,7 +105,6 @@ class TwoDaysWidget : GlanceAppWidget() {
         Log.d("TwoDaysWidget", "provideGlance called for glanceId: $id")
 
         try {
-            // 确保数据库已初始化
             if (!DatabaseProvider.isInitialized()) {
                 DatabaseProvider.init(context)
             }
@@ -168,12 +159,10 @@ class TwoDaysWidget : GlanceAppWidget() {
         val coursesJson = prefs[KEY_COURSES_JSON]
         val lastUpdate = prefs[KEY_UPDATE_TIME] ?: ""
 
-        // 解析JSON数据
         val widgetData = try {
             if (coursesJson != null) {
                 jsonParser.decodeFromString<WidgetCourseData>(coursesJson)
             } else {
-                // 返回空数据结构
                 WidgetCourseData(
                     today = DayCourses(emptyList()),
                     tomorrow = DayCourses(emptyList()),
@@ -195,9 +184,7 @@ class TwoDaysWidget : GlanceAppWidget() {
                 .background(GlanceTheme.colors.background)
                 .padding(12.dp)
         ) {
-            // 主要内容区域
             if (widgetData.today.courses.isEmpty() && widgetData.tomorrow.courses.isEmpty()) {
-                // 两天都没课
                 Box(
                     modifier = GlanceModifier.fillMaxSize().defaultWeight(),
                     contentAlignment = Alignment.Center
@@ -212,11 +199,9 @@ class TwoDaysWidget : GlanceAppWidget() {
                     )
                 }
             } else {
-                // 显示课程列表
                 Row(
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight()
                 ) {
-                    // 今天课程
                     DayColumn(
                         title = "今天",
                         dayData = widgetData.today,
@@ -224,7 +209,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                         modifier = GlanceModifier.defaultWeight().fillMaxHeight().padding(end = 6.dp)
                     )
 
-                    // 明天课程
                     DayColumn(
                         title = "明天",
                         dayData = widgetData.tomorrow,
@@ -234,7 +218,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                 }
             }
 
-            // 更新时间
             Text(
                 text = "更新: ${widgetData.updateTime}",
                 modifier = GlanceModifier.padding(top = 8.dp).fillMaxWidth(),
@@ -254,7 +237,6 @@ class TwoDaysWidget : GlanceAppWidget() {
         modifier: GlanceModifier
     ) {
         Column(modifier = modifier) {
-            // 标题
             Text(
                 text = title,
                 style = TextStyle(
@@ -266,11 +248,9 @@ class TwoDaysWidget : GlanceAppWidget() {
             )
 
             if (dayData.courses.isNotEmpty()) {
-                // 过滤掉已结束的课程
                 val activeCourses = dayData.courses.filter { it.courseStatus != CourseStatus.ENDED }
                 
                 if (activeCourses.isNotEmpty()) {
-                    // 显示未结束的课程列表
                     LazyColumn(modifier = GlanceModifier.fillMaxHeight()) {
                         items(activeCourses.size) { index ->
                             val course = activeCourses[index]
@@ -282,7 +262,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                         }
                     }
                 } else {
-                    // 所有课程都已结束 - 显示今日已结束提示
                     Box(
                         modifier = GlanceModifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -297,7 +276,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                     }
                 }
             } else {
-                // 无课提示
                 Box(
                     modifier = GlanceModifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -325,7 +303,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                 .fillMaxWidth()
                 .padding(top = if (isFirst) 0.dp else 8.dp)
         ) {
-            // 左侧彩色条
             Box(
                 modifier = GlanceModifier
                     .width(4.dp)
@@ -338,13 +315,11 @@ class TwoDaysWidget : GlanceAppWidget() {
                 content = {}
             )
 
-            // 课程信息
             Column(
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .padding(start = 8.dp)
             ) {
-                // 课程名称
                 Text(
                     text = course.name,
                     style = TextStyle(
@@ -355,7 +330,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                     maxLines = 1
                 )
 
-                // 地点
                 if (course.location.isNotBlank()) {
                     Text(
                         text = course.location,
@@ -367,7 +341,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                     )
                 }
 
-                // 时间
                 if (course.startTime.isNotBlank() && course.endTime.isNotBlank()) {
                     Text(
                         text = "${course.startTime} - ${course.endTime}",
@@ -379,7 +352,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                     )
                 }
 
-                // 状态
                 course.status?.let { status ->
                     Text(
                         text = status,
@@ -405,36 +377,28 @@ class TwoDaysWidget : GlanceAppWidget() {
                 val database = DatabaseProvider.db
                 val dao = database.scheduleDao()
 
-                // 获取当前课表ID
                 val currentTimetableId = dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
                     .firstOrNull()?.toLongOrNull() ?: return
 
-                // 获取课表信息
                 val timetable = dao.getTimetableFlow(currentTimetableId).firstOrNull() ?: return
 
-                // 获取当前日期和周数
                 val today = LocalDate.now()
                 val startDate = LocalDate.parse(timetable.startDate)
                 val currentWeekNumber = today.getWeekOfSemester(startDate)
 
-                // 获取课程和作息时间
                 val courses = dao.getCoursesFlow(currentTimetableId).firstOrNull() ?: emptyList()
                 val lessonTimes = dao.getLessonTimesFlow(currentTimetableId).firstOrNull() ?: emptyList()
 
-                // 过滤本周课程
                 val thisWeekCourses = courses.filter { it.weeks.contains(currentWeekNumber) }
 
-                // 获取今天和明天的课程
                 val todayCourses = thisWeekCourses.filter { it.dayOfWeek == today.dayOfWeek.value }
                 val tomorrow = today.plusDays(1)
                 val tomorrowCourses = thisWeekCourses.filter { it.dayOfWeek == tomorrow.dayOfWeek.value }
 
-                // 获取当前时间
                 val now = LocalDateTime.now()
                 val currentTime = now.toLocalTime()
                 val updateTimeStr = now.format(DateTimeFormatter.ofPattern("HH:mm"))
 
-                // 构建今天的课程数据
                 val todayCourseItems = todayCourses
                     .sortedBy { it.periods.minOrNull() ?: 0 }
                     .map { course ->
@@ -445,7 +409,7 @@ class TwoDaysWidget : GlanceAppWidget() {
 
                         val startTime = startLesson?.startTime ?: ""
                         val endTime = endLesson?.endTime ?: ""
-                        val status = getCourseStatus(course, startTime, endTime, currentTime)
+                        val status = getCourseStatus(startTime, endTime, currentTime)
                         
                         CourseItem(
                             name = course.name,
@@ -459,7 +423,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                         )
                     }
 
-                // 构建明天的课程数据（限制显示2门课程）
                 val tomorrowCourseItems = tomorrowCourses
                     .sortedBy { it.periods.minOrNull() ?: 0 }
                     .take(2)
@@ -475,11 +438,10 @@ class TwoDaysWidget : GlanceAppWidget() {
                             teacher = course.teacher,
                             startTime = startLesson?.startTime ?: "",
                             endTime = endLesson?.endTime ?: "",
-                            courseStatus = CourseStatus.ACTIVE  // 明天的课程默认活跃
+                            courseStatus = CourseStatus.ACTIVE
                         )
                     }
 
-                // 构建JSON数据
                 val widgetData = WidgetCourseData(
                     today = DayCourses(
                         courses = todayCourseItems
@@ -492,13 +454,11 @@ class TwoDaysWidget : GlanceAppWidget() {
 
                 val coursesJson = jsonParser.encodeToString(WidgetCourseData.serializer(), widgetData)
 
-                // 更新所有widget实例
                 val manager = GlanceAppWidgetManager(context)
                 val glanceIds = manager.getGlanceIds(TwoDaysWidget::class.java)
 
                 if (glanceIds.isEmpty()) return
 
-                // 过滤有效的小组件ID
                 val validGlanceIds = glanceIds.filter { id ->
                     try {
                         val appWidgetId = manager.getAppWidgetId(id)
@@ -511,7 +471,6 @@ class TwoDaysWidget : GlanceAppWidget() {
 
                 if (validGlanceIds.isEmpty()) return
 
-                // 更新每个小组件
                 validGlanceIds.forEach { id ->
                     try {
                         updateAppWidgetState(
@@ -529,7 +488,6 @@ class TwoDaysWidget : GlanceAppWidget() {
                     }
                 }
 
-                // 刷新所有小组件
                 try {
                     TwoDaysWidget().updateAll(context)
                 } catch (e: Exception) {
@@ -542,7 +500,6 @@ class TwoDaysWidget : GlanceAppWidget() {
         }
 
         private fun getCourseStatus(
-            course: CourseEntity,
             startTime: String,
             endTime: String,
             currentTime: LocalTime
@@ -589,8 +546,7 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
         GlobalScope.launch(Dispatchers.IO) {
             TwoDaysWidget.updateWidgetContent(context)
         }
-        
-        // 调度更新任务
+
         try {
             if (!WidgetUpdateJobService.isJobScheduled(context)) {
                 WidgetUpdateJobService.scheduleJob(context)
@@ -619,18 +575,17 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
         Log.d("TwoDaysWidgetReceiver", "onUpdate: ${appWidgetIds.size} widgets")
 
         try {
-            // 过滤有效的小组件ID
             val validAppWidgetIds = appWidgetIds.filter { appWidgetId ->
                 try {
                     appWidgetManager.getAppWidgetInfo(appWidgetId) != null
                 } catch (e: Exception) {
+                    Log.e("TwoDaysWidgetReceiver", "获取AppWidgetInfo失败", e)
                     false
                 }
             }
 
             if (validAppWidgetIds.isEmpty()) return
 
-            // 异步更新内容
             GlobalScope.launch(Dispatchers.IO) {
                 try {
                     if (!DatabaseProvider.isInitialized()) {
@@ -642,7 +597,6 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
                 }
             }
 
-            // 调度更新任务
             try {
                 if (!WidgetUpdateJobService.isJobScheduled(context)) {
                     WidgetUpdateJobService.scheduleJob(context)

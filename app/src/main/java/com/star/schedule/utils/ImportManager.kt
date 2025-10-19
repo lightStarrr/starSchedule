@@ -11,6 +11,7 @@ import com.star.schedule.utils.parser.ParseResult
 import com.star.schedule.utils.parser.TimetableParserManager
 import com.star.schedule.utils.parser.algorithms.XuexitongParser
 import com.star.schedule.utils.parser.algorithms.XuexitongParser2
+import com.star.schedule.utils.parser.algorithms.YinghuaParser1
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -21,6 +22,7 @@ object ImportManager {
         Log.d("ImportManager", "Registering XuexitongParser...")
         TimetableParserManager.register(XuexitongParser())
         TimetableParserManager.register(XuexitongParser2())
+        TimetableParserManager.register(YinghuaParser1())
     }
 
     suspend fun importTimetable(fileUri: Uri, context: Context, dao: ScheduleDao): Boolean =
