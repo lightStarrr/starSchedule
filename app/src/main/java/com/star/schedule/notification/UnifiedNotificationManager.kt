@@ -274,7 +274,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val notification = Notification.Builder(context, LIVE_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(courseName)
-            .setContentText("${startTime}开始上课")
+            .setContentText(location)
             .addExtras(liveBundle)
             .setCustomContentView(contentRemoteViews)
             .setAutoCancel(false)
