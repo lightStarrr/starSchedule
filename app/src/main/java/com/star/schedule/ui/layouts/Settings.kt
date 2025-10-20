@@ -99,6 +99,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.core.graphics.toColorInt
+import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.star.schedule.Constants
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
@@ -598,34 +599,32 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                 return if (background.luminance() > 0.7f) Color.Black else Color.White
                             }
                             // 胶囊预览卡片
-                            selectedColor.let {
-                                Card(
+                            Card(
+                                modifier = Modifier
+                                    .wrapContentWidth()
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(bottom = 16.dp),
+                                shape = RoundedCornerShape(50),
+                                colors = CardDefaults.cardColors(containerColor = selectedColor)
+                            ) {
+                                Row(
                                     modifier = Modifier
-                                        .wrapContentWidth()
-                                        .align(Alignment.CenterHorizontally)
-                                        .padding(bottom = 16.dp),
-                                    shape = RoundedCornerShape(50),
-                                    colors = CardDefaults.cardColors(containerColor = it)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
-                                            contentDescription = null,
-                                            tint = autoContentColorFor(selectedColor),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "测试内容",
-                                            color = autoContentColorFor(selectedColor),
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
+                                    Icon(
+                                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
+                                        contentDescription = null,
+                                        tint = autoContentColorFor(selectedColor),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "测试内容",
+                                        color = autoContentColorFor(selectedColor),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
                                 }
                             }
 
@@ -639,6 +638,17 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                 onColorChanged = { colorEnvelope ->
                                     selectedColor = colorEnvelope.color
                                 }
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            BrightnessSlider(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                                    .height(24.dp)
+                                    .align(Alignment.CenterHorizontally),
+                                controller = colorPickerController
                             )
 
                             Spacer(modifier = Modifier.height(16.dp))
