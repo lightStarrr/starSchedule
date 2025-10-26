@@ -7,6 +7,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 object DatabaseProvider {
     private val lock = Any()
@@ -29,8 +31,11 @@ object DatabaseProvider {
                     .addMigrations(MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
                     .build()
 
-                CoroutineScope(Dispatchers.IO).launch {
-                    db.scheduleDao().initializeDefaultTimetable()
+                // 确保在初始化后就有“当前课表”，避免其他读取逻辑拿到空值
+                runBlocking {
+                    withContext(Dispatchers.IO) {
+                        db.scheduleDao().initializeDefaultTimetable()
+                    }
                 }
                 
                 android.util.Log.d("DatabaseProvider", "Database initialized successfully")
