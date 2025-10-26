@@ -53,6 +53,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import com.star.schedule.Constants
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -245,31 +247,39 @@ fun ScheduleScreen(
     var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
     val haptic = LocalHapticFeedback.current
     val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
-
     val visibleDays = if (showWeekend) (1..7).toList() else (1..5).toList()
     val visibleDayLabels = visibleDays.map { allDayLabels[it - 1] }
-
     val courseBlocks = buildCourseBlocks(courses)
     val scrollState = rememberScrollState()
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+
+    // 动态计算左侧时间列宽度
+    val leftColumnWidth by remember(lessonTimes) {
+        mutableStateOf(
+            with(density) {
+                val maxPx = lessonTimes.maxOfOrNull { lesson ->
+                    val periodWidth = textMeasurer.measure(AnnotatedString(lesson.period.toString())).size.width.toFloat()
+                    val timeWidth = textMeasurer.measure(AnnotatedString("${lesson.startTime}\n${lesson.endTime}")).size.width.toFloat()
+                    maxOf(periodWidth, timeWidth)
+                } ?: 35f
+                maxPx.toDp() + 2.dp
+            }
+        )
+    }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val totalWidth = maxWidth
-        val leftColumnWidth = 35.dp
         val dayColumnWidth = (totalWidth - leftColumnWidth - 5.dp) / visibleDayLabels.size
 
-        // 使用 remember + mutableStateOf 保存标题高度
-        val density = LocalDensity.current
         var headerHeightDp by remember { mutableStateOf(0.dp) }
 
-        // 背景网格和标题
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            Column(modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 32.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(bottom = 32.dp)) {
                 val firstDayOfCurrentWeek = LocalDate.now()
                     .with(java.time.DayOfWeek.MONDAY)
                     .plusWeeks(((currentWeek ?: 1) - (realCurrentWeek ?: 1)).toLong())
@@ -277,6 +287,8 @@ fun ScheduleScreen(
                 val visibleDates = visibleDays.map { day ->
                     firstDayOfCurrentWeek.plusDays((day - 1).toLong())
                 }
+
+                // Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -336,7 +348,6 @@ fun ScheduleScreen(
                                 .fillMaxHeight(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
-
                         ) {
                             Text(
                                 "${lesson.period}",
@@ -352,21 +363,14 @@ fun ScheduleScreen(
 
                         // 可见列课程网格占位
                         visibleDays.forEach { day ->
-//                            val isOccupied = courseBlocks.any { block ->
-//                                block.dayOfWeek == day &&
-//                                        block.startPeriod <= lesson.period &&
-//                                        block.endPeriod >= lesson.period
-//                            }
-
                             Box(
                                 modifier = Modifier
                                     .width(dayColumnWidth)
                                     .height(cellHeight)
                                     .padding(cellPadding)
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-//                                        if (isOccupied) Color.Transparent
-//                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                     )
                             )
                         }
@@ -376,10 +380,10 @@ fun ScheduleScreen(
 
             val todayDayOfWeek = LocalDate.now().dayOfWeek.value
 
+            // 渲染课程块
             courseBlocks.forEachIndexed { index, block ->
                 val dayIndex = visibleDays.indexOf(block.dayOfWeek)
                 if (dayIndex == -1) return@forEachIndexed
-
                 val span = block.endPeriod - block.startPeriod + 1
 
                 val alpha = remember(currentWeek) { Animatable(0f) }
@@ -415,13 +419,12 @@ fun ScheduleScreen(
                     ),
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                        // 查找对应的课程实体
                         val courseEntity = courseEntities.find { entity ->
                             entity.name == block.course.name &&
-                            entity.location == block.course.location &&
-                            entity.dayOfWeek == block.dayOfWeek &&
-                            entity.periods == block.course.periods &&
-                            entity.weeks == block.course.weeks
+                                    entity.location == block.course.location &&
+                                    entity.dayOfWeek == block.dayOfWeek &&
+                                    entity.periods == block.course.periods &&
+                                    entity.weeks == block.course.weeks
                         }
                         if (courseEntity != null) {
                             selectedCourse = courseEntity
