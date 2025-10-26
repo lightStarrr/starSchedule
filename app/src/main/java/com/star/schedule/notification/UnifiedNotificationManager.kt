@@ -44,6 +44,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
 
 class UnifiedNotificationManager(private val context: Context) : NotificationManagerProvider {
 
@@ -283,7 +284,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-
     private fun showNormalNotification(
         courseName: String,
         location: String,
@@ -302,21 +302,21 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
         val contentText = if (finish) {
             if (location.isNotEmpty()) {
-                "$courseName 已上课\n地点: $location"
+                "$startTime 已上课\n地点: $location"
             } else {
-                "$courseName 已上课"
+                "$startTime 已上课"
             }
         } else {
             if (location.isNotEmpty()) {
-                "$courseName 即将上课\n地点: $location"
+                "$startTime 即将上课\n地点: $location"
             } else {
-                "$courseName 即将上课"
+                "$startTime 即将上课"
             }
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("课程提醒")
+            .setContentTitle("$courseName | 课程提醒")
             .setContentText(contentText)
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
@@ -334,6 +334,9 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setVibrate(longArrayOf(0, 250, 250, 250))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setShortCriticalText(location)
+            .setOngoing(true)
+            .setRequestPromotedOngoing(true)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)

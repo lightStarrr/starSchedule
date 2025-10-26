@@ -11,6 +11,8 @@
 
     <uses-permission android:name="flyme.permission.READ_NOTIFICATION_LIVE_STATE" />
 
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

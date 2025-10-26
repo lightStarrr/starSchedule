@@ -157,35 +157,64 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     fun requestNotificationPermissionIfNeeded(onPermissionGranted: () -> Unit) {
         when (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
             PackageManager.PERMISSION_GRANTED -> {
-                when {
-                    context.getSystemService<AlarmManager>()!!.canScheduleExactAlarms() -> {
-                        onPermissionGranted()
+                // Step 1: 检查精确闹钟权限
+                val alarmManager = context.getSystemService<AlarmManager>()
+                if (alarmManager?.canScheduleExactAlarms() != true) {
+                    val intent = Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        data = "package:${context.packageName}".toUri()
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
+                    context.startActivity(intent)
 
-                    else -> {
-                        val intent =
-                            Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        Toast.makeText(
+                            context,
+                            "请允许应用使用精确闹钟，然后重试",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    return
+                }
+
+                // ✅ Step 2: 检查是否支持实况通知（Android 16+）
+                if (android.os.Build.VERSION.SDK_INT >= 36) {
+                    val nm = context.getSystemService(android.app.NotificationManager::class.java)
+                    if (!nm.canPostPromotedNotifications()) {
+                        try {
+                            val intent = Intent("android.settings.MANAGE_APP_PROMOTED_NOTIFICATIONS").apply {
                                 data = "package:${context.packageName}".toUri()
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                        context.startActivity(intent)
-
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            val intent = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }
                         CoroutineScope(Dispatchers.Main).launch {
                             Toast.makeText(
                                 context,
-                                "请允许应用使用精确闹钟，然后重试",
+                                "请允许应用使用实况通知，然后重试",
                                 Toast.LENGTH_LONG
                             ).show()
                         }
+                        return
                     }
                 }
+
+                // ✅ 所有权限都满足
+                onPermissionGranted()
             }
 
             else -> {
+                // 请求通知权限
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }
+
 
     // 保证 currentTimetableId 与 preference 和 timetables 同步
     LaunchedEffect(timetables, currentTimetableIdPref) {
@@ -637,7 +666,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                 initialColor = savedColor,
                                 onColorChanged = { colorEnvelope ->
                                     selectedColor = colorEnvelope.color
-                                }
+                                    colorPickerController.wheelColor = colorEnvelope.color
+                                },
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
