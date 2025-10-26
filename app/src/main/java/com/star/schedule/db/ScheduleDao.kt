@@ -58,6 +58,27 @@ abstract class ScheduleDao {
     @Query("SELECT * FROM timetable ORDER BY id ASC")
     abstract suspend fun getAllTimetablesOnce(): List<TimetableEntity>
 
+    // 1) 若未设置则设为第一条课表
+    // 2) 若指向不存在的课表（被删除）则选择删除后的第一条
+    @Transaction
+    open suspend fun ensureValidCurrentTimetable() {
+        val currentId = getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
+            .firstOrNull()?.toLongOrNull()
+        val timetables = getAllTimetablesOnce()
+
+        if (timetables.isEmpty()) {
+            // 无课表：清空偏好（置空字符串，读取时 toLongOrNull 会为 null）
+            setPreference(Constants.PREF_CURRENT_TIMETABLE, "")
+            return
+        }
+
+        val firstId = timetables.first().id
+        val exists = currentId != null && timetables.any { it.id == currentId }
+        if (!exists) {
+            setPreference(Constants.PREF_CURRENT_TIMETABLE, firstId.toString())
+        }
+    }
+
     // 自动初始化默认课表
     @Transaction
     open suspend fun initializeDefaultTimetable(): Long {
@@ -262,6 +283,8 @@ abstract class ScheduleDao {
     open suspend fun insertTimetableWithReminders(timetable: TimetableEntity): Long {
         val id = insertTimetable(timetable)
         checkAndEnableReminders(id)
+        // 若当前未选定课表，则在新增后回落到第一条课表
+        ensureValidCurrentTimetable()
         return id
     }
 
@@ -269,12 +292,16 @@ abstract class ScheduleDao {
     open suspend fun updateTimetableWithReminders(timetable: TimetableEntity) {
         updateTimetable(timetable)
         checkAndEnableReminders(timetable.id)
+        // 更新后也校验一次，防止异常状态
+        ensureValidCurrentTimetable()
     }
 
     @Transaction
     open suspend fun deleteTimetableWithReminders(timetable: TimetableEntity) {
         deleteTimetable(timetable)
         checkAndEnableReminders(timetable.id)
+        // 若删除了当前课表，则回退到第一条课表或清空
+        ensureValidCurrentTimetable()
     }
 }
 
