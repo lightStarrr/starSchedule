@@ -6,6 +6,7 @@ import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -177,7 +178,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 }
 
                 // ✅ Step 2: 检查是否支持实况通知（Android 16+）
-                if (android.os.Build.VERSION.SDK_INT >= 36) {
+                if (Build.VERSION.SDK_INT >= 36 && !Build.MANUFACTURER.equals("Xiaomi")) {
                     val nm = context.getSystemService(android.app.NotificationManager::class.java)
                     if (!nm.canPostPromotedNotifications()) {
                         try {
@@ -187,6 +188,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             }
                             context.startActivity(intent)
                         } catch (_: Exception) {
+
                             val intent = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                                 putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
