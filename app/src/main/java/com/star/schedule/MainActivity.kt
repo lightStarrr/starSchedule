@@ -73,6 +73,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -93,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import com.star.schedule.db.DatabaseProvider
+import com.star.schedule.db.DatabaseProvider.dao
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.ui.layouts.DateRange
@@ -101,7 +103,9 @@ import com.star.schedule.ui.layouts.TimetableSettings
 import com.star.schedule.ui.theme.StarScheduleTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -109,19 +113,49 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
+
+    fun Activity.setExcludeFromRecents(exclude: Boolean) {
+        if (exclude) {
+            finishAndRemoveTask()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DatabaseProvider.init(this)
         enableEdgeToEdge()
-        
+
         // 启动小组件初始化服务
-        val initIntent = Intent(this, com.star.schedule.service.WidgetInitializationService::class.java)
+        val initIntent =
+            Intent(this, com.star.schedule.service.WidgetInitializationService::class.java)
         startService(initIntent)
-        
+
         setContent {
             StarScheduleTheme {
                 Layout(context = this)
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+
+        val hideFromRecents = runBlocking {
+            try {
+                val prefValue = dao().getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS).firstOrNull()
+                prefValue == "true"
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error getting hideFromRecents preference", e)
+                false
+            }
+        }
+
+        Log.d("onStop", "hide_from_recents: $hideFromRecents")
+
+        if (hideFromRecents) {
+            setExcludeFromRecents(true)
+        } else {
+            setExcludeFromRecents(false)
         }
     }
 }
@@ -211,17 +245,20 @@ fun Layout(context: Activity) {
                         if (index == 0) {
                             AnimatedContent(
                                 targetState = selectedItem == 0
-                            ) {isWeekRow ->
+                            ) { isWeekRow ->
                                 if (isWeekRow) {
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                                        horizontalArrangement = Arrangement.spacedBy(
+                                            ButtonGroupDefaults.ConnectedSpaceBetween
+                                        ),
                                     ) {
                                         ToggleButton(
                                             checked = false,
                                             enabled = weeksWithCourses.indexOf(currentWeekNumber) > 0,
                                             onCheckedChange = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                                val index = weeksWithCourses.indexOf(currentWeekNumber)
+                                                val index =
+                                                    weeksWithCourses.indexOf(currentWeekNumber)
                                                 if (index > 0) {
                                                     onCurrentWeekNumberChange(weeksWithCourses[index - 1])
                                                 }
@@ -231,7 +268,10 @@ fun Layout(context: Activity) {
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
                                         ) {
-                                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "上一周")
+                                            Icon(
+                                                Icons.Rounded.ChevronLeft,
+                                                contentDescription = "上一周"
+                                            )
                                         }
                                         ToggleButton(
                                             checked = false,
@@ -251,7 +291,8 @@ fun Layout(context: Activity) {
                                             enabled = weeksWithCourses.indexOf(currentWeekNumber) < weeksWithCourses.size - 1,
                                             onCheckedChange = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                                val index = weeksWithCourses.indexOf(currentWeekNumber)
+                                                val index =
+                                                    weeksWithCourses.indexOf(currentWeekNumber)
                                                 if (index < weeksWithCourses.size - 1) {
                                                     onCurrentWeekNumberChange(weeksWithCourses[index + 1])
                                                 }
@@ -261,7 +302,10 @@ fun Layout(context: Activity) {
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
                                         ) {
-                                            Icon(Icons.Rounded.ChevronRight, contentDescription = "下一周")
+                                            Icon(
+                                                Icons.Rounded.ChevronRight,
+                                                contentDescription = "下一周"
+                                            )
                                         }
                                     }
                                 } else {
@@ -305,11 +349,13 @@ fun Layout(context: Activity) {
         if (showWeekSelector && weeksWithCourses.isNotEmpty()) {
             OptimizedBottomSheet(
                 sheetState = weekSelectorSheetState,
-                onDismiss = { scope.launch { weekSelectorSheetState.hide() }.invokeOnCompletion {
-                    if (!weekSelectorSheetState.isVisible) {
-                        showWeekSelector = false
+                onDismiss = {
+                    scope.launch { weekSelectorSheetState.hide() }.invokeOnCompletion {
+                        if (!weekSelectorSheetState.isVisible) {
+                            showWeekSelector = false
+                        }
                     }
-                } }
+                }
             ) {
                 WeekSelectorSheet(
                     currentWeekNumber = currentWeekNumber,
@@ -538,26 +584,26 @@ suspend fun fetchLatestReleaseTag(): String? {
                 .writeTimeout(10, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .build()
-            
+
             val url = "https://api.github.com/repos/lightStarrr/starSchedule/releases/latest"
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/vnd.github+json")
                 .header("User-Agent", "StarScheduleApp")
                 .build()
-            
+
             val resp = client.newCall(request).execute()
             if (!resp.isSuccessful) {
                 Log.w("StarSchedule", "GitHub API request failed with code: ${resp.code}")
                 return@withContext null
             }
-            
+
             val body = resp.body.string()
             if (body.isBlank()) {
                 Log.w("StarSchedule", "Empty response from GitHub API")
                 return@withContext null
             }
-            
+
             val json = JSONObject(body)
             val tag = json.optString("tag_name", "v1.0.0")
             Log.d("StarSchedule", "Successfully fetched latest release tag: $tag")

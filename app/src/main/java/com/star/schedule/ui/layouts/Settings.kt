@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.LooksOne
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -102,6 +103,7 @@ import kotlinx.coroutines.launch
 import androidx.core.graphics.toColorInt
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.star.schedule.Constants
+import com.star.schedule.MainActivity
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -132,6 +134,9 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     // 只在连续课程的第一节课前发送通知的开关状态
     var notifyOnlyForFirstContinuousClass by remember { mutableStateOf(false) }
 
+    // 应用在后台显示开关状态
+    var hideFromRecents by remember { mutableStateOf(false) }
+
 
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
@@ -145,6 +150,11 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     // 只在连续课程的第一节课前发送通知的偏好设置
     val notifyOnlyForFirstContinuousClassPref by dao.getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS)
         .collectAsState(initial = "false")
+            
+        // 应用在后台显示的偏好设置
+    val hideFromRecentsPref by dao.getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS)
+        .collectAsState(initial = "false")
+
     LaunchedEffect(startupHintClosedPref) {
         showStartupHint = startupHintClosedPref != "true"
     }
@@ -152,6 +162,11 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     // 同步"只在连续课程的第一节课前发送通知"的偏好设置
     LaunchedEffect(notifyOnlyForFirstContinuousClassPref) {
         notifyOnlyForFirstContinuousClass = notifyOnlyForFirstContinuousClassPref == "true"
+    }
+
+    // 同步"应用在后台显示"的偏好设置
+    LaunchedEffect(hideFromRecentsPref) {
+        hideFromRecents = hideFromRecentsPref == "true"
     }
 
     // 权限申请辅助函数
@@ -758,6 +773,31 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                 notificationManager.scheduleTestReminder()
                             }
                         }
+                    }
+                )
+                
+                // 应用在后台显示开关
+                ListItem(
+                    headlineContent = { Text("后台隐藏应用") },
+                    supportingContent = { Text("开启后应用将不在最近任务列表中显示") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Rounded.VisibilityOff,
+                            contentDescription = null
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = hideFromRecents,
+                            onCheckedChange = { enabled ->
+                                scope.launch {
+                                    dao.setPreference(
+                                        Constants.PREF_HIDE_FROM_RECENTS,
+                                        enabled.toString()
+                                    )
+                                }
+                            }
+                        )
                     }
                 )
             }
