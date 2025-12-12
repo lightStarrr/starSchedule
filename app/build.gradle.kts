@@ -58,6 +58,7 @@ dependencies {
     implementation(platform(libs.okhttp.bom))
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     kapt(libs.androidx.room.compiler) {
         exclude(group = "com.intellij", module = "annotations")
     }
