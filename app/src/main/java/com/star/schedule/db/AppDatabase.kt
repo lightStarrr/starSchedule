@@ -13,9 +13,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TimetableEntity::class,
         LessonTimeEntity::class,
         CourseEntity::class,
-        ReminderEntity::class
+        ReminderEntity::class,
+        DayNoteEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter
@@ -44,6 +45,24 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // 添加teacher列，默认值为空字符串
                 db.execSQL("ALTER TABLE course ADD COLUMN teacher TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        // 从版本6迁移到版本7，新增日便签表
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS day_note (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        timetableId INTEGER NOT NULL,
+                        date TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        FOREIGN KEY(timetableId) REFERENCES timetable(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_day_note_timetableId_date ON day_note(timetableId, date)")
             }
         }
     }

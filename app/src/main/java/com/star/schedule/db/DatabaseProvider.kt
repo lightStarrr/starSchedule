@@ -28,7 +28,13 @@ object DatabaseProvider {
                     AppDatabase::class.java,
                     "schedule.db"
                 )
-                    .addMigrations(MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_2_3,
+                        AppDatabase.MIGRATION_3_4,
+                        AppDatabase.MIGRATION_4_5,
+                        AppDatabase.MIGRATION_5_6,
+                        AppDatabase.MIGRATION_6_7
+                    )
                     .build()
 
                 // 确保在初始化后就有“当前课表”，避免其他读取逻辑拿到空值
