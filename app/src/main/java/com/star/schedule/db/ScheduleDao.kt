@@ -9,6 +9,7 @@ import androidx.room.Transaction
 import androidx.room.TypeConverter
 import androidx.room.Update
 import com.star.schedule.Constants
+import com.star.schedule.db.DayNoteEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -277,6 +278,16 @@ abstract class ScheduleDao {
         deleteCourse(course)
         checkAndEnableReminders(course.timetableId)
     }
+
+    // ---------- 便签 ----------
+    @Query("SELECT * FROM day_note WHERE timetableId = :timetableId ORDER BY date ASC")
+    abstract fun getDayNotesFlow(timetableId: Long): Flow<List<DayNoteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun upsertDayNote(note: DayNoteEntity): Long
+
+    @Query("DELETE FROM day_note WHERE timetableId = :timetableId AND date = :date")
+    abstract suspend fun deleteDayNote(timetableId: Long, date: String)
 
     // ---------- 课表操作 ----------
     @Transaction

@@ -78,3 +78,23 @@ data class ReminderEntity(
     val date: String,   // yyyy-MM-dd
     val period: Int
 )
+
+// 每天的便签（依赖课程表）
+@Entity(
+    tableName = "day_note",
+    foreignKeys = [
+        ForeignKey(
+            entity = TimetableEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["timetableId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["timetableId", "date"], unique = true)]
+)
+data class DayNoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val timetableId: Long,    // 属于哪个课程表
+    val date: String,         // 对应的具体日期 yyyy-MM-dd
+    val content: String       // 便签内容
+)
