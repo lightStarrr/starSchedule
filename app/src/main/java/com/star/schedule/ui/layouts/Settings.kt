@@ -99,6 +99,8 @@ import com.star.schedule.R
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
+import com.star.schedule.ui.viewmodel.SettingsViewModel
+import com.star.schedule.ui.viewmodel.SettingsViewModelFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -106,18 +108,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.core.graphics.toColorInt
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
-import com.star.schedule.Constants
-import com.star.schedule.MainActivity
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNotificationManager) {
+    val viewModel: SettingsViewModel = viewModel(
+        factory = remember(dao, notificationManager) {
+            SettingsViewModelFactory(dao, notificationManager)
+        }
+    )
     val haptic = LocalHapticFeedback.current
     var clickCount by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     var resetJob by remember { mutableStateOf<Job?>(null) }
     val scrollState = rememberScrollState()
-    val showLiveCapsuleSetting = notificationManager.isLiveCapsuleCustomizationAvailable()
+    val showLiveCapsuleSetting = viewModel.isLiveCapsuleCustomizationAvailable
     var reminderAnimationsReady by remember { mutableStateOf(false) }
     var startupHintAnimationsReady by remember { mutableStateOf(false) }
 
@@ -127,43 +133,23 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         onResult = {}
     )
 
-    // 所有课表
-    val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
-    val currentTimetableIdPref by dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
-        .collectAsState(initial = null)
-
-    // 当前课表ID
-    var currentTimetableId by remember { mutableStateOf<Long?>(null) }
-
-    // 课前提醒开关状态
-    var reminderEnabled by remember { mutableStateOf(false) }
-
-    // 只在连续课程的第一节课前发送通知的开关状态
-    var notifyOnlyForFirstContinuousClass by remember { mutableStateOf(false) }
-
-    // 应用在后台显示开关状态
-    var hideFromRecents by remember { mutableStateOf(false) }
-
+    val timetables by viewModel.timetables.collectAsState()
+    val currentTimetableId by viewModel.currentTimetableId.collectAsState()
+    val reminderEnabled by viewModel.reminderEnabled.collectAsState()
+    val notifyOnlyForFirstContinuousClass by viewModel.notifyOnlyForFirstContinuousClass.collectAsState()
+    val hideFromRecents by viewModel.hideFromRecents.collectAsState()
+    val startupHintClosed by viewModel.startupHintClosed.collectAsState()
+    val liveCapsuleBgColorPref by viewModel.liveCapsuleBgColor.collectAsState()
 
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
     val timetableSheetState = rememberModalBottomSheetState()
 
     var showStartupHint by remember { mutableStateOf(false) }
+    var previousTimetableId by remember { mutableStateOf<Long?>(null) }
 
-    val startupHintClosedPref by dao.getPreferenceFlow("startup_hint_closed")
-        .collectAsState(initial = "false")
-
-    // 只在连续课程的第一节课前发送通知的偏好设置
-    val notifyOnlyForFirstContinuousClassPref by dao.getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS)
-        .collectAsState(initial = "false")
-            
-        // 应用在后台显示的偏好设置
-    val hideFromRecentsPref by dao.getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS)
-        .collectAsState(initial = "false")
-
-    LaunchedEffect(startupHintClosedPref) {
-        showStartupHint = startupHintClosedPref != "true"
+    LaunchedEffect(startupHintClosed) {
+        showStartupHint = !startupHintClosed
     }
 
     LaunchedEffect(showStartupHint) {
@@ -173,14 +159,16 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         }
     }
 
-    // 同步"只在连续课程的第一节课前发送通知"的偏好设置
-    LaunchedEffect(notifyOnlyForFirstContinuousClassPref) {
-        notifyOnlyForFirstContinuousClass = notifyOnlyForFirstContinuousClassPref == "true"
-    }
-
-    // 同步"应用在后台显示"的偏好设置
-    LaunchedEffect(hideFromRecentsPref) {
-        hideFromRecents = hideFromRecentsPref == "true"
+    LaunchedEffect(timetables, currentTimetableId) {
+        val newTimetableId = currentTimetableId
+        if (previousTimetableId != null && newTimetableId != previousTimetableId) {
+            viewModel.disableReminders()
+            com.star.schedule.service.WidgetRefreshManager.onTimetableSwitched(context)
+        }
+        if (!reminderAnimationsReady) {
+            withFrameNanos { }
+            reminderAnimationsReady = true
+        }
     }
 
     // 权限申请辅助函数
@@ -246,34 +234,6 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         }
     }
 
-
-    // 保证 currentTimetableId 与 preference 和 timetables 同步
-    LaunchedEffect(timetables, currentTimetableIdPref) {
-        val newTimetableId = currentTimetableIdPref?.toLongOrNull()
-
-        // 如果课表切换了，需要关闭之前课表的提醒
-        if (currentTimetableId != null && newTimetableId != currentTimetableId) {
-            // 课表切换时自动关闭提醒
-            notificationManager.disableReminders()
-            reminderEnabled = false
-            
-            // 课表切换时立即刷新小组件
-            com.star.schedule.service.WidgetRefreshManager.onTimetableSwitched(context)
-        }
-
-        currentTimetableId = newTimetableId
-
-        // 检查当前课表是否启用了提醒
-        reminderEnabled = if (newTimetableId != null) {
-            notificationManager.isReminderEnabledForTimetableSync(newTimetableId)
-        } else {
-            false
-        }
-        if (!reminderAnimationsReady) {
-            withFrameNanos { }
-            reminderAnimationsReady = true
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -351,12 +311,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     .fillMaxWidth(),
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                    scope.launch {
-                                        dao.setPreference(
-                                            Constants.PREF_CURRENT_TIMETABLE,
-                                            timetable.id.toString()
-                                        )
-                                    }
+                                    viewModel.selectTimetable(timetable.id)
 //                                    hideBottomSheet(timetableSheetState, scope) {
 //                                        showTimetableSheet = false
 //                                    }
@@ -445,10 +400,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(onClick = {
-                        scope.launch {
-                            dao.setPreference("startup_hint_closed", "true")
-                            showStartupHint = false
-                        }
+                        viewModel.closeStartupHint()
+                        showStartupHint = false
                     }) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
@@ -522,18 +475,10 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                             if (checked && currentTimetableId != null) {
                                 requestNotificationPermissionIfNeeded {
-                                    scope.launch {
-                                        notificationManager.enableRemindersForTimetable(
-                                            currentTimetableId!!
-                                        )
-                                        reminderEnabled = true
-                                    }
+                                    viewModel.enableRemindersForCurrentTimetable()
                                 }
                             } else {
-                                scope.launch {
-                                    notificationManager.disableReminders()
-                                    reminderEnabled = false
-                                }
+                                viewModel.disableReminders()
                             }
                         }
                     )
@@ -583,18 +528,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         Switch(
                             checked = notifyOnlyForFirstContinuousClass,
                             onCheckedChange = { enabled ->
-                                scope.launch {
-                                    dao.setPreference(
-                                        Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS,
-                                        enabled.toString()
-                                    )
-                                    // 重新设置提醒以应用新的设置
-                                    if (currentTimetableId != null) {
-                                        notificationManager.enableRemindersForTimetable(
-                                            currentTimetableId!!
-                                        )
-                                    }
-                                }
+                                viewModel.setNotifyOnlyForFirstContinuousClass(enabled)
                             }
                         )
                     }
@@ -603,22 +537,16 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 if (showLiveCapsuleSetting) {
                     // 实况通知胶囊背景颜色设置（Flyme 特有）
                     var showColorPicker by remember { mutableStateOf(false) }
-                    val liveCapsuleBgColorPref by dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR)
-                        .collectAsState(initial = "#FFE082")
                     val defaultColor = Color(0xFFFFE082)
-                    var selectedColor by remember {
-                        mutableStateOf(
-                            try {
-                                liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
-                            } catch (_: Exception) {
-                                defaultColor
-                            }
-                        )
+                    val savedColor = remember(liveCapsuleBgColorPref) {
+                        try {
+                            liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
+                        } catch (_: Exception) {
+                            defaultColor
+                        }
                     }
-                    val savedColor = try {
-                        liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
-                    } catch (_: Exception) {
-                        defaultColor
+                    var selectedColor by remember(liveCapsuleBgColorPref) {
+                        mutableStateOf(savedColor)
                     }
 
                     ListItem(
@@ -770,11 +698,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     Button(
                                         onClick = {
                                             val colorHex = "#${Integer.toHexString(selectedColor.toArgb()).substring(2).uppercase()}"
+                                            viewModel.updateLiveCapsuleBgColor(colorHex)
                                             scope.launch {
-                                                dao.setPreference(
-                                                    Constants.PREF_LIVE_CAPSULE_BG_COLOR,
-                                                    colorHex
-                                                )
                                                 colorPickerSheetState.hide()
                                             }.invokeOnCompletion {
                                                 if (!colorPickerSheetState.isVisible) {
@@ -799,9 +724,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     modifier = Modifier.clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         requestNotificationPermissionIfNeeded {
-                            scope.launch {
-                                notificationManager.sendTestNotification()
-                            }
+                            viewModel.sendTestNotification()
                         }
                     }
                 )
@@ -813,9 +736,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     modifier = Modifier.clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         requestNotificationPermissionIfNeeded {
-                            scope.launch {
-                                notificationManager.scheduleTestReminder()
-                            }
+                            viewModel.scheduleTestReminder()
                         }
                     }
                 )
@@ -834,12 +755,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         Switch(
                             checked = hideFromRecents,
                             onCheckedChange = { enabled ->
-                                scope.launch {
-                                    dao.setPreference(
-                                        Constants.PREF_HIDE_FROM_RECENTS,
-                                        enabled.toString()
-                                    )
-                                }
+                                viewModel.setHideFromRecents(enabled)
                             }
                         )
                     }
