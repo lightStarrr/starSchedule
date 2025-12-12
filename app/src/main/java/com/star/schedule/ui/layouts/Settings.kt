@@ -12,6 +12,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -113,6 +116,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     val scope = rememberCoroutineScope()
     var resetJob by remember { mutableStateOf<Job?>(null) }
     val scrollState = rememberScrollState()
+    val showLiveCapsuleSetting = notificationManager.isLiveCapsuleCustomizationAvailable()
 
     // 权限申请器
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -393,7 +397,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         AnimatedContent(
             targetState = showStartupHint,
             transitionSpec = {
-                (fadeIn(tween(300)) + scaleIn()).togetherWith(fadeOut(tween(300)) + scaleOut())
+                    (fadeIn(tween(300)) + scaleIn()).togetherWith(fadeOut(tween(300)) + scaleOut())
             }
         ) { show ->
             if (show) {
@@ -512,17 +516,17 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         AnimatedVisibility(
             visible = reminderEnabled,
             enter = expandVertically(
-                animationSpec = tween(durationMillis = 300),
-                expandFrom = Alignment.Top
-            ) + fadeIn(
-                animationSpec = tween(durationMillis = 200)
-            ),
+                    animationSpec = tween(durationMillis = 300),
+                    expandFrom = Alignment.Top
+                ) + fadeIn(
+                    animationSpec = tween(durationMillis = 200)
+                ),
             exit = shrinkVertically(
-                animationSpec = tween(durationMillis = 300),
-                shrinkTowards = Alignment.Top
-            ) + fadeOut(
-                animationSpec = tween(durationMillis = 200)
-            )
+                    animationSpec = tween(durationMillis = 300),
+                    shrinkTowards = Alignment.Top
+                ) + fadeOut(
+                    animationSpec = tween(durationMillis = 200)
+                )
         ) {
             Column {
                 // 只在连续课程的第一节课前发送通知的开关
@@ -556,191 +560,191 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     }
                 )
 
-                // 实况通知胶囊背景颜色设置
-                var showColorPicker by remember { mutableStateOf(false) }
-                val liveCapsuleBgColorPref by dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR)
-          .collectAsState(initial = "#FFE082")
-                val defaultColor = Color(0xFFFFE082)
-                var selectedColor by remember {
-                    mutableStateOf(
-                        try {
-                            liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
-                        } catch (_: Exception) {
-                            defaultColor
-                        }
-                    )
-                }
-                val savedColor = try {
-                    liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
-                } catch (_: Exception) {
-                    defaultColor
-                }
-
-
-                ListItem(
-                    headlineContent = { Text("实况通知胶囊背景颜色") },
-                    supportingContent = { Text("自定义实况通知胶囊的背景颜色") },
-                    leadingContent = {
-                        Icon(
-                            Icons.Rounded.ColorLens,
-                            contentDescription = null
+                if (showLiveCapsuleSetting) {
+                    // 实况通知胶囊背景颜色设置（Flyme 特有）
+                    var showColorPicker by remember { mutableStateOf(false) }
+                    val liveCapsuleBgColorPref by dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR)
+                        .collectAsState(initial = "#FFE082")
+                    val defaultColor = Color(0xFFFFE082)
+                    var selectedColor by remember {
+                        mutableStateOf(
+                            try {
+                                liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
+                            } catch (_: Exception) {
+                                defaultColor
+                            }
                         )
-                    },
-                    trailingContent = {
-                        val modifier = Modifier
-                            .width(48.dp)
-                            .height(24.dp)
-                            .background(
-                                color = savedColor,
-                                shape = RoundedCornerShape(6.dp)
+                    }
+                    val savedColor = try {
+                        liveCapsuleBgColorPref?.let { Color(it.toColorInt()) } ?: defaultColor
+                    } catch (_: Exception) {
+                        defaultColor
+                    }
+
+                    ListItem(
+                        headlineContent = { Text("实况通知胶囊背景颜色") },
+                        supportingContent = { Text("自定义实况通知胶囊的背景颜色") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Rounded.ColorLens,
+                                contentDescription = null
                             )
-                        Box(
-                            modifier = modifier
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.primary,
+                        },
+                        trailingContent = {
+                            val modifier = Modifier
+                                .width(48.dp)
+                                .height(24.dp)
+                                .background(
+                                    color = savedColor,
                                     shape = RoundedCornerShape(6.dp)
                                 )
-                        )
-                    },
-                    modifier = Modifier.clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                        showColorPicker = true
-                    }
-                )
+                            Box(
+                                modifier = modifier
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(6.dp)
+                                    )
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            showColorPicker = true
+                        }
+                    )
 
-                // 颜色选择器BottomSheet
-                if (showColorPicker) {
-                    val colorPickerController = remember { ColorPickerController() }
-                    val colorPickerSheetState =
-                        rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                    // 颜色选择器BottomSheet
+                    if (showColorPicker) {
+                        val colorPickerController = remember { ColorPickerController() }
+                        val colorPickerSheetState =
+                            rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-                    OptimizedBottomSheet(
-                        sheetState = colorPickerSheetState,
-                        onDismiss = {
-                            scope.launch {
-                                colorPickerSheetState.hide()
-                            }.invokeOnCompletion {
-                                if (!colorPickerSheetState.isVisible) {
-                                    showColorPicker = false
+                        OptimizedBottomSheet(
+                            sheetState = colorPickerSheetState,
+                            onDismiss = {
+                                scope.launch {
+                                    colorPickerSheetState.hide()
+                                }.invokeOnCompletion {
+                                    if (!colorPickerSheetState.isVisible) {
+                                        showColorPicker = false
+                                    }
                                 }
                             }
-                        }
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                                .navigationBarsPadding()
-                                .verticalScroll(rememberScrollState())
                         ) {
-                            Text(
-                                text = "选择颜色",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-
-                            fun autoContentColorFor(background: Color): Color {
-                                return if (background.luminance() > 0.7f) Color.Black else Color.White
-                            }
-                            // 胶囊预览卡片
-                            Card(
+                            Column(
                                 modifier = Modifier
-                                    .wrapContentWidth()
-                                    .align(Alignment.CenterHorizontally)
-                                    .padding(bottom = 16.dp),
-                                shape = RoundedCornerShape(50),
-                                colors = CardDefaults.cardColors(containerColor = selectedColor)
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                                    .navigationBarsPadding()
+                                    .verticalScroll(rememberScrollState())
                             ) {
+                                Text(
+                                    text = "选择颜色",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+
+                                fun autoContentColorFor(background: Color): Color {
+                                    return if (background.luminance() > 0.7f) Color.Black else Color.White
+                                }
+                                // 胶囊预览卡片
+                                Card(
+                                    modifier = Modifier
+                                        .wrapContentWidth()
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(bottom = 16.dp),
+                                    shape = RoundedCornerShape(50),
+                                    colors = CardDefaults.cardColors(containerColor = selectedColor)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
+                                            contentDescription = null,
+                                            tint = autoContentColorFor(selectedColor),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "测试内容",
+                                            color = autoContentColorFor(selectedColor),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+
+                                HsvColorPicker(
+                                    modifier = Modifier
+                                        .size(300.dp)
+                                        .align(Alignment.CenterHorizontally),
+                                    controller = colorPickerController,
+                                    initialColor = savedColor,
+                                    onColorChanged = { colorEnvelope ->
+                                        selectedColor = colorEnvelope.color
+                                        colorPickerController.wheelColor = colorEnvelope.color
+                                    },
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                BrightnessSlider(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .height(24.dp)
+                                        .align(Alignment.CenterHorizontally),
+                                    controller = colorPickerController
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // 按钮区域 - 右对齐
                                 Row(
                                     modifier = Modifier
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
+                                        .fillMaxWidth()
+                                        .padding(end = 8.dp),
+                                    horizontalArrangement = Arrangement.End
                                 ) {
-                                    Icon(
-                                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
-                                        contentDescription = null,
-                                        tint = autoContentColorFor(selectedColor),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "测试内容",
-                                        color = autoContentColorFor(selectedColor),
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
-
-
-                            HsvColorPicker(
-                                modifier = Modifier
-                                    .size(300.dp)
-                                    .align(Alignment.CenterHorizontally),
-                                controller = colorPickerController,
-                                initialColor = savedColor,
-                                onColorChanged = { colorEnvelope ->
-                                    selectedColor = colorEnvelope.color
-                                    colorPickerController.wheelColor = colorEnvelope.color
-                                },
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            BrightnessSlider(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
-                                    .height(24.dp)
-                                    .align(Alignment.CenterHorizontally),
-                                controller = colorPickerController
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // 按钮区域 - 右对齐
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                              .padding(end = 8.dp),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                // 取消按钮 - 无边框样式
-                                OutlinedButton(
-                                    onClick = {
-                                        scope.launch {
-                                            colorPickerSheetState.hide()
-                                        }.invokeOnCompletion {
-                                            if (!colorPickerSheetState.isVisible) {
-                                                showColorPicker = false
+                                    // 取消按钮 - 无边框样式
+                                    OutlinedButton(
+                                        onClick = {
+                                            scope.launch {
+                                                colorPickerSheetState.hide()
+                                            }.invokeOnCompletion {
+                                                if (!colorPickerSheetState.isVisible) {
+                                                    showColorPicker = false
+                                                }
                                             }
-                                        }
-                                    },
-                                    modifier = Modifier.padding(end = 8.dp)
-                                ) {
-                                    Text("取消")
-                                }
-
-                                // 确定按钮 - 固定样式
-                                Button(
-                                    onClick = {
-                                        val colorHex = "#${Integer.toHexString(selectedColor.toArgb()).substring(2).uppercase()}"
-                                        scope.launch {
-                                            dao.setPreference(
-                                                Constants.PREF_LIVE_CAPSULE_BG_COLOR,
-                                                colorHex
-                                            )
-                                            colorPickerSheetState.hide()
-                                        }.invokeOnCompletion {
-                                            if (!colorPickerSheetState.isVisible) {
-                                                showColorPicker = false
-                                            }
-                                        }
+                                        },
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    ) {
+                                        Text("取消")
                                     }
-                                ) {
-                                    Text("确定")
+
+                                    // 确定按钮 - 固定样式
+                                    Button(
+                                        onClick = {
+                                            val colorHex = "#${Integer.toHexString(selectedColor.toArgb()).substring(2).uppercase()}"
+                                            scope.launch {
+                                                dao.setPreference(
+                                                    Constants.PREF_LIVE_CAPSULE_BG_COLOR,
+                                                    colorHex
+                                                )
+                                                colorPickerSheetState.hide()
+                                            }.invokeOnCompletion {
+                                                if (!colorPickerSheetState.isVisible) {
+                                                    showColorPicker = false
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Text("确定")
+                                    }
                                 }
                             }
                         }

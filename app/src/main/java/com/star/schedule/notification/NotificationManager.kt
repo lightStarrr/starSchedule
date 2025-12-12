@@ -44,7 +44,6 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
 
 class UnifiedNotificationManager(private val context: Context) : NotificationManagerProvider {
 
@@ -57,6 +56,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         const val LIVE_CHANNEL_ID = "live_notification_channel"
         const val LIVE_CHANNEL_NAME = "实况通知"
         const val NOTIFICATION_ID = 1001
+        private const val FINISH_NOTIFICATION_DISMISS_DELAY_MS = 5 * 60 * 1000L
 
         // 定期更新提醒的请求码
         const val DAILY_UPDATE_REQUEST_CODE = 9999
@@ -134,24 +134,22 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         return false
     }
 
+    fun isLiveCapsuleCustomizationAvailable(): Boolean {
+        return Build.MANUFACTURER.equals("meizu", ignoreCase = true) &&
+            getFlymeVersion() >= 11 &&
+            isFlymeLiveNotificationEnabled(context)
+    }
+
     fun showCourseNotificationImmediate(
         courseName: String = "课程提醒",
         location: String = "",
         startTime: String = "",
         finish: Boolean
     ) {
-        when (Build.MANUFACTURER) {
-            "meizu" -> {
-                if (getFlymeVersion() >= 11 && isFlymeLiveNotificationEnabled(context)) {
-                    showMeizuLiveNotification(courseName, location, startTime, finish)
-                } else {
-                    showNormalNotification(courseName, location, startTime, finish)
-                }
-            }
-
-            else -> {
-                showNormalNotification(courseName, location, startTime, finish)
-            }
+        if (isLiveCapsuleCustomizationAvailable()) {
+            showMeizuLiveNotification(courseName, location, startTime, finish)
+        } else {
+            showNormalNotification(courseName, location, startTime, finish)
         }
     }
 
@@ -195,7 +193,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
             Log.d("UnifiedNotification", "已设置更新通知闹钟，时间: $startTime")
 
-            // 🔹 安排“取消通知”闹钟（课程开始后1分钟触发）
+            // 🔹 安排“取消通知”闹钟（课程开始后5分钟触发）
             val cancelIntent = Intent(context, CourseNotificationCancelReceiver::class.java)
             val cancelPendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -206,11 +204,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
-                triggerTime + 60_000,
+                triggerTime + FINISH_NOTIFICATION_DISMISS_DELAY_MS,
                 cancelPendingIntent
             )
 
-            Log.d("UnifiedNotification", "已设置取消通知闹钟，延迟1分钟触发")
+            Log.d("UnifiedNotification", "已设置取消通知闹钟，延迟5分钟触发")
 
         } catch (e: Exception) {
             Log.e("UnifiedNotification", "设置更新/取消闹钟失败", e)
