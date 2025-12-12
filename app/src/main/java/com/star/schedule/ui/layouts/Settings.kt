@@ -80,6 +80,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -117,6 +118,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     var resetJob by remember { mutableStateOf<Job?>(null) }
     val scrollState = rememberScrollState()
     val showLiveCapsuleSetting = notificationManager.isLiveCapsuleCustomizationAvailable()
+    var reminderAnimationsReady by remember { mutableStateOf(false) }
+    var startupHintAnimationsReady by remember { mutableStateOf(false) }
 
     // 权限申请器
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -161,6 +164,13 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
     LaunchedEffect(startupHintClosedPref) {
         showStartupHint = startupHintClosedPref != "true"
+    }
+
+    LaunchedEffect(showStartupHint) {
+        if (showStartupHint && !startupHintAnimationsReady) {
+            withFrameNanos { }
+            startupHintAnimationsReady = true
+        }
     }
 
     // 同步"只在连续课程的第一节课前发送通知"的偏好设置
@@ -258,6 +268,10 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             notificationManager.isReminderEnabledForTimetableSync(newTimetableId)
         } else {
             false
+        }
+        if (!reminderAnimationsReady) {
+            withFrameNanos { }
+            reminderAnimationsReady = true
         }
     }
 
@@ -394,61 +408,71 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             }
         }
 
-        AnimatedContent(
-            targetState = showStartupHint,
-            transitionSpec = {
-                    (fadeIn(tween(300)) + scaleIn()).togetherWith(fadeOut(tween(300)) + scaleOut())
-            }
-        ) { show ->
-            if (show) {
-                Card(
+        val startupHintCard: @Composable () -> Unit = {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                    shape = MaterialTheme.shapes.medium
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Info,
-                            contentDescription = "提示",
-                            tint = MaterialTheme.colorScheme.onSecondary,
-                            modifier = Modifier.size(28.dp)
+                    Icon(
+                        imageVector = Icons.Rounded.Info,
+                        contentDescription = "提示",
+                        tint = MaterialTheme.colorScheme.onSecondary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "请允许开机自启和后台运行",
+                            style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSecondary)
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "请允许开机自启和后台运行",
-                                style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSecondary)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "软件不会常驻后台，仅在需要发送通知时被系统唤起。",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "软件不会常驻后台，仅在需要发送通知时被系统唤起。",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f)
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = {
-                            scope.launch {
-                                dao.setPreference("startup_hint_closed", "true")
-                                showStartupHint = false
-                            }
-                        }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "关闭提示",
-                                tint = MaterialTheme.colorScheme.onSecondary
-                            )
-                        }
+                        )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = {
+                        scope.launch {
+                            dao.setPreference("startup_hint_closed", "true")
+                            showStartupHint = false
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "关闭提示",
+                            tint = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
+                }
+            }
+        }
+
+        if (!startupHintAnimationsReady) {
+            if (showStartupHint) {
+                startupHintCard()
+            }
+        } else {
+            AnimatedContent(
+                targetState = showStartupHint,
+                transitionSpec = {
+                    (fadeIn(tween(300)) + scaleIn()).togetherWith(fadeOut(tween(300)) + scaleOut())
+                }
+            ) { show ->
+                if (show) {
+                    startupHintCard()
                 }
             }
         }
@@ -466,17 +490,21 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 AnimatedContent(
                     targetState = reminderEnabled,
                     transitionSpec = {
-                        (scaleIn(
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessLow
-                            ),
-                            initialScale = 0.8f
-                        ) + fadeIn() togetherWith
-                                scaleOut(
-                                    animationSpec = tween(100),
-                                    targetScale = 0.8f
-                                ) + fadeOut())
+                        if (reminderAnimationsReady) {
+                            (scaleIn(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                ),
+                                initialScale = 0.8f
+                            ) + fadeIn() togetherWith
+                                    scaleOut(
+                                        animationSpec = tween(100),
+                                        targetScale = 0.8f
+                                    ) + fadeOut())
+                        } else {
+                            (EnterTransition.None).togetherWith(ExitTransition.None)
+                        }
                     }, label = "NotificationIcon"
                 ) { enabled ->
                     Icon(
@@ -513,20 +541,32 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         )
 
         // 通知设置项 - 作为一个整体一起出现
-        AnimatedVisibility(
-            visible = reminderEnabled,
-            enter = expandVertically(
+        val reminderEnterTransition =
+            if (reminderAnimationsReady) {
+                expandVertically(
                     animationSpec = tween(durationMillis = 300),
                     expandFrom = Alignment.Top
                 ) + fadeIn(
                     animationSpec = tween(durationMillis = 200)
-                ),
-            exit = shrinkVertically(
+                )
+            } else {
+                EnterTransition.None
+            }
+        val reminderExitTransition =
+            if (reminderAnimationsReady) {
+                shrinkVertically(
                     animationSpec = tween(durationMillis = 300),
                     shrinkTowards = Alignment.Top
                 ) + fadeOut(
                     animationSpec = tween(durationMillis = 200)
                 )
+            } else {
+                ExitTransition.None
+            }
+        AnimatedVisibility(
+            visible = reminderEnabled,
+            enter = reminderEnterTransition,
+            exit = reminderExitTransition
         ) {
             Column {
                 // 只在连续课程的第一节课前发送通知的开关
