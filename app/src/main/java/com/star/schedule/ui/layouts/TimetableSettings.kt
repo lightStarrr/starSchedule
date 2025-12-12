@@ -5,6 +5,12 @@ import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -17,7 +23,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +57,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -190,38 +198,121 @@ fun TimetableSettings(dao: ScheduleDao) {
                 }
             }
         }
-        items(timetables) { timetable ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                    showTimetableDetailSheet = timetable
+        if (timetables.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "暂无课表",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "点击“新建”或使用导入功能，一键构建属于你的课程安排。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(timetable.name, style = MaterialTheme.typography.titleMedium)
-                        IconButton(onClick = {
+            }
+        } else {
+            itemsIndexed(
+                items = timetables,
+                key = { _, timetable -> timetable.id }
+            ) { index, timetable ->
+                val cardAlpha = remember(timetable.id) { Animatable(0f) }
+                val cardOffset = remember(timetable.id) { Animatable(32f) }
+                var isRemoving by remember(timetable.id) { mutableStateOf(false) }
+                val exitDurationMillis = 260
+                LaunchedEffect(timetable.id) {
+                    val delayMillis = (index * 40).coerceAtMost(240)
+                    launch {
+                        cardAlpha.animateTo(
+                            targetValue = 1f,
+                            animationSpec = tween(
+                                durationMillis = 350,
+                                delayMillis = delayMillis
+                            )
+                        )
+                    }
+                    launch {
+                        cardOffset.animateTo(
+                            targetValue = 0f,
+                            animationSpec = tween(
+                                durationMillis = 350,
+                                delayMillis = delayMillis
+                            )
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = !isRemoving,
+                    enter = EnterTransition.None,
+                    exit = fadeOut(animationSpec = tween(exitDurationMillis)) + shrinkVertically(
+                        animationSpec = tween(exitDurationMillis)
+                    )
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                alpha = cardAlpha.value
+                                translationY = cardOffset.value
+                            },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                            scope.launch {
-                                dao.deleteTimetableWithReminders(
-                                    timetable
-                                )
+                            showTimetableDetailSheet = timetable
+                        }
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(timetable.name, style = MaterialTheme.typography.titleMedium)
+                                IconButton(onClick = {
+                                    if (isRemoving) return@IconButton
+                                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                    isRemoving = true
+                                    scope.launch {
+                                        cardAlpha.stop()
+                                        cardOffset.stop()
+                                        val exitSpec = tween<Float>(durationMillis = exitDurationMillis)
+                                        val fadeJob = launch {
+                                            cardAlpha.animateTo(
+                                                targetValue = 0f,
+                                                animationSpec = exitSpec
+                                            )
+                                        }
+                                        val slideJob = launch {
+                                            cardOffset.animateTo(
+                                                targetValue = 16f,
+                                                animationSpec = exitSpec
+                                            )
+                                        }
+                                        fadeJob.join()
+                                        slideJob.join()
+                                        dao.deleteTimetableWithReminders(timetable)
+                                    }
+                                }) {
+                                    Icon(Icons.Rounded.Delete, contentDescription = "删除课表")
+                                }
                             }
-                        }) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "删除课表")
                         }
                     }
                 }
             }
         }
-
-
     }
 
     // 课表详情 BottomSheet
