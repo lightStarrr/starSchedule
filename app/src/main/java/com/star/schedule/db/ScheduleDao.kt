@@ -117,6 +117,140 @@ abstract class ScheduleDao {
     @Delete
     abstract suspend fun deleteLessonTime(lessonTime: LessonTimeEntity)
 
+    @Query("DELETE FROM lesson_time WHERE timetableId = :timetableId")
+    abstract suspend fun deleteLessonTimesByTimetableId(timetableId: Long)
+
+    @Transaction
+    open suspend fun replaceLessonTimesForTimetable(timetableId: Long, lessonTimes: List<LessonTimeEntity>) {
+        deleteLessonTimesByTimetableId(timetableId)
+        lessonTimes.forEach { insertLessonTime(it) }
+        checkAndEnableReminders(timetableId)
+    }
+
+    // ------------------ 课程时间模板 ------------------
+    @Query("SELECT * FROM lesson_time_template ORDER BY updatedAt DESC")
+    abstract fun getLessonTimeTemplatesFlow(): Flow<List<LessonTimeTemplateEntity>>
+
+    @Query("SELECT * FROM lesson_time_template WHERE name = :name LIMIT 1")
+    abstract suspend fun getLessonTimeTemplateByNameOnce(name: String): LessonTimeTemplateEntity?
+
+    @Query("SELECT * FROM lesson_time_template WHERE id = :templateId LIMIT 1")
+    abstract suspend fun getLessonTimeTemplateByIdOnce(templateId: Long): LessonTimeTemplateEntity?
+
+    @Insert
+    abstract suspend fun insertLessonTimeTemplate(template: LessonTimeTemplateEntity): Long
+
+    @Update
+    abstract suspend fun updateLessonTimeTemplate(template: LessonTimeTemplateEntity)
+
+    @Delete
+    abstract suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity)
+
+    @Insert
+    abstract suspend fun insertLessonTimeTemplateItems(items: List<LessonTimeTemplateItemEntity>)
+
+    @Query("DELETE FROM lesson_time_template_item WHERE templateId = :templateId")
+    abstract suspend fun deleteLessonTimeTemplateItemsByTemplateId(templateId: Long)
+
+    @Query("SELECT * FROM lesson_time_template_item WHERE templateId = :templateId ORDER BY period ASC")
+    abstract suspend fun getLessonTimeTemplateItemsOnce(templateId: Long): List<LessonTimeTemplateItemEntity>
+
+    @Transaction
+    open suspend fun saveLessonTimeTemplateFromTimetable(
+        timetableId: Long,
+        templateName: String,
+        overwrite: Boolean = false
+    ): Long {
+        val now = System.currentTimeMillis()
+        val lessonTimes = getLessonTimesFlow(timetableId).firstOrNull().orEmpty().sortedBy { it.period }
+        val existing = getLessonTimeTemplateByNameOnce(templateName)
+
+        val templateId = if (existing == null) {
+            insertLessonTimeTemplate(
+                LessonTimeTemplateEntity(
+                    name = templateName,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        } else {
+            if (!overwrite) throw IllegalStateException("TEMPLATE_EXISTS")
+            updateLessonTimeTemplate(existing.copy(updatedAt = now))
+            deleteLessonTimeTemplateItemsByTemplateId(existing.id)
+            existing.id
+        }
+
+        if (lessonTimes.isNotEmpty()) {
+            insertLessonTimeTemplateItems(
+                lessonTimes.map { time ->
+                    LessonTimeTemplateItemEntity(
+                        templateId = templateId,
+                        period = time.period,
+                        startTime = time.startTime,
+                        endTime = time.endTime
+                    )
+                }
+            )
+        }
+
+        return templateId
+    }
+
+    @Transaction
+    open suspend fun saveLessonTimeTemplateFromItems(
+        templateName: String,
+        lessonTimes: List<LessonTimeTemplateItemEntity>,
+        overwrite: Boolean = false,
+        createdAt: Long = System.currentTimeMillis(),
+        updatedAt: Long = System.currentTimeMillis()
+    ): Long {
+        val existing = getLessonTimeTemplateByNameOnce(templateName)
+
+        val templateId = if (existing == null) {
+            insertLessonTimeTemplate(
+                LessonTimeTemplateEntity(
+                    name = templateName,
+                    createdAt = createdAt,
+                    updatedAt = updatedAt
+                )
+            )
+        } else {
+            if (!overwrite) throw IllegalStateException("TEMPLATE_EXISTS")
+            updateLessonTimeTemplate(existing.copy(updatedAt = updatedAt))
+            deleteLessonTimeTemplateItemsByTemplateId(existing.id)
+            existing.id
+        }
+
+        if (lessonTimes.isNotEmpty()) {
+            insertLessonTimeTemplateItems(
+                lessonTimes.map { item ->
+                    item.copy(
+                        id = 0,
+                        templateId = templateId
+                    )
+                }
+            )
+        }
+
+        return templateId
+    }
+
+    @Transaction
+    open suspend fun applyLessonTimeTemplateToTimetable(timetableId: Long, templateId: Long) {
+        val items = getLessonTimeTemplateItemsOnce(templateId).sortedBy { it.period }
+        replaceLessonTimesForTimetable(
+            timetableId,
+            items.map { item ->
+                LessonTimeEntity(
+                    timetableId = timetableId,
+                    period = item.period,
+                    startTime = item.startTime,
+                    endTime = item.endTime
+                )
+            }
+        )
+    }
+
     // ------------------ 课程 ------------------
     @Query("SELECT * FROM course WHERE timetableId = :timetableId ORDER BY dayOfWeek ASC")
     abstract fun getCoursesFlow(timetableId: Long): Flow<List<CourseEntity>>
@@ -143,6 +277,16 @@ abstract class ScheduleDao {
 
     @Delete
     abstract suspend fun deleteCourse(course: CourseEntity)
+
+    @Query("DELETE FROM course WHERE timetableId = :timetableId")
+    abstract suspend fun deleteCoursesByTimetableId(timetableId: Long)
+
+    @Transaction
+    open suspend fun replaceCoursesForTimetable(timetableId: Long, courses: List<CourseEntity>) {
+        deleteCoursesByTimetableId(timetableId)
+        courses.forEach { insertCourse(it) }
+        checkAndEnableReminders(timetableId)
+    }
 
     // ---------- 提醒 ----------
     @Insert(onConflict = OnConflictStrategy.REPLACE)

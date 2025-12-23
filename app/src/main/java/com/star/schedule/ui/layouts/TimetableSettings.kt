@@ -3,6 +3,7 @@ package com.star.schedule.ui.layouts
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -35,6 +37,8 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileOpen
+import androidx.compose.material.icons.rounded.Polyline
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -66,22 +70,30 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.star.schedule.Constants
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
+import com.star.schedule.db.LessonTimeTemplateEntity
+import com.star.schedule.db.LessonTimeTemplateItemEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
 import com.star.schedule.service.WidgetRefreshManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.utils.ImportManager.importTimetable
+import com.star.schedule.utils.LessonTimeTemplateExport
+import com.star.schedule.utils.LessonTimeTemplateExportBundle
+import com.star.schedule.utils.LidaJwImporter
 import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -98,13 +110,26 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+private enum class LessonTimeTemplateImportConflictStrategy {
+    OVERWRITE,
+    RENAME,
+    SKIP
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimetableSettings(dao: ScheduleDao) {
     val scope = rememberCoroutineScope()
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
     val haptic = LocalHapticFeedback.current
-    LocalContext.current
+    val context = LocalContext.current
+
+    val lidaAccountPref by dao.getPreferenceFlow(Constants.PREF_LIDA_JW_ACCOUNT).collectAsState(initial = null)
+    val lidaPasswordPref by dao.getPreferenceFlow(Constants.PREF_LIDA_JW_PASSWORD).collectAsState(initial = null)
+    val lidaAccount = lidaAccountPref.orEmpty()
+    val lidaPassword = lidaPasswordPref.orEmpty()
+
+    var updatingTimetableIds by remember { mutableStateOf(setOf<Long>()) }
 
     // BottomSheet 状态管理
     var showAddLessonSheet by remember { mutableStateOf(false) }
@@ -115,6 +140,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     var showImportOptionsSheet by remember { mutableStateOf(false) }
     var showWakeUpImportSheet by remember { mutableStateOf(false) }
     var showXuexitongImportSheet by remember { mutableStateOf(false) }
+    var showLidaImportSheet by remember { mutableStateOf(false) }
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
 
     // BottomSheet状态
@@ -126,6 +152,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     val importOptionsSheetState = rememberModalBottomSheetState()
     val wakeUpImportSheetState = rememberModalBottomSheetState()
     val xuexitongImportSheetState = rememberModalBottomSheetState()
+    val lidaImportSheetState = rememberModalBottomSheetState()
 
     LazyColumn(
         modifier = Modifier
@@ -280,32 +307,102 @@ fun TimetableSettings(dao: ScheduleDao) {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(timetable.name, style = MaterialTheme.typography.titleMedium)
-                                IconButton(onClick = {
-                                    if (isRemoving) return@IconButton
-                                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                    isRemoving = true
-                                    scope.launch {
-                                        cardAlpha.stop()
-                                        cardOffset.stop()
-                                        val exitSpec = tween<Float>(durationMillis = exitDurationMillis)
-                                        val fadeJob = launch {
-                                            cardAlpha.animateTo(
-                                                targetValue = 0f,
-                                                animationSpec = exitSpec
-                                            )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val isLidaTimetable = timetable.name.startsWith("上海立达学院")
+                                    val isUpdating = updatingTimetableIds.contains(timetable.id)
+
+                                    if (isLidaTimetable) {
+                                        IconButton(
+                                            onClick = {
+                                                if (isRemoving || isUpdating) return@IconButton
+                                                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+
+                                                if (lidaAccount.isBlank() || lidaPassword.isBlank()) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "请先在“上海立达学院导入”中登录一次，以保存账号密码",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                    return@IconButton
+                                                }
+
+                                                updatingTimetableIds = updatingTimetableIds + timetable.id
+                                                scope.launch {
+                                                    try {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "正在更新课程…",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+
+                                                        when (val result = LidaJwImporter.updateCoursesForTimetable(
+                                                            timetableId = timetable.id,
+                                                            account = lidaAccount,
+                                                            password = lidaPassword,
+                                                            dao = dao
+                                                        )) {
+                                                            is LidaJwImporter.ImportResult.Success -> {
+                                                                result.warning?.let {
+                                                                    Toast.makeText(
+                                                                        context,
+                                                                        it,
+                                                                        Toast.LENGTH_LONG
+                                                                    ).show()
+                                                                }
+                                                                WidgetRefreshManager.onCourseDataChanged(context)
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    "更新成功",
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            }
+
+                                                            is LidaJwImporter.ImportResult.Error -> {
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    result.message,
+                                                                    Toast.LENGTH_LONG
+                                                                ).show()
+                                                            }
+                                                        }
+                                                    } finally {
+                                                        updatingTimetableIds = updatingTimetableIds - timetable.id
+                                                    }
+                                                }
+                                            },
+                                            enabled = !isRemoving && !isUpdating
+                                        ) {
+                                            Icon(Icons.Rounded.Refresh, contentDescription = "更新课程")
                                         }
-                                        val slideJob = launch {
-                                            cardOffset.animateTo(
-                                                targetValue = 16f,
-                                                animationSpec = exitSpec
-                                            )
-                                        }
-                                        fadeJob.join()
-                                        slideJob.join()
-                                        dao.deleteTimetableWithReminders(timetable)
                                     }
-                                }) {
-                                    Icon(Icons.Rounded.Delete, contentDescription = "删除课表")
+
+                                    IconButton(onClick = {
+                                        if (isRemoving || isUpdating) return@IconButton
+                                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                        isRemoving = true
+                                        scope.launch {
+                                            cardAlpha.stop()
+                                            cardOffset.stop()
+                                            val exitSpec = tween<Float>(durationMillis = exitDurationMillis)
+                                            val fadeJob = launch {
+                                                cardAlpha.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = exitSpec
+                                                )
+                                            }
+                                            val slideJob = launch {
+                                                cardOffset.animateTo(
+                                                    targetValue = 16f,
+                                                    animationSpec = exitSpec
+                                                )
+                                            }
+                                            fadeJob.join()
+                                            slideJob.join()
+                                            dao.deleteTimetableWithReminders(timetable)
+                                        }
+                                    }, enabled = !isRemoving && !isUpdating) {
+                                        Icon(Icons.Rounded.Delete, contentDescription = "删除课表")
+                                    }
                                 }
                             }
                         }
@@ -423,6 +520,14 @@ fun TimetableSettings(dao: ScheduleDao) {
                     }
                 }
             },
+            onLidaImport = {
+                scope.launch { importOptionsSheetState.hide() }.invokeOnCompletion {
+                    if (!importOptionsSheetState.isVisible) {
+                        showImportOptionsSheet = false
+                        showLidaImportSheet = true
+                    }
+                }
+            },
             sheetState = importOptionsSheetState
         )
     }
@@ -454,6 +559,21 @@ fun TimetableSettings(dao: ScheduleDao) {
             },
             dao = dao,
             sheetState = xuexitongImportSheetState
+        )
+    }
+
+    // 上海立达学院导入 BottomSheet
+    if (showLidaImportSheet) {
+        LidaImportSheet(
+            onDismiss = {
+                scope.launch { lidaImportSheetState.hide() }.invokeOnCompletion {
+                    if (!lidaImportSheetState.isVisible) {
+                        showLidaImportSheet = false
+                    }
+                }
+            },
+            dao = dao,
+            sheetState = lidaImportSheetState
         )
     }
 }
@@ -1405,6 +1525,249 @@ fun TimetableDetailSheet(
     val editLessonSheetState = rememberModalBottomSheetState()
     val editCourseSheetState = rememberModalBottomSheetState()
 
+    // 课程时间模板
+    val lessonTimeTemplates by dao.getLessonTimeTemplatesFlow().collectAsState(initial = emptyList())
+    var showLessonTimeTemplateDialog by remember { mutableStateOf(false) }
+    var showSaveLessonTimeTemplateDialog by remember { mutableStateOf(false) }
+    var templateName by remember { mutableStateOf("") }
+    var templateNameError by remember { mutableStateOf("") }
+    var overwriteTemplateName by remember { mutableStateOf<String?>(null) }
+    var confirmApplyTemplate by remember { mutableStateOf<LessonTimeTemplateEntity?>(null) }
+    var confirmDeleteTemplate by remember { mutableStateOf<LessonTimeTemplateEntity?>(null) }
+    var exportTemplate by remember { mutableStateOf<LessonTimeTemplateEntity?>(null) }
+    var exportAllTemplates by remember { mutableStateOf(false) }
+    var pendingImportTemplates by remember { mutableStateOf<List<LessonTimeTemplateExport>>(emptyList()) }
+    var showImportTemplateConflictDialog by remember { mutableStateOf(false) }
+    val templateExportJson = remember { Json { prettyPrint = true } }
+    val templateImportJson = remember { Json { ignoreUnknownKeys = true; coerceInputValues = true } }
+
+    fun sanitizeFileName(name: String): String =
+        name.replace(Regex("""[\\/:*?"<>|]"""), "_").trim().ifEmpty { "lesson_time_template" }
+
+    val exportTemplateLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val template = exportTemplate
+        val exportAll = exportAllTemplates
+        exportTemplate = null
+        exportAllTemplates = false
+
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        scope.launch {
+            try {
+                val jsonText = withContext(Dispatchers.IO) {
+                    if (exportAll) {
+                        val exports = lessonTimeTemplates.map { t ->
+                            val items = dao.getLessonTimeTemplateItemsOnce(t.id)
+                            LessonTimeTemplateExport(
+                                templateName = t.name,
+                                createdAt = t.createdAt,
+                                updatedAt = t.updatedAt,
+                                lessonTimes = items.map { item ->
+                                    LessonTimeTemplateExport.LessonTime(
+                                        period = item.period,
+                                        startTime = item.startTime,
+                                        endTime = item.endTime
+                                    )
+                                }
+                            )
+                        }
+                        val bundle = LessonTimeTemplateExportBundle(templates = exports)
+                        templateExportJson.encodeToString(bundle)
+                    } else {
+                        requireNotNull(template) { "No template selected" }
+                        val items = dao.getLessonTimeTemplateItemsOnce(template.id)
+                        val exportData = LessonTimeTemplateExport(
+                            templateName = template.name,
+                            createdAt = template.createdAt,
+                            updatedAt = template.updatedAt,
+                            lessonTimes = items.map { item ->
+                                LessonTimeTemplateExport.LessonTime(
+                                    period = item.period,
+                                    startTime = item.startTime,
+                                    endTime = item.endTime
+                                )
+                            }
+                        )
+                        templateExportJson.encodeToString(exportData)
+                    }
+                }
+
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(jsonText.toByteArray(Charsets.UTF_8))
+                } ?: error("无法写入文件")
+
+                Toast.makeText(context, "模板已导出", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "导出失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importTemplateLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        scope.launch {
+            try {
+                val jsonText = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        String(inputStream.readBytes(), Charsets.UTF_8)
+                    } ?: error("无法读取文件")
+                }
+
+                val templates = try {
+                    templateImportJson.decodeFromString(
+                        LessonTimeTemplateExportBundle.serializer(),
+                        jsonText
+                    ).templates
+                } catch (_: Exception) {
+                    listOf(
+                        templateImportJson.decodeFromString(
+                            LessonTimeTemplateExport.serializer(),
+                            jsonText
+                        )
+                    )
+                }
+
+                val normalized = templates.mapNotNull { t ->
+                    val name = t.templateName.trim()
+                    if (name.isBlank()) null else t.copy(templateName = name)
+                }
+
+                if (normalized.isEmpty()) {
+                    Toast.makeText(context, "未解析到模板", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                pendingImportTemplates = normalized
+                showImportTemplateConflictDialog = true
+            } catch (e: Exception) {
+                Toast.makeText(context, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun runTemplateImport(strategy: LessonTimeTemplateImportConflictStrategy) {
+        val templatesToImport = pendingImportTemplates
+        pendingImportTemplates = emptyList()
+        showImportTemplateConflictDialog = false
+
+        if (templatesToImport.isEmpty()) return
+
+        scope.launch {
+            try {
+                val (imported, overwritten, skipped) = withContext(Dispatchers.IO) {
+                    suspend fun findAvailableName(baseName: String): String {
+                        if (dao.getLessonTimeTemplateByNameOnce(baseName) == null) return baseName
+
+                        var index = 1
+                        while (true) {
+                            val candidate = if (index == 1) {
+                                "$baseName (导入)"
+                            } else {
+                                "$baseName (导入 $index)"
+                            }
+                            if (dao.getLessonTimeTemplateByNameOnce(candidate) == null) return candidate
+                            index++
+                        }
+                    }
+
+                    var importedCount = 0
+                    var overwrittenCount = 0
+                    var skippedCount = 0
+                    val now = System.currentTimeMillis()
+
+                    templatesToImport.forEach { t ->
+                        val baseName = t.templateName.trim()
+                        if (baseName.isBlank()) {
+                            skippedCount++
+                            return@forEach
+                        }
+
+                        val createdAt = t.createdAt.takeIf { it > 0 } ?: now
+                        val updatedAt = t.updatedAt.takeIf { it > 0 } ?: createdAt
+                        val lessonTimes = t.lessonTimes
+                            .asSequence()
+                            .filter { it.period > 0 && it.startTime.isNotBlank() && it.endTime.isNotBlank() }
+                            .filter { it.startTime != it.endTime }
+                            .sortedBy { it.period }
+                            .distinctBy { it.period }
+                            .map { time ->
+                                LessonTimeTemplateItemEntity(
+                                    templateId = 0,
+                                    period = time.period,
+                                    startTime = time.startTime,
+                                    endTime = time.endTime
+                                )
+                            }
+                            .toList()
+
+                        when (strategy) {
+                            LessonTimeTemplateImportConflictStrategy.OVERWRITE -> {
+                                val exists = dao.getLessonTimeTemplateByNameOnce(baseName) != null
+                                dao.saveLessonTimeTemplateFromItems(
+                                    templateName = baseName,
+                                    lessonTimes = lessonTimes,
+                                    overwrite = true,
+                                    createdAt = createdAt,
+                                    updatedAt = updatedAt
+                                )
+                                importedCount++
+                                if (exists) overwrittenCount++
+                            }
+
+                            LessonTimeTemplateImportConflictStrategy.RENAME -> {
+                                val finalName = findAvailableName(baseName)
+                                dao.saveLessonTimeTemplateFromItems(
+                                    templateName = finalName,
+                                    lessonTimes = lessonTimes,
+                                    overwrite = false,
+                                    createdAt = createdAt,
+                                    updatedAt = updatedAt
+                                )
+                                importedCount++
+                            }
+
+                            LessonTimeTemplateImportConflictStrategy.SKIP -> {
+                                if (dao.getLessonTimeTemplateByNameOnce(baseName) != null) {
+                                    skippedCount++
+                                    return@forEach
+                                }
+
+                                dao.saveLessonTimeTemplateFromItems(
+                                    templateName = baseName,
+                                    lessonTimes = lessonTimes,
+                                    overwrite = false,
+                                    createdAt = createdAt,
+                                    updatedAt = updatedAt
+                                )
+                                importedCount++
+                            }
+                        }
+                    }
+
+                    Triple(importedCount, overwrittenCount, skippedCount)
+                }
+
+                val suffix = when (strategy) {
+                    LessonTimeTemplateImportConflictStrategy.OVERWRITE ->
+                        if (overwritten > 0) "（覆盖 $overwritten 个）" else ""
+
+                    LessonTimeTemplateImportConflictStrategy.RENAME -> ""
+                    LessonTimeTemplateImportConflictStrategy.SKIP ->
+                        if (skipped > 0) "（跳过 $skipped 个）" else ""
+                }
+
+                Toast.makeText(context, "已导入 $imported 个模板$suffix", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     OptimizedBottomSheet(
         onDismiss = onDismiss,
         sheetState = sheetState
@@ -1639,8 +2002,13 @@ fun TimetableDetailSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("课程时间管理", style = MaterialTheme.typography.titleSmall)
-                        IconButton(onClick = { showAddLessonSheet = true }) {
-                            Icon(Icons.Rounded.Add, contentDescription = "新增课程时间")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { showLessonTimeTemplateDialog = true }) {
+                                Text("模板")
+                            }
+                            IconButton(onClick = { showAddLessonSheet = true }) {
+                                Icon(Icons.Rounded.Add, contentDescription = "新增课程时间")
+                            }
                         }
                     }
 
@@ -1811,6 +2179,350 @@ fun TimetableDetailSheet(
         }
     }
 
+    // 课程时间模板
+    if (showLessonTimeTemplateDialog) {
+        AlertDialog(
+            onDismissRequest = { showLessonTimeTemplateDialog = false },
+            title = { Text("课程时间模板") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                if (sortedLessonTimes.isEmpty()) {
+                                    Toast.makeText(context, "当前课表暂无课程时间，无法保存模板", Toast.LENGTH_SHORT)
+                                        .show()
+                                    return@TextButton
+                                }
+                                templateName = ""
+                                templateNameError = ""
+                                showLessonTimeTemplateDialog = false
+                                showSaveLessonTimeTemplateDialog = true
+                            }
+                        ) {
+                            Text("保存当前为模板")
+                        }
+                        TextButton(
+                            onClick = {
+                                showLessonTimeTemplateDialog = false
+                                importTemplateLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                            }
+                        ) {
+                            Text("导入")
+                        }
+                        TextButton(
+                            onClick = {
+                                if (lessonTimeTemplates.isEmpty()) {
+                                    Toast.makeText(context, "暂无模板可导出", Toast.LENGTH_SHORT).show()
+                                    return@TextButton
+                                }
+                                exportAllTemplates = true
+                                exportTemplate = null
+                                exportTemplateLauncher.launch("lesson_time_templates.json")
+                            }
+                        ) {
+                            Text("导出全部")
+                        }
+                    }
+
+                    if (lessonTimeTemplates.isEmpty()) {
+                        Text(
+                            text = "暂无模板",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    } else {
+                        LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                            itemsIndexed(
+                                items = lessonTimeTemplates,
+                                key = { _, item -> item.id }
+                            ) { _, template ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = template.name,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Row(modifier = Modifier.width(IntrinsicSize.Min)) {
+                                        IconButton(
+                                            onClick = {
+                                                confirmApplyTemplate = template
+                                                showLessonTimeTemplateDialog = false
+                                            }
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.FileDownload,
+                                                contentDescription = "应用模板"
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                exportTemplate = template
+                                                exportAllTemplates = false
+                                                showLessonTimeTemplateDialog = false
+                                                exportTemplateLauncher.launch("${sanitizeFileName(template.name)}.json")
+                                            }
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.Polyline,
+                                                contentDescription = "导出模板"
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                confirmDeleteTemplate = template
+                                                showLessonTimeTemplateDialog = false
+                                            }
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.Delete,
+                                                contentDescription = "删除模板"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLessonTimeTemplateDialog = false }) {
+                    Text("关闭")
+                }
+            }
+        )
+    }
+
+    if (showImportTemplateConflictDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showImportTemplateConflictDialog = false
+                pendingImportTemplates = emptyList()
+            },
+            title = { Text("导入模板") },
+            text = {
+                Text("共解析到 ${pendingImportTemplates.size} 个模板，若存在同名模板，如何处理？")
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { runTemplateImport(LessonTimeTemplateImportConflictStrategy.OVERWRITE) }) {
+                        Text("覆盖")
+                    }
+                    TextButton(onClick = { runTemplateImport(LessonTimeTemplateImportConflictStrategy.RENAME) }) {
+                        Text("重命名")
+                    }
+                    TextButton(onClick = { runTemplateImport(LessonTimeTemplateImportConflictStrategy.SKIP) }) {
+                        Text("跳过")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showImportTemplateConflictDialog = false
+                        pendingImportTemplates = emptyList()
+                    }
+                ) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    if (showSaveLessonTimeTemplateDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveLessonTimeTemplateDialog = false },
+            title = { Text("保存课程时间模板") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = templateName,
+                        onValueChange = {
+                            templateName = it
+                            templateNameError = ""
+                        },
+                        label = { Text("模板名称") },
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = templateNameError.isNotEmpty(),
+                        supportingText = if (templateNameError.isNotEmpty()) {
+                            { Text(templateNameError) }
+                        } else null
+                    )
+                    Text(
+                        text = "将当前课表的课程时间保存为模板，可用于其他课表。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val nameToSave = templateName.trim()
+                        if (nameToSave.isBlank()) {
+                            templateNameError = "模板名称不能为空"
+                            return@TextButton
+                        }
+                        if (nameToSave.length > 100) {
+                            templateNameError = "模板名称不能超过100个字符"
+                            return@TextButton
+                        }
+
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    dao.saveLessonTimeTemplateFromTimetable(
+                                        timetableId = timetable.id,
+                                        templateName = nameToSave,
+                                        overwrite = false
+                                    )
+                                }
+                                showSaveLessonTimeTemplateDialog = false
+                                Toast.makeText(context, "已保存为模板", Toast.LENGTH_SHORT).show()
+                            } catch (e: IllegalStateException) {
+                                if (e.message == "TEMPLATE_EXISTS") {
+                                    showSaveLessonTimeTemplateDialog = false
+                                    overwriteTemplateName = nameToSave
+                                } else {
+                                    Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT)
+                                        .show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text("保存")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveLessonTimeTemplateDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    overwriteTemplateName?.let { nameToOverwrite ->
+        AlertDialog(
+            onDismissRequest = { overwriteTemplateName = null },
+            title = { Text("覆盖模板？") },
+            text = { Text("模板“$nameToOverwrite”已存在，是否覆盖？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    dao.saveLessonTimeTemplateFromTimetable(
+                                        timetableId = timetable.id,
+                                        templateName = nameToOverwrite,
+                                        overwrite = true
+                                    )
+                                }
+                                Toast.makeText(context, "已覆盖模板", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "覆盖失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                overwriteTemplateName = null
+                            }
+                        }
+                    }
+                ) {
+                    Text("覆盖")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { overwriteTemplateName = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    confirmApplyTemplate?.let { template ->
+        AlertDialog(
+            onDismissRequest = { confirmApplyTemplate = null },
+            title = { Text("应用模板？") },
+            text = { Text("应用“${template.name}”将覆盖当前课表的课程时间，是否继续？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    dao.applyLessonTimeTemplateToTimetable(
+                                        timetableId = timetable.id,
+                                        templateId = template.id
+                                    )
+                                }
+                                WidgetRefreshManager.onCourseDataChanged(context)
+                                Toast.makeText(context, "已应用模板", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "应用失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                confirmApplyTemplate = null
+                            }
+                        }
+                    }
+                ) {
+                    Text("应用")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmApplyTemplate = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    confirmDeleteTemplate?.let { template ->
+        AlertDialog(
+            onDismissRequest = { confirmDeleteTemplate = null },
+            title = { Text("删除模板？") },
+            text = { Text("确定删除模板“${template.name}”？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    dao.deleteLessonTimeTemplate(template)
+                                }
+                                Toast.makeText(context, "模板已删除", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                confirmDeleteTemplate = null
+                            }
+                        }
+                    }
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteTemplate = null }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     // 子 BottomSheet
     if (showAddLessonSheet) {
         AddLessonTimeSheet(
@@ -1914,6 +2626,7 @@ fun ImportOptionsSheet(
     onDismiss: () -> Unit,
     onWakeUpImport: () -> Unit,
     onXuexitongImport: () -> Unit,
+    onLidaImport: () -> Unit,
     sheetState: androidx.compose.material3.SheetState
 ) {
     OptimizedBottomSheet(
@@ -1990,6 +2703,37 @@ fun ImportOptionsSheet(
                         )
                         Text(
                             text = "自动匹配xls内容格式，如无法导入请联系作者",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // 上海立达学院教务导入选项
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onLidaImport() },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Rounded.CalendarMonth,
+                        contentDescription = "上海立达学院",
+                        modifier = Modifier.padding(end = 12.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "上海立达学院",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "账号密码登录教务系统导入",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2164,6 +2908,149 @@ fun WakeUpImportSheet(
     }
 }
 
+// ---------- 上海立达学院导入弹窗 ----------
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun LidaImportSheet(
+    onDismiss: () -> Unit,
+    dao: ScheduleDao,
+    sheetState: androidx.compose.material3.SheetState
+) {
+    var account by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        account = dao.getPreferenceFlow(Constants.PREF_LIDA_JW_ACCOUNT).firstOrNull().orEmpty()
+        password = dao.getPreferenceFlow(Constants.PREF_LIDA_JW_PASSWORD).firstOrNull().orEmpty()
+    }
+
+    OptimizedBottomSheet(
+        onDismiss = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "上海立达学院导入",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "将使用教务系统账号密码登录并抓取“学期理论课表”。\n账号密码将保存在本机，用于一键更新课程。",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // 错误信息显示
+            if (errorMessage.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            OutlinedTextField(
+                value = account,
+                onValueChange = {
+                    account = it
+                    errorMessage = ""
+                },
+                label = { Text("账号") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = {
+                    password = it
+                    errorMessage = ""
+                },
+                label = { Text("密码") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            if (isLoading) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) { LoadingIndicator() }
+            } else {
+                Button(
+                    onClick = {
+                        val trimmedAccount = account.trim()
+                        if (trimmedAccount.isBlank() || password.isBlank()) {
+                            errorMessage = "请输入账号和密码"
+                            return@Button
+                        }
+
+                        isLoading = true
+                        scope.launch {
+                            try {
+                                dao.setPreference(Constants.PREF_LIDA_JW_ACCOUNT, trimmedAccount)
+                                dao.setPreference(Constants.PREF_LIDA_JW_PASSWORD, password)
+
+                                when (val result =
+                                    LidaJwImporter.importFromLidaJw(trimmedAccount, password, dao)) {
+                                    is LidaJwImporter.ImportResult.Success -> {
+                                        result.warning?.let {
+                                            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                                        }
+                                        WidgetRefreshManager.onTimetableSwitched(context)
+                                        onDismiss()
+                                    }
+
+                                    is LidaJwImporter.ImportResult.Error -> {
+                                        errorMessage = result.message
+                                    }
+                                }
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                ) {
+                    Text("登录并导入")
+                }
+            }
+        }
+    }
+}
+
 // 从分享文本中提取口令
 fun extractKeyFromShareText(text: String): String {
     val pattern = "分享口令为「([a-f0-9]+)」".toRegex()
@@ -2175,22 +3062,42 @@ fun extractKeyFromShareText(text: String): String {
 // WakeUp导入函数
 suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withContext(Dispatchers.IO) {
     try {
-        val client = OkHttpClient()
+        val client = OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
         val request = Request.Builder()
             .url("https://i.wakeup.fun/share_schedule/get?key=$key")
             .get()
+            .addHeader("User-Agent", "StarSchedule/1.0")
             .build()
         val response = client.newCall(request).execute()
-        val body = response.body.string()
-
-        if (response.code != 200) return@withContext false
+        
+        if (!response.isSuccessful) {
+            Log.e("WakeUpImport", "请求失败: ${response.code} - ${response.message}")
+            return@withContext false
+        }
+        
+        val body = response.body?.string() ?: run {
+            Log.e("WakeUpImport", "响应体为空")
+            return@withContext false
+        }
 
         val rootJson = Json.parseToJsonElement(body).jsonObject
-        if (rootJson["status"]?.jsonPrimitive?.int != 1) return@withContext false
+        if (rootJson["status"]?.jsonPrimitive?.int != 1) {
+            Log.e("WakeUpImport", "API返回错误状态: ${rootJson["status"]}")
+            return@withContext false
+        }
 
-        val dataStr = rootJson["data"]?.jsonPrimitive?.content ?: return@withContext false
+        val dataStr = rootJson["data"]?.jsonPrimitive?.content ?: run {
+            Log.e("WakeUpImport", "API返回数据为空")
+            return@withContext false
+        }
         val segments = dataStr.split("\n")
-        if (segments.size < 4) return@withContext false
+        if (segments.size < 4) {
+            Log.e("WakeUpImport", "API返回数据格式错误，段数: ${segments.size}")
+            return@withContext false
+        }
 
         val timetableInfo = Json.decodeFromString<JsonObject>(segments[0])
         val lessonTimes = Json.decodeFromString<JsonArray>(segments[1])
@@ -2293,7 +3200,7 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
         }
         true
     } catch (e: Exception) {
-        e.printStackTrace()
+        Log.e("WakeUpImport", "导入失败", e)
         false
     }
 }

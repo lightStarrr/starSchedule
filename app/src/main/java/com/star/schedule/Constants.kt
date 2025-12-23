@@ -7,4 +7,6 @@ object Constants {
     const val PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS = "notify_only_for_first_continuous_class"
     const val PREF_LIVE_CAPSULE_BG_COLOR = "live_capsule_bg_color"
     const val PREF_HIDE_FROM_RECENTS = "hide_from_recents"
+    const val PREF_LIDA_JW_ACCOUNT = "lida_jw_account"
+    const val PREF_LIDA_JW_PASSWORD = "lida_jw_password"
 }

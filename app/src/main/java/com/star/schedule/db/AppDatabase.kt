@@ -12,11 +12,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PreferenceEntity::class,
         TimetableEntity::class,
         LessonTimeEntity::class,
+        LessonTimeTemplateEntity::class,
+        LessonTimeTemplateItemEntity::class,
         CourseEntity::class,
         ReminderEntity::class,
         DayNoteEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter
@@ -63,6 +65,38 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_day_note_timetableId_date ON day_note(timetableId, date)")
+            }
+        }
+
+        // 从版本7迁移到版本8，新增课程时间模板表
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS lesson_time_template (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_lesson_time_template_name ON lesson_time_template(name)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS lesson_time_template_item (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        templateId INTEGER NOT NULL,
+                        period INTEGER NOT NULL,
+                        startTime TEXT NOT NULL,
+                        endTime TEXT NOT NULL,
+                        FOREIGN KEY(templateId) REFERENCES lesson_time_template(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_lesson_time_template_item_templateId ON lesson_time_template_item(templateId)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_lesson_time_template_item_templateId_period ON lesson_time_template_item(templateId, period)")
             }
         }
     }

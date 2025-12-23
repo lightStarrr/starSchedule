@@ -46,6 +46,42 @@ data class LessonTimeEntity(
     val endTime: String           // 结束时间 "08:45"
 )
 
+// 课程时间模板（全局）
+@Entity(
+    tableName = "lesson_time_template",
+    indices = [Index(value = ["name"], unique = true)]
+)
+data class LessonTimeTemplateEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,              // 模板名称（唯一）
+    val createdAt: Long,           // 创建时间（epoch millis）
+    val updatedAt: Long            // 更新时间（epoch millis）
+)
+
+// 模板中的单节时间
+@Entity(
+    tableName = "lesson_time_template_item",
+    foreignKeys = [
+        ForeignKey(
+            entity = LessonTimeTemplateEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["templateId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["templateId"]),
+        Index(value = ["templateId", "period"], unique = true)
+    ]
+)
+data class LessonTimeTemplateItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val templateId: Long,
+    val period: Int,
+    val startTime: String,
+    val endTime: String
+)
+
 // 一门课（依赖课程表）
 @Entity(
     tableName = "course",
