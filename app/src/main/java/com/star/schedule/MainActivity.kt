@@ -579,9 +579,9 @@ suspend fun fetchLatestReleaseTag(): String? {
         try {
             // 创建带有超时和重试机制的OkHttpClient
             val client = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
-                .writeTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .build()
 
@@ -589,16 +589,18 @@ suspend fun fetchLatestReleaseTag(): String? {
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "StarScheduleApp")
                 .build()
 
             val resp = client.newCall(request).execute()
             if (!resp.isSuccessful) {
-                Log.w("StarSchedule", "GitHub API request failed with code: ${resp.code}")
+                Log.w("StarSchedule", "GitHub API request failed with code: ${resp.code}, message: ${resp.message}")
                 return@withContext null
             }
 
-            val body = resp.body.string()
+            val body = resp.body?.string() ?: run {
+                Log.w("StarSchedule", "Empty response body from GitHub API")
+                return@withContext null
+            }
             if (body.isBlank()) {
                 Log.w("StarSchedule", "Empty response from GitHub API")
                 return@withContext null
@@ -616,6 +618,9 @@ suspend fun fetchLatestReleaseTag(): String? {
             null
         } catch (e: java.net.UnknownHostException) {
             Log.w("StarSchedule", "Cannot resolve host, network unavailable", e)
+            null
+        } catch (e: java.net.ConnectException) {
+            Log.w("StarSchedule", "Connection failed, network may be unavailable", e)
             null
         } catch (e: Exception) {
             Log.w("StarSchedule", "Failed to fetch latest release tag", e)
