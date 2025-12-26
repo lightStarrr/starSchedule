@@ -22,7 +22,8 @@ data class TimetableEntity(
     val startDate: String,       // 学期开始日期
     val showFuture: Boolean = false, // 是否显示未来的课程
     val rowHeight: Int = 60,     // 课时行高度，默认60dp
-    val reminderTime: Int = 15   // 课前提醒时间，默认15分钟
+    val reminderTime: Int = 15,  // 课前提醒时间，默认15分钟
+    val autoUpdateJson: String? = null // 自动更新配置（JSON，含 type 字段）
 )
 
 // 一节课的时间范围（依赖课程表）

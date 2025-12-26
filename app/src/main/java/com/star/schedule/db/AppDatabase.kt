@@ -1,6 +1,10 @@
 // AppDatabase.kt
 package com.star.schedule.db
 
+import com.star.schedule.Constants
+import com.star.schedule.autoupdate.LidaJwAutoUpdateConfig
+import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
+import com.star.schedule.autoupdate.TimetableAutoUpdateJson
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
@@ -18,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReminderEntity::class,
         DayNoteEntity::class
     ],
-    version = 8,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter
@@ -97,6 +101,70 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_lesson_time_template_item_templateId ON lesson_time_template_item(templateId)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_lesson_time_template_item_templateId_period ON lesson_time_template_item(templateId, period)")
+            }
+        }
+
+        // 从版本8迁移到版本9：在课程表中新增自动更新配置字段（JSON）
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE timetable ADD COLUMN autoUpdateJson TEXT")
+
+                // 兼容旧版本：把偏好里保存的立达教务账号密码迁移到对应课程表的 autoUpdateJson
+                val account = db.query(
+                    "SELECT value FROM preference WHERE prefKey = ? LIMIT 1",
+                    arrayOf(Constants.PREF_LIDA_JW_ACCOUNT)
+                ).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else ""
+                }
+                val password = db.query(
+                    "SELECT value FROM preference WHERE prefKey = ? LIMIT 1",
+                    arrayOf(Constants.PREF_LIDA_JW_PASSWORD)
+                ).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else ""
+                }
+
+                if (account.isNotBlank() && password.isNotBlank()) {
+                    val configJson = TimetableAutoUpdateJson.encode(
+                        QiangzhiJwAutoUpdateConfig(
+                            baseUrl = "http://jw.lidapoly.edu.cn/shldzyjsxy_jsxsd",
+                            account = account,
+                            password = password
+                        )
+                    )
+                    db.execSQL(
+                        "UPDATE timetable SET autoUpdateJson = ? WHERE name LIKE ?",
+                        arrayOf(configJson, "上海立达学院%")
+                    )
+                }
+            }
+        }
+
+        // 从版本9迁移到版本10：修复旧版本写入的 JSON 缺少 type 字段的问题
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.query("SELECT id, autoUpdateJson FROM timetable WHERE autoUpdateJson IS NOT NULL").use { cursor ->
+                    val idIndex = cursor.getColumnIndex("id")
+                    val jsonIndex = cursor.getColumnIndex("autoUpdateJson")
+                    while (cursor.moveToNext()) {
+                        val timetableId = cursor.getLong(idIndex)
+                        val rawJson = cursor.getString(jsonIndex).orEmpty()
+                        if (rawJson.isBlank()) continue
+                        if (!TimetableAutoUpdateJson.getType(rawJson).isNullOrBlank()) continue
+
+                        val config = TimetableAutoUpdateJson.decodeAs<LidaJwAutoUpdateConfig>(rawJson) ?: continue
+                        val fixedJson = TimetableAutoUpdateJson.encode(
+                            QiangzhiJwAutoUpdateConfig(
+                                baseUrl = "http://jw.lidapoly.edu.cn/shldzyjsxy_jsxsd",
+                                account = config.account,
+                                password = config.password
+                            )
+                        )
+                        db.execSQL(
+                            "UPDATE timetable SET autoUpdateJson = ? WHERE id = ?",
+                            arrayOf<Any>(fixedJson, timetableId)
+                        )
+                    }
+                }
             }
         }
     }
