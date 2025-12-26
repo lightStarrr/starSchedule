@@ -1,6 +1,8 @@
 package com.star.schedule.utils
 
 import android.util.Log
+import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
+import com.star.schedule.autoupdate.TimetableAutoUpdateJson
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
@@ -19,13 +21,39 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Base64
 
-object LidaJwImporter {
-    private const val TAG = "LidaJwImporter"
+object QiangzhiJwImporter {
+    private const val TAG = "QiangzhiJwImporter"
 
-    private const val BASE_URL = "http://jw.lidapoly.edu.cn/shldzyjsxy_jsxsd"
-    private const val LOGIN_URL = "$BASE_URL/xk/LoginToXk"
-    private const val MAIN_URL = "$BASE_URL/framework/xsMain.jsp"
-    private const val TIMETABLE_URL = "$BASE_URL/xskb/xskb_list.do"
+    // 仅作为示例
+    const val EXAMPLE_BASE_URL = "http://jw.lidapoly.edu.cn/shldzyjsxy_jsxsd"
+
+    private data class Endpoints(
+        val baseUrl: String,
+        val loginUrl: String,
+        val mainUrl: String,
+        val timetableUrl: String
+    )
+
+    private fun normalizeBaseUrl(input: String): String? {
+        val trimmed = input.trim()
+        if (trimmed.isBlank()) return null
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return null
+        return trimmed.removeSuffix("/")
+    }
+
+    private fun endpoints(baseUrl: String): Endpoints? {
+        val normalized = normalizeBaseUrl(baseUrl) ?: return null
+        return Endpoints(
+            baseUrl = normalized,
+            loginUrl = "$normalized/xk/LoginToXk",
+            mainUrl = "$normalized/framework/xsMain.jsp",
+            timetableUrl = "$normalized/xskb/xskb_list.do"
+        )
+    }
+
+    private fun hostLabel(baseUrl: String): String? =
+        runCatching { java.net.URI(baseUrl).host }.getOrNull()?.takeIf { it.isNotBlank() }
+
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 
@@ -34,12 +62,16 @@ object LidaJwImporter {
         data class Error(val message: String) : ImportResult
     }
 
-    suspend fun importFromLidaJw(
+    suspend fun importFromQiangzhiJw(
+        baseUrl: String,
         account: String,
         password: String,
         dao: ScheduleDao
     ): ImportResult = withContext(Dispatchers.IO) {
         try {
+            val endpoints = endpoints(baseUrl)
+                ?: return@withContext ImportResult.Error("网址格式不正确，请输入形如 http(s)://.../xxx_jsxsd")
+
             val cookieJar = InMemoryCookieJar()
             val client = OkHttpClient.Builder()
                 .cookieJar(cookieJar)
@@ -54,7 +86,7 @@ object LidaJwImporter {
                 .build()
 
             val loginRequest = Request.Builder()
-                .url(LOGIN_URL)
+                .url(endpoints.loginUrl)
                 .post(requestBody)
                 .addHeader("User-Agent", USER_AGENT)
                 .build()
@@ -71,7 +103,7 @@ object LidaJwImporter {
 
                 val location = response.header("Location")
                 val resolved = location?.let { loginRequest.url.resolve(it)?.toString() } ?: ""
-                if (resolved.isBlank() || !resolved.startsWith(MAIN_URL)) {
+                if (resolved.isBlank() || !resolved.startsWith(endpoints.mainUrl)) {
                     Log.w(TAG, "Login redirect unexpected. http=${response.code}, location=$location")
                     return@withContext ImportResult.Error("登录失败，请检查账号密码是否正确")
                 }
@@ -93,7 +125,7 @@ object LidaJwImporter {
 
             val html = client.newCall(
                 Request.Builder()
-                    .url(TIMETABLE_URL)
+                    .url(endpoints.timetableUrl)
                     .get()
                     .addHeader("User-Agent", USER_AGENT)
                     .build()
@@ -115,7 +147,8 @@ object LidaJwImporter {
 
             val (startDate, warning) = inferStartDate(parsed.termId)
             val timetableName = buildString {
-                append("上海立达学院")
+                append("强智教务")
+                hostLabel(endpoints.baseUrl)?.let { append(" ").append(it) }
                 if (!parsed.termId.isNullOrBlank()) {
                     append(" ").append(parsed.termId)
                 }
@@ -125,7 +158,14 @@ object LidaJwImporter {
                 TimetableEntity(
                     name = timetableName,
                     showWeekend = true,
-                    startDate = startDate.toString()
+                    startDate = startDate.toString(),
+                    autoUpdateJson = TimetableAutoUpdateJson.encode(
+                        QiangzhiJwAutoUpdateConfig(
+                            baseUrl = endpoints.baseUrl,
+                            account = account,
+                            password = password
+                        )
+                    )
                 )
             )
 
@@ -164,11 +204,15 @@ object LidaJwImporter {
 
     suspend fun updateCoursesForTimetable(
         timetableId: Long,
+        baseUrl: String,
         account: String,
         password: String,
         dao: ScheduleDao
     ): ImportResult = withContext(Dispatchers.IO) {
         try {
+            val endpoints = endpoints(baseUrl)
+                ?: return@withContext ImportResult.Error("网址格式不正确，请检查课表的自动更新配置")
+
             val timetable = dao.getTimetableFlow(timetableId).firstOrNull()
             if (timetable == null) {
                 return@withContext ImportResult.Error("课表不存在，无法更新")
@@ -188,7 +232,7 @@ object LidaJwImporter {
                 .build()
 
             val loginRequest = Request.Builder()
-                .url(LOGIN_URL)
+                .url(endpoints.loginUrl)
                 .post(requestBody)
                 .addHeader("User-Agent", USER_AGENT)
                 .build()
@@ -205,7 +249,7 @@ object LidaJwImporter {
 
                 val location = response.header("Location")
                 val resolved = location?.let { loginRequest.url.resolve(it)?.toString() } ?: ""
-                if (resolved.isBlank() || !resolved.startsWith(MAIN_URL)) {
+                if (resolved.isBlank() || !resolved.startsWith(endpoints.mainUrl)) {
                     Log.w(TAG, "Login redirect unexpected. http=${response.code}, location=$location")
                     return@withContext ImportResult.Error("登录失败，请检查账号密码是否正确")
                 }
@@ -227,7 +271,7 @@ object LidaJwImporter {
 
             val html = client.newCall(
                 Request.Builder()
-                    .url(TIMETABLE_URL)
+                    .url(endpoints.timetableUrl)
                     .get()
                     .addHeader("User-Agent", USER_AGENT)
                     .build()

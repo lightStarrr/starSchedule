@@ -79,6 +79,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.star.schedule.Constants
+import com.star.schedule.autoupdate.LidaJwAutoUpdateConfig
+import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
+import com.star.schedule.autoupdate.TimetableAutoUpdateJson
+import com.star.schedule.autoupdate.TimetableAutoUpdateTypes
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.LessonTimeTemplateEntity
@@ -90,7 +94,7 @@ import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.utils.ImportManager.importTimetable
 import com.star.schedule.utils.LessonTimeTemplateExport
 import com.star.schedule.utils.LessonTimeTemplateExportBundle
-import com.star.schedule.utils.LidaJwImporter
+import com.star.schedule.utils.QiangzhiJwImporter
 import com.star.schedule.utils.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -124,11 +128,6 @@ fun TimetableSettings(dao: ScheduleDao) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
 
-    val lidaAccountPref by dao.getPreferenceFlow(Constants.PREF_LIDA_JW_ACCOUNT).collectAsState(initial = null)
-    val lidaPasswordPref by dao.getPreferenceFlow(Constants.PREF_LIDA_JW_PASSWORD).collectAsState(initial = null)
-    val lidaAccount = lidaAccountPref.orEmpty()
-    val lidaPassword = lidaPasswordPref.orEmpty()
-
     var updatingTimetableIds by remember { mutableStateOf(setOf<Long>()) }
 
     // BottomSheet 状态管理
@@ -140,7 +139,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     var showImportOptionsSheet by remember { mutableStateOf(false) }
     var showWakeUpImportSheet by remember { mutableStateOf(false) }
     var showXuexitongImportSheet by remember { mutableStateOf(false) }
-    var showLidaImportSheet by remember { mutableStateOf(false) }
+    var showQiangzhiImportSheet by remember { mutableStateOf(false) }
     var currentTimetableId by remember { mutableStateOf<Long?>(null) }
 
     // BottomSheet状态
@@ -152,7 +151,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     val importOptionsSheetState = rememberModalBottomSheetState()
     val wakeUpImportSheetState = rememberModalBottomSheetState()
     val xuexitongImportSheetState = rememberModalBottomSheetState()
-    val lidaImportSheetState = rememberModalBottomSheetState()
+    val qiangzhiImportSheetState = rememberModalBottomSheetState()
 
     LazyColumn(
         modifier = Modifier
@@ -308,65 +307,119 @@ fun TimetableSettings(dao: ScheduleDao) {
                             ) {
                                 Text(timetable.name, style = MaterialTheme.typography.titleMedium)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    val isLidaTimetable = timetable.name.startsWith("上海立达学院")
                                     val isUpdating = updatingTimetableIds.contains(timetable.id)
 
-                                    if (isLidaTimetable) {
+                                    val autoUpdateJson = timetable.autoUpdateJson
+                                    val autoUpdateType = TimetableAutoUpdateJson.getType(autoUpdateJson)
+                                    val hasAutoUpdate = TimetableAutoUpdateTypes.isSupported(autoUpdateType)
+
+                                    if (hasAutoUpdate) {
                                         IconButton(
                                             onClick = {
                                                 if (isRemoving || isUpdating) return@IconButton
                                                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
 
-                                                if (lidaAccount.isBlank() || lidaPassword.isBlank()) {
+                                                val configJson = autoUpdateJson.orEmpty()
+                                                val config = TimetableAutoUpdateJson.decode(configJson)
+                                                if (config == null) {
                                                     Toast.makeText(
                                                         context,
-                                                        "请先在“上海立达学院导入”中登录一次，以保存账号密码",
+                                                        "自动更新配置无效，请重新导入",
                                                         Toast.LENGTH_LONG
                                                     ).show()
                                                     return@IconButton
                                                 }
 
-                                                updatingTimetableIds = updatingTimetableIds + timetable.id
-                                                scope.launch {
-                                                    try {
-                                                        Toast.makeText(
-                                                            context,
-                                                            "正在更新课程…",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-
-                                                        when (val result = LidaJwImporter.updateCoursesForTimetable(
-                                                            timetableId = timetable.id,
-                                                            account = lidaAccount,
-                                                            password = lidaPassword,
-                                                            dao = dao
-                                                        )) {
-                                                            is LidaJwImporter.ImportResult.Success -> {
-                                                                result.warning?.let {
-                                                                    Toast.makeText(
-                                                                        context,
-                                                                        it,
-                                                                        Toast.LENGTH_LONG
-                                                                    ).show()
-                                                                }
-                                                                WidgetRefreshManager.onCourseDataChanged(context)
+                                                when (config) {
+                                                    is QiangzhiJwAutoUpdateConfig -> {
+                                                        updatingTimetableIds = updatingTimetableIds + timetable.id
+                                                        scope.launch {
+                                                            try {
                                                                 Toast.makeText(
                                                                     context,
-                                                                    "更新成功",
+                                                                    "正在更新课程…",
                                                                     Toast.LENGTH_SHORT
                                                                 ).show()
-                                                            }
 
-                                                            is LidaJwImporter.ImportResult.Error -> {
-                                                                Toast.makeText(
-                                                                    context,
-                                                                    result.message,
-                                                                    Toast.LENGTH_LONG
-                                                                ).show()
+                                                                when (val result =
+                                                                    QiangzhiJwImporter.updateCoursesForTimetable(
+                                                                        timetableId = timetable.id,
+                                                                        baseUrl = config.baseUrl,
+                                                                        account = config.account,
+                                                                        password = config.password,
+                                                                        dao = dao
+                                                                    )) {
+                                                                    is QiangzhiJwImporter.ImportResult.Success -> {
+                                                                        result.warning?.let {
+                                                                            Toast.makeText(
+                                                                                context,
+                                                                                it,
+                                                                                Toast.LENGTH_LONG
+                                                                            ).show()
+                                                                        }
+                                                                        WidgetRefreshManager.onCourseDataChanged(context)
+                                                                        Toast.makeText(
+                                                                            context,
+                                                                            "更新成功",
+                                                                            Toast.LENGTH_SHORT
+                                                                        ).show()
+                                                                    }
+
+                                                                    is QiangzhiJwImporter.ImportResult.Error -> {
+                                                                        Toast.makeText(
+                                                                            context,
+                                                                            result.message,
+                                                                            Toast.LENGTH_LONG
+                                                                        ).show()
+                                                                    }
+                                                                }
+                                                            } finally {
+                                                                updatingTimetableIds =
+                                                                    updatingTimetableIds - timetable.id
                                                             }
                                                         }
-                                                    } finally {
-                                                        updatingTimetableIds = updatingTimetableIds - timetable.id
+                                                    }
+
+                                                    is LidaJwAutoUpdateConfig -> {
+                                                        updatingTimetableIds = updatingTimetableIds + timetable.id
+                                                        scope.launch {
+                                                            try {
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    "正在更新课程…",
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
+
+                                                                when (val result =
+                                                                    QiangzhiJwImporter.updateCoursesForTimetable(
+                                                                        timetableId = timetable.id,
+                                                                        baseUrl = QiangzhiJwImporter.EXAMPLE_BASE_URL,
+                                                                        account = config.account,
+                                                                        password = config.password,
+                                                                        dao = dao
+                                                                    )) {
+                                                                    is QiangzhiJwImporter.ImportResult.Success -> {
+                                                                        WidgetRefreshManager.onCourseDataChanged(context)
+                                                                        Toast.makeText(
+                                                                            context,
+                                                                            "更新成功",
+                                                                            Toast.LENGTH_SHORT
+                                                                        ).show()
+                                                                    }
+
+                                                                    is QiangzhiJwImporter.ImportResult.Error -> {
+                                                                        Toast.makeText(
+                                                                            context,
+                                                                            result.message,
+                                                                            Toast.LENGTH_LONG
+                                                                        ).show()
+                                                                    }
+                                                                }
+                                                            } finally {
+                                                                updatingTimetableIds =
+                                                                    updatingTimetableIds - timetable.id
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             },
@@ -520,11 +573,11 @@ fun TimetableSettings(dao: ScheduleDao) {
                     }
                 }
             },
-            onLidaImport = {
+            onQiangzhiImport = {
                 scope.launch { importOptionsSheetState.hide() }.invokeOnCompletion {
                     if (!importOptionsSheetState.isVisible) {
                         showImportOptionsSheet = false
-                        showLidaImportSheet = true
+                        showQiangzhiImportSheet = true
                     }
                 }
             },
@@ -562,18 +615,18 @@ fun TimetableSettings(dao: ScheduleDao) {
         )
     }
 
-    // 上海立达学院导入 BottomSheet
-    if (showLidaImportSheet) {
-        LidaImportSheet(
+    // 强智教务系统导入 BottomSheet
+    if (showQiangzhiImportSheet) {
+        QiangzhiImportSheet(
             onDismiss = {
-                scope.launch { lidaImportSheetState.hide() }.invokeOnCompletion {
-                    if (!lidaImportSheetState.isVisible) {
-                        showLidaImportSheet = false
+                scope.launch { qiangzhiImportSheetState.hide() }.invokeOnCompletion {
+                    if (!qiangzhiImportSheetState.isVisible) {
+                        showQiangzhiImportSheet = false
                     }
                 }
             },
             dao = dao,
-            sheetState = lidaImportSheetState
+            sheetState = qiangzhiImportSheetState
         )
     }
 }
@@ -2626,7 +2679,7 @@ fun ImportOptionsSheet(
     onDismiss: () -> Unit,
     onWakeUpImport: () -> Unit,
     onXuexitongImport: () -> Unit,
-    onLidaImport: () -> Unit,
+    onQiangzhiImport: () -> Unit,
     sheetState: androidx.compose.material3.SheetState
 ) {
     OptimizedBottomSheet(
@@ -2712,10 +2765,10 @@ fun ImportOptionsSheet(
 
             Spacer(Modifier.height(8.dp))
 
-            // 上海立达学院教务导入选项
+            // 强智教务系统导入选项
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { onLidaImport() },
+                onClick = { onQiangzhiImport() },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
@@ -2724,16 +2777,16 @@ fun ImportOptionsSheet(
                 ) {
                     Icon(
                         Icons.Rounded.CalendarMonth,
-                        contentDescription = "上海立达学院",
+                        contentDescription = "强智教务系统",
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column {
                         Text(
-                            text = "上海立达学院",
+                            text = "强智教务系统",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "账号密码登录教务系统导入",
+                            text = "账号密码登录教务系统导入（需填写网址）",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2908,14 +2961,15 @@ fun WakeUpImportSheet(
     }
 }
 
-// ---------- 上海立达学院导入弹窗 ----------
+// ---------- 强智教务系统导入弹窗 ----------
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun LidaImportSheet(
+fun QiangzhiImportSheet(
     onDismiss: () -> Unit,
     dao: ScheduleDao,
     sheetState: androidx.compose.material3.SheetState
 ) {
+    var baseUrl by remember { mutableStateOf(QiangzhiJwImporter.EXAMPLE_BASE_URL) }
     var account by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
@@ -2924,8 +2978,27 @@ fun LidaImportSheet(
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        account = dao.getPreferenceFlow(Constants.PREF_LIDA_JW_ACCOUNT).firstOrNull().orEmpty()
-        password = dao.getPreferenceFlow(Constants.PREF_LIDA_JW_PASSWORD).firstOrNull().orEmpty()
+        val config = withContext(Dispatchers.IO) {
+            dao.getAllTimetablesOnce()
+                .asSequence()
+                .mapNotNull { timetable -> TimetableAutoUpdateJson.decode(timetable.autoUpdateJson) }
+                .firstOrNull { it is QiangzhiJwAutoUpdateConfig || it is LidaJwAutoUpdateConfig }
+        }
+        when (config) {
+            is QiangzhiJwAutoUpdateConfig -> {
+                baseUrl = config.baseUrl
+                account = config.account
+                password = config.password
+            }
+
+            is LidaJwAutoUpdateConfig -> {
+                baseUrl = QiangzhiJwImporter.EXAMPLE_BASE_URL
+                account = config.account
+                password = config.password
+            }
+
+            null -> Unit
+        }
     }
 
     OptimizedBottomSheet(
@@ -2940,7 +3013,7 @@ fun LidaImportSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "上海立达学院导入",
+                text = "强智教务系统导入",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -2951,7 +3024,7 @@ fun LidaImportSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "将使用教务系统账号密码登录并抓取“学期理论课表”。\n账号密码将保存在本机，用于一键更新课程。",
+                    text = "将使用账号密码登录强智教务系统并抓取“学期理论课表”。\n请填写教务系统网址，例如：${QiangzhiJwImporter.EXAMPLE_BASE_URL}\n账号密码将保存在课程表数据库中，用于一键更新课程。",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(12.dp)
                 )
@@ -2974,6 +3047,20 @@ fun LidaImportSheet(
                 }
                 Spacer(Modifier.height(8.dp))
             }
+
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = {
+                    baseUrl = it
+                    errorMessage = ""
+                },
+                label = { Text("网址") },
+                placeholder = { Text(QiangzhiJwImporter.EXAMPLE_BASE_URL) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(Modifier.height(8.dp))
 
             OutlinedTextField(
                 value = account,
@@ -3010,6 +3097,16 @@ fun LidaImportSheet(
             } else {
                 Button(
                     onClick = {
+                        val normalizedBaseUrl = baseUrl.trim().removeSuffix("/")
+                        if (normalizedBaseUrl.isBlank()) {
+                            errorMessage = "请输入网址"
+                            return@Button
+                        }
+                        if (!normalizedBaseUrl.startsWith("http://") && !normalizedBaseUrl.startsWith("https://")) {
+                            errorMessage = "网址需要以 http:// 或 https:// 开头"
+                            return@Button
+                        }
+
                         val trimmedAccount = account.trim()
                         if (trimmedAccount.isBlank() || password.isBlank()) {
                             errorMessage = "请输入账号和密码"
@@ -3019,12 +3116,51 @@ fun LidaImportSheet(
                         isLoading = true
                         scope.launch {
                             try {
-                                dao.setPreference(Constants.PREF_LIDA_JW_ACCOUNT, trimmedAccount)
-                                dao.setPreference(Constants.PREF_LIDA_JW_PASSWORD, password)
-
                                 when (val result =
-                                    LidaJwImporter.importFromLidaJw(trimmedAccount, password, dao)) {
-                                    is LidaJwImporter.ImportResult.Success -> {
+                                    QiangzhiJwImporter.importFromQiangzhiJw(
+                                        baseUrl = normalizedBaseUrl,
+                                        account = trimmedAccount,
+                                        password = password,
+                                        dao = dao
+                                    )) {
+                                    is QiangzhiJwImporter.ImportResult.Success -> {
+                                        val configJson = TimetableAutoUpdateJson.encode(
+                                            QiangzhiJwAutoUpdateConfig(
+                                                baseUrl = normalizedBaseUrl,
+                                                account = trimmedAccount,
+                                                password = password
+                                            )
+                                        )
+                                        withContext(Dispatchers.IO) {
+                                            dao.getAllTimetablesOnce()
+                                                .filter { timetable ->
+                                                    val type =
+                                                        TimetableAutoUpdateJson.getType(timetable.autoUpdateJson)
+                                                    when (type) {
+                                                        TimetableAutoUpdateTypes.QIANGZHI_JW -> {
+                                                            val existing =
+                                                                TimetableAutoUpdateJson.decodeAs<QiangzhiJwAutoUpdateConfig>(
+                                                                    timetable.autoUpdateJson
+                                                                )
+                                                            existing?.baseUrl?.trim()?.removeSuffix("/") == normalizedBaseUrl
+                                                        }
+
+                                                        TimetableAutoUpdateTypes.LIDA_JW ->
+                                                            normalizedBaseUrl == QiangzhiJwImporter.EXAMPLE_BASE_URL
+
+                                                        null ->
+                                                            normalizedBaseUrl == QiangzhiJwImporter.EXAMPLE_BASE_URL &&
+                                                                timetable.name.startsWith("上海立达学院")
+
+                                                        else -> false
+                                                    }
+                                                }
+                                                .forEach { timetable ->
+                                                    if (timetable.autoUpdateJson == configJson) return@forEach
+                                                    dao.updateTimetable(timetable.copy(autoUpdateJson = configJson))
+                                                }
+                                        }
+
                                         result.warning?.let {
                                             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
                                         }
@@ -3032,7 +3168,7 @@ fun LidaImportSheet(
                                         onDismiss()
                                     }
 
-                                    is LidaJwImporter.ImportResult.Error -> {
+                                    is QiangzhiJwImporter.ImportResult.Error -> {
                                         errorMessage = result.message
                                     }
                                 }
