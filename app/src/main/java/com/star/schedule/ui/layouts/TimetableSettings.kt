@@ -305,8 +305,17 @@ fun TimetableSettings(dao: ScheduleDao) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(timetable.name, style = MaterialTheme.typography.titleMedium)
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = timetable.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.width(IntrinsicSize.Min)
+                                ) {
                                     val isUpdating = updatingTimetableIds.contains(timetable.id)
 
                                     val autoUpdateJson = timetable.autoUpdateJson
