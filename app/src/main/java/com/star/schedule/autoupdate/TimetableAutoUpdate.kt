@@ -9,24 +9,13 @@ import kotlinx.serialization.json.jsonPrimitive
 object TimetableAutoUpdateTypes {
     const val QIANGZHI_JW = "qiangzhi_jw"
 
-    // legacy type kept for compatibility with old saved data
-    const val LIDA_JW = "lida_jw"
-
-    private val supportedTypes: Set<String> = setOf(QIANGZHI_JW, LIDA_JW)
+    private val supportedTypes: Set<String> = setOf(QIANGZHI_JW)
 
     fun isSupported(type: String?): Boolean = !type.isNullOrBlank() && supportedTypes.contains(type)
 }
 
 @Serializable
 sealed class TimetableAutoUpdateConfig
-
-@Serializable
-@SerialName(TimetableAutoUpdateTypes.LIDA_JW)
-// legacy config kept for compatibility with old saved data
-data class LidaJwAutoUpdateConfig(
-    val account: String,
-    val password: String
-) : TimetableAutoUpdateConfig()
 
 @Serializable
 @SerialName(TimetableAutoUpdateTypes.QIANGZHI_JW)
