@@ -239,7 +239,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val capsuleBundle = Bundle().apply {
             putInt("notification.live.capsuleStatus", 1)
             putInt("notification.live.capsuleType", 3)
-            putString("notification.live.capsuleContent", courseName)
+            putString("notification.live.capsuleContent", location)
 
             val drawable = ContextCompat.getDrawable(context, R.drawable.ic_notification)?.mutate()
             if (drawable != null) {

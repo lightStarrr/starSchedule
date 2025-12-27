@@ -3133,43 +3133,6 @@ fun QiangzhiImportSheet(
                                         dao = dao
                                     )) {
                                     is QiangzhiJwImporter.ImportResult.Success -> {
-                                        val configJson = TimetableAutoUpdateJson.encode(
-                                            QiangzhiJwAutoUpdateConfig(
-                                                baseUrl = normalizedBaseUrl,
-                                                account = trimmedAccount,
-                                                password = password
-                                            )
-                                        )
-                                        withContext(Dispatchers.IO) {
-                                            dao.getAllTimetablesOnce()
-                                                .filter { timetable ->
-                                                    val type =
-                                                        TimetableAutoUpdateJson.getType(timetable.autoUpdateJson)
-                                                    when (type) {
-                                                        TimetableAutoUpdateTypes.QIANGZHI_JW -> {
-                                                            val existing =
-                                                                TimetableAutoUpdateJson.decodeAs<QiangzhiJwAutoUpdateConfig>(
-                                                                    timetable.autoUpdateJson
-                                                                )
-                                                            existing?.baseUrl?.trim()?.removeSuffix("/") == normalizedBaseUrl
-                                                        }
-
-                                                        TimetableAutoUpdateTypes.LIDA_JW ->
-                                                            normalizedBaseUrl == QiangzhiJwImporter.EXAMPLE_BASE_URL
-
-                                                        null ->
-                                                            normalizedBaseUrl == QiangzhiJwImporter.EXAMPLE_BASE_URL &&
-                                                                timetable.name.startsWith("上海立达学院")
-
-                                                        else -> false
-                                                    }
-                                                }
-                                                .forEach { timetable ->
-                                                    if (timetable.autoUpdateJson == configJson) return@forEach
-                                                    dao.updateTimetable(timetable.copy(autoUpdateJson = configJson))
-                                                }
-                                        }
-
                                         result.warning?.let {
                                             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
                                         }
