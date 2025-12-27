@@ -1,10 +1,6 @@
 // AppDatabase.kt
 package com.star.schedule.db
 
-import com.star.schedule.Constants
-import com.star.schedule.autoupdate.LidaJwAutoUpdateConfig
-import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
-import com.star.schedule.autoupdate.TimetableAutoUpdateJson
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
@@ -114,29 +110,6 @@ abstract class AppDatabase : RoomDatabase() {
         // 从版本9迁移到版本10：修复旧版本写入的 JSON 缺少 type 字段的问题
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.query("SELECT id, autoUpdateJson FROM timetable WHERE autoUpdateJson IS NOT NULL").use { cursor ->
-                    val idIndex = cursor.getColumnIndex("id")
-                    val jsonIndex = cursor.getColumnIndex("autoUpdateJson")
-                    while (cursor.moveToNext()) {
-                        val timetableId = cursor.getLong(idIndex)
-                        val rawJson = cursor.getString(jsonIndex).orEmpty()
-                        if (rawJson.isBlank()) continue
-                        if (!TimetableAutoUpdateJson.getType(rawJson).isNullOrBlank()) continue
-
-                        val config = TimetableAutoUpdateJson.decodeAs<LidaJwAutoUpdateConfig>(rawJson) ?: continue
-                        val fixedJson = TimetableAutoUpdateJson.encode(
-                            QiangzhiJwAutoUpdateConfig(
-                                baseUrl = "http://jw.lidapoly.edu.cn/shldzyjsxy_jsxsd",
-                                account = config.account,
-                                password = config.password
-                            )
-                        )
-                        db.execSQL(
-                            "UPDATE timetable SET autoUpdateJson = ? WHERE id = ?",
-                            arrayOf<Any>(fixedJson, timetableId)
-                        )
-                    }
-                }
             }
         }
     }
