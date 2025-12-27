@@ -108,34 +108,6 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE timetable ADD COLUMN autoUpdateJson TEXT")
-
-                // 兼容旧版本：把偏好里保存的立达教务账号密码迁移到对应课程表的 autoUpdateJson
-                val account = db.query(
-                    "SELECT value FROM preference WHERE prefKey = ? LIMIT 1",
-                    arrayOf(Constants.PREF_LIDA_JW_ACCOUNT)
-                ).use { cursor ->
-                    if (cursor.moveToFirst()) cursor.getString(0) else ""
-                }
-                val password = db.query(
-                    "SELECT value FROM preference WHERE prefKey = ? LIMIT 1",
-                    arrayOf(Constants.PREF_LIDA_JW_PASSWORD)
-                ).use { cursor ->
-                    if (cursor.moveToFirst()) cursor.getString(0) else ""
-                }
-
-                if (account.isNotBlank() && password.isNotBlank()) {
-                    val configJson = TimetableAutoUpdateJson.encode(
-                        QiangzhiJwAutoUpdateConfig(
-                            baseUrl = "http://jw.lidapoly.edu.cn/shldzyjsxy_jsxsd",
-                            account = account,
-                            password = password
-                        )
-                    )
-                    db.execSQL(
-                        "UPDATE timetable SET autoUpdateJson = ? WHERE name LIKE ?",
-                        arrayOf(configJson, "上海立达学院%")
-                    )
-                }
             }
         }
 
