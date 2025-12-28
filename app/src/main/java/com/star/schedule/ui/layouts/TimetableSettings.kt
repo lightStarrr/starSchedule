@@ -79,7 +79,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.star.schedule.Constants
-import com.star.schedule.autoupdate.LidaJwAutoUpdateConfig
 import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
 import com.star.schedule.autoupdate.TimetableAutoUpdateJson
 import com.star.schedule.autoupdate.TimetableAutoUpdateTypes
@@ -366,48 +365,6 @@ fun TimetableSettings(dao: ScheduleDao) {
                                                                                 Toast.LENGTH_LONG
                                                                             ).show()
                                                                         }
-                                                                        WidgetRefreshManager.onCourseDataChanged(context)
-                                                                        Toast.makeText(
-                                                                            context,
-                                                                            "更新成功",
-                                                                            Toast.LENGTH_SHORT
-                                                                        ).show()
-                                                                    }
-
-                                                                    is QiangzhiJwImporter.ImportResult.Error -> {
-                                                                        Toast.makeText(
-                                                                            context,
-                                                                            result.message,
-                                                                            Toast.LENGTH_LONG
-                                                                        ).show()
-                                                                    }
-                                                                }
-                                                            } finally {
-                                                                updatingTimetableIds =
-                                                                    updatingTimetableIds - timetable.id
-                                                            }
-                                                        }
-                                                    }
-
-                                                    is LidaJwAutoUpdateConfig -> {
-                                                        updatingTimetableIds = updatingTimetableIds + timetable.id
-                                                        scope.launch {
-                                                            try {
-                                                                Toast.makeText(
-                                                                    context,
-                                                                    "正在更新课程…",
-                                                                    Toast.LENGTH_SHORT
-                                                                ).show()
-
-                                                                when (val result =
-                                                                    QiangzhiJwImporter.updateCoursesForTimetable(
-                                                                        timetableId = timetable.id,
-                                                                        baseUrl = QiangzhiJwImporter.EXAMPLE_BASE_URL,
-                                                                        account = config.account,
-                                                                        password = config.password,
-                                                                        dao = dao
-                                                                    )) {
-                                                                    is QiangzhiJwImporter.ImportResult.Success -> {
                                                                         WidgetRefreshManager.onCourseDataChanged(context)
                                                                         Toast.makeText(
                                                                             context,
@@ -2991,19 +2948,11 @@ fun QiangzhiImportSheet(
             dao.getAllTimetablesOnce()
                 .asSequence()
                 .mapNotNull { timetable -> TimetableAutoUpdateJson.decode(timetable.autoUpdateJson) }
-                .firstOrNull { it is QiangzhiJwAutoUpdateConfig || it is LidaJwAutoUpdateConfig }
+                .firstOrNull { it is QiangzhiJwAutoUpdateConfig }
         }
         when (config) {
             is QiangzhiJwAutoUpdateConfig -> {
                 baseUrl = config.baseUrl
-                account = config.account
-                password = config.password
-            }
-
-            is LidaJwAutoUpdateConfig -> {
-                baseUrl = QiangzhiJwImporter.EXAMPLE_BASE_URL
-                account = config.account
-                password = config.password
             }
 
             null -> Unit
