@@ -17,6 +17,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
+import androidx.core.graphics.drawable.IconCompat
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -111,7 +112,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         notificationManager.createNotificationChannel(liveChannel)
     }
 
-    private fun loadLiveIconBitmap(path: String?): Bitmap? {
+    private fun loadIconBitmap(path: String?, targetSizeDp: Int): Bitmap? {
         if (path.isNullOrBlank()) return null
         val file = File(path)
         if (!file.exists()) return null
@@ -121,7 +122,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             }
             val bitmap = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null
             val targetSize =
-                (48 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+                (targetSizeDp * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
             val maxSide = maxOf(bitmap.width, bitmap.height).coerceAtLeast(1)
             if (maxSide <= targetSize) {
                 bitmap
@@ -134,6 +135,31 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 )
             }
         }.getOrNull()
+    }
+
+    private fun loadLiveIconBitmap(path: String?): Bitmap? = loadIconBitmap(path, 48)
+
+    private fun loadSmallIconBitmap(path: String?): Bitmap? = loadIconBitmap(path, 24)
+
+    private fun tintBitmap(source: Bitmap, colorInt: Int): Bitmap {
+        val tinted = createBitmap(source.width, source.height)
+        val canvas = Canvas(tinted)
+        val paint = Paint().apply {
+            colorFilter = PorterDuffColorFilter(colorInt, PorterDuff.Mode.SRC_IN)
+            isFilterBitmap = true
+        }
+        canvas.drawBitmap(source, 0f, 0f, paint)
+        return tinted
+    }
+
+    private fun getCustomNotificationIconPath(): String? {
+        return runCatching {
+            runBlocking {
+                DatabaseProvider.dao()
+                    .getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH)
+                    .first()
+            }
+        }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
     private fun getFlymeVersion(): Int {
@@ -179,10 +205,11 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         startTime: String = "",
         finish: Boolean
     ) {
+        val customIconPath = getCustomNotificationIconPath()
         if (isLiveCapsuleCustomizationAvailable()) {
-            showMeizuLiveNotification(courseName, location, startTime, finish)
+            showMeizuLiveNotification(courseName, location, startTime, finish, customIconPath)
         } else {
-            showNormalNotification(courseName, location, startTime, finish)
+            showNormalNotification(courseName, location, startTime, finish, customIconPath)
         }
     }
 
@@ -253,7 +280,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         courseName: String,
         location: String,
         startTime: String,
-        finish: Boolean
+        finish: Boolean,
+        customIconPath: String?
     ) {
         // 获取数据库实例
         val dao = DatabaseProvider.dao()
@@ -263,7 +291,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             val colorPref = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
             val templatePref = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE).first()
             val customIconPref =
-                dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH).first()
+                customIconPath
+                    ?: dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH).first()
             Triple(
                 colorPref ?: "#FFE082",
                 FlymeLiveTemplate.fromPref(templatePref),
@@ -275,23 +304,20 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         }
 
         val textColor = autoContentColorFor(Color(capsuleBgColor.toColorInt()))
-        val customIconBitmap = loadLiveIconBitmap(iconPath)?.let { src ->
-            val tinted = createBitmap(src.width, src.height)
-            val canvas = Canvas(tinted)
-            val paint = Paint().apply {
-                colorFilter = PorterDuffColorFilter(textColor.toArgb(), PorterDuff.Mode.SRC_IN)
-                isFilterBitmap = true
-            }
-            canvas.drawBitmap(src, 0f, 0f, paint)
-            tinted
+        val textColorInt = textColor.toArgb()
+        val customCapsuleIconBitmap = loadLiveIconBitmap(iconPath)?.let { src ->
+            tintBitmap(src, textColorInt)
         }
         val defaultIconBitmap =
             ContextCompat.getDrawable(context, R.drawable.ic_notification)?.mutate()
                 ?.let { drawable ->
-                    drawable.setTint(textColor.toArgb())
+                    drawable.setTint(textColorInt)
                     drawable.toBitmap()
                 }
-        val capsuleIconBitmap = customIconBitmap ?: defaultIconBitmap
+        val capsuleIconBitmap = customCapsuleIconBitmap ?: defaultIconBitmap
+        val customSmallIconBitmap = iconPath?.let { path ->
+            loadSmallIconBitmap(path)?.let { tintBitmap(it, android.graphics.Color.WHITE) }
+        }
 
         val capsuleBundle = Bundle().apply {
             putInt("notification.live.capsuleStatus", 1)
@@ -322,17 +348,27 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 setTextViewText(R.id.live_title, courseName)
                 setTextViewText(R.id.location, location)
                 setTextViewText(R.id.live_time, startTime)
-                setImageViewResource(R.id.live_icon, R.drawable.star)
+                when {
+                    capsuleIconBitmap != null -> setImageViewBitmap(
+                        R.id.live_icon,
+                        capsuleIconBitmap
+                    )
+                    else -> setImageViewResource(R.id.live_icon, R.drawable.star)
+                }
             }
 
-        val notification = Notification.Builder(context, LIVE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
+        val notificationBuilder = Notification.Builder(context, LIVE_CHANNEL_ID)
             .setContentTitle(courseName)
             .setContentText(location)
             .addExtras(liveBundle)
             .setCustomContentView(contentRemoteViews)
             .setAutoCancel(false)
-            .build()
+
+        customSmallIconBitmap?.let { smallIcon ->
+            notificationBuilder.setSmallIcon(Icon.createWithBitmap(smallIcon))
+        } ?: notificationBuilder.setSmallIcon(R.drawable.ic_notification)
+
+        val notification = notificationBuilder.build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
@@ -341,7 +377,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         courseName: String,
         location: String,
         startTime: String,
-        finish: Boolean
+        finish: Boolean,
+        customIconPath: String?
     ) {
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -367,11 +404,19 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             }
         }
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("$courseName | 课程提醒")
-            .setContentText(contentText)
-            .setStyle(
+        val customSmallIconBitmap = customIconPath?.let { path ->
+            loadSmallIconBitmap(path)?.let { tintBitmap(it, android.graphics.Color.WHITE) }
+        }
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID).apply {
+            if (customSmallIconBitmap != null) {
+                setSmallIcon(IconCompat.createWithBitmap(customSmallIconBitmap))
+            } else {
+                setSmallIcon(R.drawable.ic_notification)
+            }
+            setContentTitle("$courseName | 课程提醒")
+            setContentText(contentText)
+            setStyle(
                 NotificationCompat.BigTextStyle().bigText(
                     if (startTime.isNotEmpty()) {
                         "$contentText\n时间: $startTime"
@@ -380,17 +425,17 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                     }
                 )
             )
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(false)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setVibrate(longArrayOf(0, 250, 250, 250))
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setShortCriticalText(location)
-            .setOngoing(true)
-            .setRequestPromotedOngoing(true)
-            .build()
+            setContentIntent(pendingIntent)
+            setAutoCancel(false)
+            setPriority(NotificationCompat.PRIORITY_MAX)
+            setCategory(NotificationCompat.CATEGORY_REMINDER)
+            setDefaults(NotificationCompat.DEFAULT_ALL)
+            setVibrate(longArrayOf(0, 250, 250, 250))
+            setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            setShortCriticalText(location)
+            setOngoing(true)
+            setRequestPromotedOngoing(true)
+        }.build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
