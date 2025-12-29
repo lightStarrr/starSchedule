@@ -53,6 +53,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 
 class UnifiedNotificationManager(private val context: Context) : NotificationManagerProvider {
 
@@ -127,19 +128,17 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             if (maxSide <= targetSize) {
                 bitmap
             } else {
-                Bitmap.createScaledBitmap(
-                    bitmap,
+                bitmap.scale(
                     (bitmap.width * targetSize / maxSide).coerceAtLeast(1),
-                    (bitmap.height * targetSize / maxSide).coerceAtLeast(1),
-                    true
+                    (bitmap.height * targetSize / maxSide).coerceAtLeast(1)
                 )
             }
         }.getOrNull()
     }
 
-    private fun loadLiveIconBitmap(path: String?): Bitmap? = loadIconBitmap(path, 48)
+    private fun loadLiveIconBitmap(path: String?): Bitmap? = loadIconBitmap(path, 96)
 
-    private fun loadSmallIconBitmap(path: String?): Bitmap? = loadIconBitmap(path, 24)
+    private fun loadSmallIconBitmap(path: String?): Bitmap? = loadIconBitmap(path, 28)
 
     private fun tintBitmap(source: Bitmap, colorInt: Int): Bitmap {
         val tinted = createBitmap(source.width, source.height)

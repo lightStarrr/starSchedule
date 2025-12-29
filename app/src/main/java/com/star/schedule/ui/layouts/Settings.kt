@@ -234,31 +234,16 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 }
 
                 // ✅ Step 2: 检查是否支持实况通知（Android 16+）
-                if (Build.VERSION.SDK_INT >= 36 && !Build.MANUFACTURER.equals("Xiaomi") && !Build.MANUFACTURER.equals("meizu")) {
+                if (Build.VERSION.SDK_INT >= 36 && !Build.MANUFACTURER.equals("meizu")) {
                     val nm = context.getSystemService(android.app.NotificationManager::class.java)
                     if (!nm.canPostPromotedNotifications()) {
-                        try {
-                            val intent = Intent("android.settings.MANAGE_APP_PROMOTED_NOTIFICATIONS").apply {
-                                data = "package:${context.packageName}".toUri()
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {
-
-                            val intent = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        }
                         CoroutineScope(Dispatchers.Main).launch {
                             Toast.makeText(
                                 context,
-                                "请允许应用使用实况通知，然后重试，如已允许请提issues",
+                                "未启用实况通知，请在设置中开启，否则将使用普通通知",
                                 Toast.LENGTH_LONG
                             ).show()
                         }
-                        return
                     }
                 }
 
