@@ -69,6 +69,14 @@ class SettingsViewModel(
             initialValue = null
         )
 
+    val liveCapsuleIconPath = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH)
+        .map { it?.takeIf { path -> path.isNotBlank() } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null
+        )
+
     val liveNotificationTemplate = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE)
         .map { FlymeLiveTemplate.fromPref(it) }
         .stateIn(
@@ -153,6 +161,18 @@ class SettingsViewModel(
     fun updateLiveCapsuleBgColor(colorHex: String) {
         viewModelScope.launch {
             dao.setPreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR, colorHex)
+        }
+    }
+
+    fun updateLiveCapsuleIconPath(path: String) {
+        viewModelScope.launch {
+            dao.setPreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH, path)
+        }
+    }
+
+    fun clearLiveCapsuleIcon() {
+        viewModelScope.launch {
+            dao.setPreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH, "")
         }
     }
 

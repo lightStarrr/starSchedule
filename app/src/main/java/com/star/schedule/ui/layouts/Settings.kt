@@ -5,7 +5,10 @@ import android.app.Activity
 import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,6 +29,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -85,12 +89,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -111,6 +119,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.core.graphics.toColorInt
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -118,6 +127,9 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.compose.ui.graphics.ColorFilter
+import java.io.File
+import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -150,6 +162,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     val startupHintClosed by viewModel.startupHintClosed.collectAsState()
     val liveCapsuleBgColorPref by viewModel.liveCapsuleBgColor.collectAsState()
     val liveNotificationTemplate by viewModel.liveNotificationTemplate.collectAsState()
+    val liveCapsuleIconPath by viewModel.liveCapsuleIconPath.collectAsState()
+    var liveCapsuleIconBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
@@ -179,6 +193,21 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             withFrameNanos { }
             reminderAnimationsReady = true
         }
+    }
+
+    LaunchedEffect(liveCapsuleIconPath) {
+        val loaded: Bitmap? = withContext(Dispatchers.IO) {
+            liveCapsuleIconPath?.let { path ->
+                runCatching {
+                    val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+                    BitmapFactory.decodeFile(path, options)?.let { decoded ->
+                        val targetSize = (128 * context.resources.displayMetrics.density).toInt().coerceAtLeast(64)
+                        scaleLiveIcon(decoded, targetSize)
+                    }
+                }.getOrNull()
+            }
+        }
+        liveCapsuleIconBitmap = loaded
     }
 
     // 权限申请辅助函数
@@ -243,6 +272,51 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             }
         }
     }
+
+    suspend fun saveLiveIconToLocal(uri: Uri): Result<Pair<String, Bitmap>> = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+                val original = BitmapFactory.decodeStream(input, null, options)
+                    ?: throw IllegalStateException("无法读取图片")
+                val targetSize = (256 * context.resources.displayMetrics.density).toInt().coerceAtLeast(64)
+                val scaled = scaleLiveIcon(original, targetSize)
+                val iconDir = File(context.filesDir, "live_icons").apply { mkdirs() }
+                val iconFile = File(iconDir, "custom_live_icon.png")
+                FileOutputStream(iconFile).use { out ->
+                    scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                Pair(iconFile.absolutePath, scaled)
+            } ?: throw IllegalStateException("无法打开图片")
+        }
+    }
+
+    fun deleteSavedLiveIcon(path: String?) {
+        path?.let { stored ->
+            runCatching { File(stored).takeIf { it.exists() }?.delete() }
+        }
+    }
+
+    val liveIconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri ?: return@rememberLauncherForActivityResult
+            scope.launch {
+                val saveResult = saveLiveIconToLocal(uri)
+                saveResult.onSuccess { (path, preview) ->
+                    viewModel.updateLiveCapsuleIconPath(path)
+                    liveCapsuleIconBitmap = preview
+                    Toast.makeText(context, "已更新实况通知图标", Toast.LENGTH_SHORT).show()
+                }.onFailure { error ->
+                    Toast.makeText(
+                        context,
+                        "更新图标失败: ${error.message ?: "未知错误"}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    )
 
 
     Column(
@@ -561,6 +635,58 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     }
 
                     ListItem(
+                        headlineContent = { Text("实况通知图标") },
+                        supportingContent = {
+                            Text(
+                                if (liveCapsuleIconPath.isNullOrEmpty()) "点击上传自定义图标"
+                                else "已设置自定义图标，点击更换或清除"
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Rounded.Notifications,
+                                contentDescription = null
+                            )
+                        },
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                liveCapsuleIconBitmap?.let { bitmap ->
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop,
+                                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                                    )
+                                } ?: Icon(
+                                    painter = painterResource(id = R.drawable.ic_notification),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                if (!liveCapsuleIconPath.isNullOrEmpty()) {
+                                    IconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            deleteSavedLiveIcon(liveCapsuleIconPath)
+                                            viewModel.clearLiveCapsuleIcon()
+                                            liveCapsuleIconBitmap = null
+                                        }
+                                    ) {
+                                        Icon(Icons.Rounded.Close, contentDescription = "恢复默认")
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            liveIconPickerLauncher.launch(arrayOf("image/*"))
+                        }
+                    )
+
+                    ListItem(
                         headlineContent = { Text("实况通知胶囊背景颜色") },
                         supportingContent = { Text("自定义实况通知胶囊的背景颜色") },
                         leadingContent = {
@@ -635,15 +761,25 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                         .padding(bottom = 16.dp),
                                     shape = RoundedCornerShape(50),
                                     colors = CardDefaults.cardColors(containerColor = selectedColor)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
                                     ) {
-                                        Icon(
-                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_notification),
+                                        Row(
+                                            modifier = Modifier
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                        liveCapsuleIconBitmap?.let { bitmap ->
+                                            Image(
+                                                bitmap = bitmap.asImageBitmap(),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(18.dp)
+                                                    .clip(RoundedCornerShape(4.dp)),
+                                                contentScale = ContentScale.Crop,
+                                                colorFilter = ColorFilter.tint(autoContentColorFor(selectedColor))
+                                            )
+                                        } ?: Icon(
+                                            painter = painterResource(id = R.drawable.ic_notification),
                                             contentDescription = null,
                                             tint = autoContentColorFor(selectedColor),
                                             modifier = Modifier.size(18.dp)
@@ -776,6 +912,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     FlymeTemplateOption(
                                         template = template,
                                         selected = template == liveNotificationTemplate,
+                                        customIcon = liveCapsuleIconBitmap,
                                         onSelect = {
                                             haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                                             viewModel.updateFlymeLiveTemplate(template)
@@ -912,6 +1049,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 private fun FlymeTemplateOption(
     template: FlymeLiveTemplate,
     selected: Boolean,
+    customIcon: Bitmap?,
     onSelect: () -> Unit
 ) {
     Card(
@@ -955,7 +1093,8 @@ private fun FlymeTemplateOption(
 
             Spacer(modifier = Modifier.height(12.dp))
             FlymeTemplatePreview(
-                template = template
+                template = template,
+                customIcon = customIcon
             )
         }
     }
@@ -963,7 +1102,8 @@ private fun FlymeTemplateOption(
 
 @Composable
 private fun FlymeTemplatePreview(
-    template: FlymeLiveTemplate
+    template: FlymeLiveTemplate,
+    customIcon: Bitmap?
 ) {
     val context = LocalContext.current
     val sampleCourse = "示例课程"
@@ -1014,12 +1154,16 @@ private fun FlymeTemplatePreview(
                             text = sampleLocation
                         }
                         view.findViewById<ImageView>(R.id.live_icon)?.apply {
-                            setImageDrawable(
-                                ContextCompat.getDrawable(
-                                    context,
-                                    R.drawable.star
+                            if (customIcon != null) {
+                                setImageBitmap(customIcon)
+                            } else {
+                                setImageDrawable(
+                                    ContextCompat.getDrawable(
+                                        context,
+                                        R.drawable.star
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 )
@@ -1031,4 +1175,13 @@ private fun FlymeTemplatePreview(
         TemplateCard(label = "即将上课", layoutRes = template.ongoingLayout)
         TemplateCard(label = "已上课", layoutRes = template.finishedLayout)
     }
+}
+
+private fun scaleLiveIcon(bitmap: Bitmap, targetSizePx: Int): Bitmap {
+    val maxSide = maxOf(bitmap.width, bitmap.height).coerceAtLeast(1)
+    if (maxSide <= targetSizePx) return bitmap
+
+    val width = (bitmap.width * targetSizePx / maxSide).coerceAtLeast(1)
+    val height = (bitmap.height * targetSizePx / maxSide).coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(bitmap, width, height, true)
 }
