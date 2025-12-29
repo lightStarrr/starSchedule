@@ -9,6 +9,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.os.Build
@@ -25,9 +31,9 @@ import androidx.core.content.getSystemService
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
+import com.star.schedule.Constants
 import com.star.schedule.MainActivity
 import com.star.schedule.R
-import com.star.schedule.Constants
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.LessonTimeEntity
@@ -39,11 +45,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.core.graphics.createBitmap
 
 class UnifiedNotificationManager(private val context: Context) : NotificationManagerProvider {
 
@@ -103,6 +111,31 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         notificationManager.createNotificationChannel(liveChannel)
     }
 
+    private fun loadLiveIconBitmap(path: String?): Bitmap? {
+        if (path.isNullOrBlank()) return null
+        val file = File(path)
+        if (!file.exists()) return null
+        return runCatching {
+            val options = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null
+            val targetSize =
+                (48 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            val maxSide = maxOf(bitmap.width, bitmap.height).coerceAtLeast(1)
+            if (maxSide <= targetSize) {
+                bitmap
+            } else {
+                Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * targetSize / maxSide).coerceAtLeast(1),
+                    (bitmap.height * targetSize / maxSide).coerceAtLeast(1),
+                    true
+                )
+            }
+        }.getOrNull()
+    }
+
     private fun getFlymeVersion(): Int {
         val display = Build.DISPLAY ?: return -1
         val regex = Regex("Flyme\\s*([0-9]+)")
@@ -125,7 +158,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             null as String?,
             null as Bundle?
         )
-        Log.d("LiveUtil", "result=" + call + ", context package=" + context.getPackageName())
+        Log.d("LiveUtil", "result=" + call + ", context package=" + context.packageName)
         if (call != null) {
             val z = call.getBoolean("result", false)
             Log.d("LiveUtil", "result1 = $z")
@@ -136,8 +169,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
     fun isLiveCapsuleCustomizationAvailable(): Boolean {
         return Build.MANUFACTURER.equals("meizu", ignoreCase = true) &&
-            getFlymeVersion() >= 11 &&
-            isFlymeLiveNotificationEnabled(context)
+                getFlymeVersion() >= 11 &&
+                isFlymeLiveNotificationEnabled(context)
     }
 
     fun showCourseNotificationImmediate(
@@ -216,7 +249,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
 
-
     private fun showMeizuLiveNotification(
         courseName: String,
         location: String,
@@ -227,25 +259,47 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val dao = DatabaseProvider.dao()
 
         // 获取用户配置：背景色与模板
-        val (capsuleBgColor, template) = runBlocking {
+        val (capsuleBgColor, template, iconPath) = runBlocking {
             val colorPref = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
             val templatePref = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE).first()
-            Pair(colorPref ?: "#FFE082", FlymeLiveTemplate.fromPref(templatePref))
+            val customIconPref =
+                dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH).first()
+            Triple(
+                colorPref ?: "#FFE082",
+                FlymeLiveTemplate.fromPref(templatePref),
+                customIconPref?.takeIf { it.isNotBlank() }
+            )
         }
         fun autoContentColorFor(background: Color): Color {
             return if (background.luminance() > 0.7f) Color.Black else Color.White
         }
+
         val textColor = autoContentColorFor(Color(capsuleBgColor.toColorInt()))
+        val customIconBitmap = loadLiveIconBitmap(iconPath)?.let { src ->
+            val tinted = createBitmap(src.width, src.height)
+            val canvas = Canvas(tinted)
+            val paint = Paint().apply {
+                colorFilter = PorterDuffColorFilter(textColor.toArgb(), PorterDuff.Mode.SRC_IN)
+                isFilterBitmap = true
+            }
+            canvas.drawBitmap(src, 0f, 0f, paint)
+            tinted
+        }
+        val defaultIconBitmap =
+            ContextCompat.getDrawable(context, R.drawable.ic_notification)?.mutate()
+                ?.let { drawable ->
+                    drawable.setTint(textColor.toArgb())
+                    drawable.toBitmap()
+                }
+        val capsuleIconBitmap = customIconBitmap ?: defaultIconBitmap
 
         val capsuleBundle = Bundle().apply {
             putInt("notification.live.capsuleStatus", 1)
             putInt("notification.live.capsuleType", 3)
             putString("notification.live.capsuleContent", location)
 
-            val drawable = ContextCompat.getDrawable(context, R.drawable.ic_notification)?.mutate()
-            if (drawable != null) {
-                drawable.setTint(textColor.toArgb())
-                val icon = Icon.createWithBitmap(drawable.toBitmap())
+            capsuleIconBitmap?.let { iconBitmap ->
+                val icon = Icon.createWithBitmap(iconBitmap)
                 putParcelable("notification.live.capsuleIcon", icon)
             }
             putInt("notification.live.capsuleBgColor", capsuleBgColor.toColorInt())
@@ -362,7 +416,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
 
         // 检查是否只在连续课程的第一节课前发送通知
-        val notifyOnlyForFirstContinuousClassPref = dao.getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS).first()
+        val notifyOnlyForFirstContinuousClassPref =
+            dao.getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS).first()
         val notifyOnlyForFirstContinuousClass = notifyOnlyForFirstContinuousClassPref == "true"
 
         val startDate =
@@ -385,16 +440,20 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                         val previousContinuousClass = todayCourses.find { c ->
                             c.periods.contains(period - 1)
                         }
-                        
+
                         // 如果有连续的前一节课，并且是同一门课（课程名称和地点都相同），则不为当前课程设置提醒
-                        if (previousContinuousClass != null && 
-                            previousContinuousClass.name == course.name && 
-                            previousContinuousClass.location == course.location) {
-                            Log.d("UnifiedNotification", "跳过同一门连续课程的后续课程提醒: ${course.name}, 节数: $period")
+                        if (previousContinuousClass != null &&
+                            previousContinuousClass.name == course.name &&
+                            previousContinuousClass.location == course.location
+                        ) {
+                            Log.d(
+                                "UnifiedNotification",
+                                "跳过同一门连续课程的后续课程提醒: ${course.name}, 节数: $period"
+                            )
                             return@forEach
                         }
                     }
-                    
+
                     val lessonTime = lessonTimes.find { it.period == period }
                     if (lessonTime != null) {
                         scheduleReminderForCourse(course, lessonTime, date, timetable.reminderTime)
@@ -593,7 +652,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
             // 检查是否有启用的课表提醒
             val dao = DatabaseProvider.dao()
-            val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId =
+                dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -632,7 +692,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             }
 
             val dao = DatabaseProvider.dao()
-            val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId =
+                dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -667,7 +728,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             Log.d("UnifiedNotification", "开始定期更新提醒")
 
             val dao = DatabaseProvider.dao()
-            val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId =
+                dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -789,10 +851,11 @@ class CourseReminderReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val dao = DatabaseProvider.dao()
-                
+
                 // 从数据库获取当前启用的课表ID（使用正确的偏好键）
-                val enabledTimetableId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
-                
+                val enabledTimetableId =
+                    dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
+
                 if (enabledTimetableId.isNullOrEmpty()) {
                     Log.w("UnifiedNotification", "未找到启用的课表提醒设置")
                     // 如果没有启用的课表，使用默认值
