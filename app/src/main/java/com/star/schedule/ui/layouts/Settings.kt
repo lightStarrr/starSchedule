@@ -47,8 +47,10 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ColorLens
@@ -87,9 +89,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
@@ -98,6 +102,7 @@ import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.star.schedule.R
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.notification.FlymeLiveTemplate
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.ui.viewmodel.SettingsViewModel
 import com.star.schedule.ui.viewmodel.SettingsViewModelFactory
@@ -109,6 +114,10 @@ import kotlinx.coroutines.launch
 import androidx.core.graphics.toColorInt
 import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -140,6 +149,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
     val hideFromRecents by viewModel.hideFromRecents.collectAsState()
     val startupHintClosed by viewModel.startupHintClosed.collectAsState()
     val liveCapsuleBgColorPref by viewModel.liveCapsuleBgColor.collectAsState()
+    val liveNotificationTemplate by viewModel.liveNotificationTemplate.collectAsState()
 
     // 控制 BottomSheet 显示
     var showTimetableSheet by remember { mutableStateOf(false) }
@@ -537,6 +547,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 if (showLiveCapsuleSetting) {
                     // 实况通知胶囊背景颜色设置（Flyme 特有）
                     var showColorPicker by remember { mutableStateOf(false) }
+                    var showTemplatePicker by remember { mutableStateOf(false) }
                     val defaultColor = Color(0xFFFFE082)
                     val savedColor = remember(liveCapsuleBgColorPref) {
                         try {
@@ -714,6 +725,77 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                             }
                         }
                     }
+
+                    ListItem(
+                        headlineContent = { Text("实况通知模板") },
+                        supportingContent = { Text(liveNotificationTemplate.description) },
+                        leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
+                        trailingContent = {
+                            Text(
+                                text = liveNotificationTemplate.title,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            showTemplatePicker = true
+                        }
+                    )
+
+                    if (showTemplatePicker) {
+                        val templateSheetState =
+                            rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+                        OptimizedBottomSheet(
+                            sheetState = templateSheetState,
+                            onDismiss = {
+                                scope.launch {
+                                    templateSheetState.hide()
+                                }.invokeOnCompletion {
+                                    if (!templateSheetState.isVisible) {
+                                        showTemplatePicker = false
+                                    }
+                                }
+                            }
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                                    .navigationBarsPadding()
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                Text(
+                                    text = "选择实况通知模板",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+
+                                FlymeLiveTemplate.entries.forEachIndexed { index, template ->
+                                    FlymeTemplateOption(
+                                        template = template,
+                                        selected = template == liveNotificationTemplate,
+                                        onSelect = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            viewModel.updateFlymeLiveTemplate(template)
+                                            scope.launch {
+                                                templateSheetState.hide()
+                                            }.invokeOnCompletion {
+                                                if (!templateSheetState.isVisible) {
+                                                    showTemplatePicker = false
+                                                }
+                                            }
+                                        }
+                                    )
+
+                                    if (index != FlymeLiveTemplate.entries.toTypedArray().lastIndex) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // 通知测试项
@@ -822,5 +904,131 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 context.startActivity(intent)
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FlymeTemplateOption(
+    template: FlymeLiveTemplate,
+    selected: Boolean,
+    onSelect: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(16.dp)
+            ),
+        onClick = onSelect,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = template.title,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = template.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (selected) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            FlymeTemplatePreview(
+                template = template
+            )
+        }
+    }
+}
+
+@Composable
+private fun FlymeTemplatePreview(
+    template: FlymeLiveTemplate
+) {
+    val context = LocalContext.current
+    val sampleCourse = "示例课程"
+    val sampleLocation = "示例教室 A101"
+    val sampleTime = "10:00"
+
+    @Composable
+    fun TemplateCard(label: String, layoutRes: Int) {
+        val isLightTheme = !isSystemInDarkTheme()
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Card(
+                modifier = Modifier.fillMaxWidth().border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline,
+                    shape = RoundedCornerShape(14.dp)
+                ),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isLightTheme) Color(0xFFF5F5F5) else Color(0xFF1F1F1F)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    factory = { ctx ->
+                        LayoutInflater.from(ctx).inflate(layoutRes, null).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT
+                            )
+                        }
+                    },
+                    update = { view ->
+                        view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        view.findViewById<TextView>(R.id.live_title)?.apply {
+                            text = sampleCourse
+                        }
+                        view.findViewById<TextView>(R.id.live_time)?.apply {
+                            text = sampleTime
+                        }
+                        view.findViewById<TextView>(R.id.location)?.apply {
+                            text = sampleLocation
+                        }
+                        view.findViewById<ImageView>(R.id.live_icon)?.apply {
+                            setImageDrawable(
+                                ContextCompat.getDrawable(
+                                    context,
+                                    R.drawable.star
+                                )
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TemplateCard(label = "即将上课", layoutRes = template.ongoingLayout)
+        TemplateCard(label = "已上课", layoutRes = template.finishedLayout)
     }
 }
