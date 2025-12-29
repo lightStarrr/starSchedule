@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.star.schedule.Constants
 import com.star.schedule.db.ScheduleDao
+import com.star.schedule.notification.FlymeLiveTemplate
 import com.star.schedule.notification.UnifiedNotificationManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,6 +67,14 @@ class SettingsViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null
+        )
+
+    val liveNotificationTemplate = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE)
+        .map { FlymeLiveTemplate.fromPref(it) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = FlymeLiveTemplate.Classic
         )
 
     val isLiveCapsuleCustomizationAvailable =
@@ -144,6 +153,12 @@ class SettingsViewModel(
     fun updateLiveCapsuleBgColor(colorHex: String) {
         viewModelScope.launch {
             dao.setPreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR, colorHex)
+        }
+    }
+
+    fun updateFlymeLiveTemplate(template: FlymeLiveTemplate) {
+        viewModelScope.launch {
+            dao.setPreference(Constants.PREF_FLYME_LIVE_TEMPLATE, template.prefValue)
         }
     }
 }

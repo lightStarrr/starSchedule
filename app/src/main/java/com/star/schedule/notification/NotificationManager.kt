@@ -225,17 +225,18 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     ) {
         // 获取数据库实例
         val dao = DatabaseProvider.dao()
-        
-        // 获取自定义背景颜色，默认为原来的颜色
-        val capsuleBgColor = runBlocking {
+
+        // 获取用户配置：背景色与模板
+        val (capsuleBgColor, template) = runBlocking {
             val colorPref = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
-            colorPref ?: "#FFE082"
+            val templatePref = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE).first()
+            Pair(colorPref ?: "#FFE082", FlymeLiveTemplate.fromPref(templatePref))
         }
         fun autoContentColorFor(background: Color): Color {
             return if (background.luminance() > 0.7f) Color.Black else Color.White
         }
         val textColor = autoContentColorFor(Color(capsuleBgColor.toColorInt()))
-        
+
         val capsuleBundle = Bundle().apply {
             putInt("notification.live.capsuleStatus", 1)
             putInt("notification.live.capsuleType", 3)
@@ -259,8 +260,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             putInt("notification.live.contentColor", textColor.toArgb())
         }
 
-        val layout = if(finish) RemoteViews(context.packageName, R.layout.live_notification_card_ok)
-        else RemoteViews(context.packageName, R.layout.live_notification_card)
+        val layoutRes = if (finish) template.finishedLayout else template.ongoingLayout
+        val layout = RemoteViews(context.packageName, layoutRes)
 
         val contentRemoteViews =
             layout.apply {
