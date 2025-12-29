@@ -618,6 +618,58 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     }
                 )
 
+                ListItem(
+                    headlineContent = { Text("通知图标") },
+                    supportingContent = {
+                        Text(
+                            if (liveCapsuleIconPath.isNullOrEmpty()) "点击上传自定义图标"
+                            else "已设置自定义图标，点击更换或清除"
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Rounded.Notifications,
+                            contentDescription = null
+                        )
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            liveCapsuleIconBitmap?.let { bitmap ->
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop,
+                                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                                )
+                            } ?: Icon(
+                                painter = painterResource(id = R.drawable.ic_notification),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            if (!liveCapsuleIconPath.isNullOrEmpty()) {
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                        deleteSavedLiveIcon(liveCapsuleIconPath)
+                                        viewModel.clearLiveCapsuleIcon()
+                                        liveCapsuleIconBitmap = null
+                                    }
+                                ) {
+                                    Icon(Icons.Rounded.Close, contentDescription = "恢复默认")
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        liveIconPickerLauncher.launch(arrayOf("image/*"))
+                    }
+                )
+
                 if (showLiveCapsuleSetting) {
                     // 实况通知胶囊背景颜色设置（Flyme 特有）
                     var showColorPicker by remember { mutableStateOf(false) }
@@ -633,58 +685,6 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     var selectedColor by remember(liveCapsuleBgColorPref) {
                         mutableStateOf(savedColor)
                     }
-
-                    ListItem(
-                        headlineContent = { Text("实况通知图标") },
-                        supportingContent = {
-                            Text(
-                                if (liveCapsuleIconPath.isNullOrEmpty()) "点击上传自定义图标"
-                                else "已设置自定义图标，点击更换或清除"
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Rounded.Notifications,
-                                contentDescription = null
-                            )
-                        },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                liveCapsuleIconBitmap?.let { bitmap ->
-                                    Image(
-                                        bitmap = bitmap.asImageBitmap(),
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Crop,
-                                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-                                    )
-                                } ?: Icon(
-                                    painter = painterResource(id = R.drawable.ic_notification),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                if (!liveCapsuleIconPath.isNullOrEmpty()) {
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                                            deleteSavedLiveIcon(liveCapsuleIconPath)
-                                            viewModel.clearLiveCapsuleIcon()
-                                            liveCapsuleIconBitmap = null
-                                        }
-                                    ) {
-                                        Icon(Icons.Rounded.Close, contentDescription = "恢复默认")
-                                    }
-                                }
-                            }
-                        },
-                        modifier = Modifier.clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                            liveIconPickerLauncher.launch(arrayOf("image/*"))
-                        }
-                    )
 
                     ListItem(
                         headlineContent = { Text("实况通知胶囊背景颜色") },
