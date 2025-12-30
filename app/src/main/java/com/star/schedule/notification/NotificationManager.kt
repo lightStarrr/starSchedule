@@ -350,7 +350,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 when {
                     capsuleIconBitmap != null -> setImageViewBitmap(
                         R.id.live_icon,
-                        capsuleIconBitmap
+                        loadLiveIconBitmap(iconPath)
                     )
                     else -> setImageViewResource(R.id.live_icon, R.drawable.star)
                 }
