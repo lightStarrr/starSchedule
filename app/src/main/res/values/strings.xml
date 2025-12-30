@@ -47,7 +47,7 @@
     <string name="import_xls_subtitle">自动匹配xls内容格式，如无法导入请联系作者</string>
     <string name="import_qiangzhi_title">强智教务系统</string>
     <string name="import_qiangzhi_subtitle">账号密码登录教务系统导入（需填写网址）</string>
-    <string name="import_more_coming">更多导入方式即将推出...</string>
+    <string name="import_more_coming">更多导入方式即将推出…</string>
     <string name="wakeup_import_title">从WakeUp课程表在线导入</string>
     <string name="wakeup_import_instruction">请完整复制分享口令</string>
     <string name="wakeup_import_example">[示例]这是来自「WakeUp课程表」的课表分享，30分钟内有效哦，如果失效请朋友再分享一遍叭。为了保护隐私我们选择不监听你的剪贴板，请复制这条消息后，打开App的主界面，右上角第二个按钮 -&gt; 从分享口令导入，按操作提示即可完成导入~分享口令为「0000000000000000」</string>
@@ -88,14 +88,14 @@
     <string name="support_teacher_hint">教师名称，不超过50个字符</string>
     <string name="label_location_input">地点</string>
     <string name="support_location_length">上课地点不能超过100个字符</string>
-    <string name="label_day_of_week">星期 (1-7)</string>
-    <string name="support_day_of_week">1=周一，2=周二，...，7=周日</string>
-    <string name="label_periods">节次 (如 1,2,3 或 1-7 或 1-5,7)</string>
-    <string name="support_periods">用逗号分隔，如：1,2,3 或范围格式：1-7</string>
-    <string name="support_periods_overlap">支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7</string>
-    <string name="label_weeks">周次 (如 1,2,3 或 1-7 或 1-5,7)</string>
-    <string name="support_weeks">用逗号分隔，如：1,2,3 或范围格式：1-7，表示第几周上课</string>
-    <string name="support_weeks_hint">支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7</string>
+    <string name="label_day_of_week">星期 (1–7)</string>
+    <string name="support_day_of_week">1=周一，2=周二，…，7=周日</string>
+    <string name="label_periods">节次 (如 1,2,3 或 1–7 或 1–5,7)</string>
+    <string name="support_periods">用逗号分隔，如：1,2,3 或范围格式：1–7</string>
+    <string name="support_periods_overlap">支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1–7 或 1–5,7</string>
+    <string name="label_weeks">周次 (如 1,2,3 或 1–7 或 1–5,7)</string>
+    <string name="support_weeks">用逗号分隔，如：1,2,3 或范围格式：1–7，表示第几周上课</string>
+    <string name="support_weeks_hint">支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1–7 或 1–5,7</string>
     <string name="error_time_overlap_course">时间重叠：与现有课程在同一时间</string>
     <string name="label_timetable_name">课表名称</string>
     <string name="support_timetable_name_required">课程表名称不能为空，且不超过100个字符</string>
@@ -228,8 +228,8 @@
     <string name="update_available_message">发现新版本：v%1$s => %2$s</string>
     <string name="content_desc_previous_week">上一周</string>
     <string name="content_desc_next_week">下一周</string>
-    <string name="widget_loading">加载中...</string>
-    <string name="web_loading_title">网页加载中...</string>
+    <string name="widget_loading">加载中…</string>
+    <string name="web_loading_title">网页加载中…</string>
     <string name="action_back">返回</string>
     <string name="action_download">下载</string>
     <string name="download_options_title">下载选项</string>
@@ -240,31 +240,31 @@
     <string name="error_course_name_too_long">课程名称不能超过50个字符</string>
     <string name="error_location_too_long">上课地点不能超过100个字符</string>
     <string name="error_day_of_week_not_number">星期必须是数字</string>
-    <string name="error_day_of_week_range">星期必须在1-7之间（1=周一，7=周日）</string>
+    <string name="error_day_of_week_range">星期必须在1–7之间（1=周一，7=周日）</string>
     <string name="error_periods_empty">节次不能为空</string>
     <string name="error_periods_at_least_one">至少需要一个节次</string>
     <string name="error_period_range_format">节次范围格式错误，应为：开始-结束</string>
     <string name="error_period_range_start_number">节次范围开始值必须是数字</string>
     <string name="error_period_range_end_number">节次范围结束值必须是数字</string>
     <string name="error_period_range_start_after_end">节次范围开始值不能大于结束值</string>
-    <string name="error_period_range">节次范围必须在1-20之间</string>
-    <string name="error_periods_number_format">节次必须是数字，格式如：1,2,3 或 1-7</string>
-    <string name="error_periods_range">节次必须在1-20之间</string>
+    <string name="error_period_range">节次范围必须在1–20之间</string>
+    <string name="error_periods_number_format">节次必须是数字，格式如：1,2,3 或 1–7</string>
+    <string name="error_periods_range">节次必须在1–20之间</string>
     <string name="error_periods_duplicate">节次不能重复</string>
-    <string name="error_periods_format">节次格式错误，支持：1,2,3 或 1-7</string>
+    <string name="error_periods_format">节次格式错误，支持：1,2,3 或 1–7</string>
     <string name="error_weeks_empty">周次不能为空</string>
     <string name="error_weeks_at_least_one">至少需要一个周次</string>
     <string name="error_week_range_format">周次范围格式错误，应为：开始-结束</string>
     <string name="error_week_range_start_number">周次范围开始值必须是数字</string>
     <string name="error_week_range_end_number">周次范围结束值必须是数字</string>
     <string name="error_week_range_start_after_end">周次范围开始值不能大于结束值</string>
-    <string name="error_week_range">周次范围必须在1-30之间</string>
-    <string name="error_weeks_number_format">周次必须是数字，格式如：1,2,3 或 1-7</string>
-    <string name="error_weeks_range">周次必须在1-30之间</string>
+    <string name="error_week_range">周次范围必须在1–30之间</string>
+    <string name="error_weeks_number_format">周次必须是数字，格式如：1,2,3 或 1–7</string>
+    <string name="error_weeks_range">周次必须在1–30之间</string>
     <string name="error_weeks_duplicate">周次不能重复</string>
-    <string name="error_weeks_format">周次格式错误，支持：1,2,3 或 1-7</string>
+    <string name="error_weeks_format">周次格式错误，支持：1,2,3 或 1–7</string>
     <string name="error_period_must_be_number">节次必须是数字</string>
-    <string name="error_period_must_be_in_range">节次必须在1-20之间</string>
+    <string name="error_period_must_be_in_range">节次必须在1–20之间</string>
     <string name="error_field_required">%1$s不能为空</string>
     <string name="error_field_time_format">%1$s格式错误，请使用HH:mm格式，如：08:00</string>
     <string name="error_end_time_after_start">结束时间必须晚于开始时间</string>
@@ -275,8 +275,8 @@
     <string name="error_timetable_name_required">课程表名称不能为空</string>
     <string name="error_timetable_name_too_long">课程表名称不能超过100个字符</string>
     <string name="error_semester_start_date_required">学期开始日期不能为空</string>
-    <string name="error_semester_start_year_range">学期开始日期年份必须在2000-2050年之间</string>
-    <string name="error_date_format_detail">日期格式错误，请使用yyyy-MM-dd格式，如：2024-09-01</string>
+    <string name="error_semester_start_year_range">学期开始日期年份必须在2000–2050年之间</string>
+    <string name="error_date_format_detail">日期格式错误，请使用yyyy–MM–dd格式，如：2024–09–01</string>
     <string name="error_image_read_failed">无法读取图片</string>
     <string name="error_image_open_failed">无法打开图片</string>
     <string name="error_unknown">未知错误</string>
