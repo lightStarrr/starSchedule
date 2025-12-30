@@ -21,6 +21,7 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.currentState
+import androidx.glance.LocalContext
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -34,6 +35,7 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.star.schedule.R
 import com.star.schedule.Constants
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.getWeekOfSemester
@@ -52,16 +54,7 @@ import java.time.format.DateTimeFormatter
 
 enum class CourseStatus {
     ACTIVE,
-    ENDED;
-    
-    companion object {
-        fun fromString(status: String?): CourseStatus {
-            return when (status) {
-                "已结束" -> ENDED
-                else -> ACTIVE
-            }
-        }
-    }
+    ENDED
 }
 
 val KEY_COURSES_JSON = stringPreferencesKey("courses_json")
@@ -126,6 +119,7 @@ class TwoDaysWidget : GlanceAppWidget() {
 
     @Composable
     private fun ErrorContent() {
+        val context = LocalContext.current
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -135,7 +129,7 @@ class TwoDaysWidget : GlanceAppWidget() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "加载失败",
+                text = context.getString(R.string.widget_error_title),
                 style = TextStyle(
                     color = GlanceTheme.colors.onErrorContainer,
                     fontWeight = FontWeight.Bold,
@@ -144,7 +138,7 @@ class TwoDaysWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.padding(bottom = 8.dp)
             )
             Text(
-                text = "请稍后重试",
+                text = context.getString(R.string.widget_error_message),
                 style = TextStyle(
                     color = GlanceTheme.colors.onErrorContainer,
                     fontSize = 14.sp
@@ -155,6 +149,7 @@ class TwoDaysWidget : GlanceAppWidget() {
 
     @Composable
     private fun Content() {
+        val context = LocalContext.current
         val prefs = currentState<Preferences>()
         val coursesJson = prefs[KEY_COURSES_JSON]
         val lastUpdate = prefs[KEY_UPDATE_TIME] ?: ""
@@ -170,7 +165,7 @@ class TwoDaysWidget : GlanceAppWidget() {
                 )
             }
         } catch (e: Exception) {
-            Log.e("TwoDaysWidget", "JSON解析失败", e)
+            Log.e("TwoDaysWidget", context.getString(R.string.widget_json_parse_error), e)
             WidgetCourseData(
                 today = DayCourses(emptyList()),
                 tomorrow = DayCourses(emptyList()),
@@ -190,7 +185,7 @@ class TwoDaysWidget : GlanceAppWidget() {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "今明两天都没课~",
+                        text = context.getString(R.string.widget_empty_state),
                         style = TextStyle(
                             color = GlanceTheme.colors.onSurfaceVariant,
                             fontWeight = FontWeight.Bold,
@@ -203,14 +198,14 @@ class TwoDaysWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.fillMaxWidth().defaultWeight()
                 ) {
                     DayColumn(
-                        title = "今天",
+                        title = context.getString(R.string.widget_today),
                         dayData = widgetData.today,
                         isToday = true,
                         modifier = GlanceModifier.defaultWeight().fillMaxHeight().padding(end = 6.dp)
                     )
 
                     DayColumn(
-                        title = "明天",
+                        title = context.getString(R.string.widget_tomorrow),
                         dayData = widgetData.tomorrow,
                         isToday = false,
                         modifier = GlanceModifier.defaultWeight().fillMaxHeight().padding(start = 6.dp)
@@ -219,7 +214,7 @@ class TwoDaysWidget : GlanceAppWidget() {
             }
 
             Text(
-                text = "更新: ${widgetData.updateTime}",
+                text = context.getString(R.string.widget_update_time_label, widgetData.updateTime),
                 modifier = GlanceModifier.padding(top = 8.dp).fillMaxWidth(),
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurfaceVariant,
@@ -236,6 +231,7 @@ class TwoDaysWidget : GlanceAppWidget() {
         isToday: Boolean,
         modifier: GlanceModifier
     ) {
+        val context = LocalContext.current
         Column(modifier = modifier) {
             Text(
                 text = title,
@@ -267,7 +263,11 @@ class TwoDaysWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isToday) "今天的课都上完了~" else "${title}没课~",
+                            text = if (isToday) {
+                                context.getString(R.string.widget_no_classes_today)
+                            } else {
+                                context.getString(R.string.widget_no_classes_template, title)
+                            },
                             style = TextStyle(
                                 color = GlanceTheme.colors.onSurfaceVariant,
                                 fontSize = 16.sp
@@ -281,7 +281,7 @@ class TwoDaysWidget : GlanceAppWidget() {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "${title}没课~",
+                        text = context.getString(R.string.widget_no_classes_template, title),
                         style = TextStyle(
                             color = GlanceTheme.colors.onSurfaceVariant,
                             fontSize = 16.sp
@@ -403,23 +403,24 @@ class TwoDaysWidget : GlanceAppWidget() {
                     .sortedBy { it.periods.minOrNull() ?: 0 }
                     .map { course ->
                         val startPeriod = course.periods.minOrNull() ?: 0
-                        val endPeriod = course.periods.maxOrNull() ?: 0
-                        val startLesson = lessonTimes.find { it.period == startPeriod }
-                        val endLesson = lessonTimes.find { it.period == endPeriod }
+                val endPeriod = course.periods.maxOrNull() ?: 0
+                val startLesson = lessonTimes.find { it.period == startPeriod }
+                val endLesson = lessonTimes.find { it.period == endPeriod }
 
-                        val startTime = startLesson?.startTime ?: ""
-                        val endTime = endLesson?.endTime ?: ""
-                        val status = getCourseStatus(startTime, endTime, currentTime)
-                        
-                        CourseItem(
-                            name = course.name,
-                            location = course.location,
-                            teacher = course.teacher,
+                val startTime = startLesson?.startTime ?: ""
+                val endTime = endLesson?.endTime ?: ""
+                val statusInfo = getCourseStatus(startTime, endTime, currentTime, context)
+                    ?: CourseStatusInfo(null, CourseStatus.ACTIVE)
+
+                CourseItem(
+                    name = course.name,
+                    location = course.location,
+                    teacher = course.teacher,
                             startTime = startTime,
                             endTime = endTime,
-                            status = status,
-                            color = if (status != null) "secondary" else "primary",
-                            courseStatus = CourseStatus.fromString(status)
+                            status = statusInfo.text,
+                            color = if (statusInfo.text != null) "secondary" else "primary",
+                            courseStatus = statusInfo.courseStatus
                         )
                     }
 
@@ -499,11 +500,14 @@ class TwoDaysWidget : GlanceAppWidget() {
             }
         }
 
+        private data class CourseStatusInfo(val text: String?, val courseStatus: CourseStatus)
+
         private fun getCourseStatus(
             startTime: String,
             endTime: String,
-            currentTime: LocalTime
-        ): String? {
+            currentTime: LocalTime,
+            context: Context
+        ): CourseStatusInfo? {
             try {
                 if (startTime.isBlank() || endTime.isBlank()) return null
 
@@ -516,22 +520,29 @@ class TwoDaysWidget : GlanceAppWidget() {
                 return when {
                     currentTime.isBefore(start) -> {
                         val minutes = java.time.Duration.between(currentTime, start).toMinutes()
-                        when {
-                            minutes < 60 -> "${minutes}分钟后"
-                            minutes < 1440 -> "${minutes / 60}小时后"
-                            else -> "明天"
+                        val statusText = when {
+                            minutes < 60 -> context.getString(R.string.widget_status_minutes, minutes)
+                            minutes < 1440 -> context.getString(R.string.widget_status_hours, minutes / 60)
+                            else -> context.getString(R.string.widget_status_tomorrow)
                         }
+                        CourseStatusInfo(statusText, CourseStatus.ACTIVE)
                     }
-                    currentTime.isAfter(end) -> "已结束"
+                    currentTime.isAfter(end) -> CourseStatusInfo(
+                        context.getString(R.string.widget_status_finished),
+                        CourseStatus.ENDED
+                    )
                     currentTime.isAfter(start) && currentTime.isBefore(end) -> {
                         val minutes = java.time.Duration.between(currentTime, end).toMinutes()
-                        "${minutes}分钟后结束"
+                        CourseStatusInfo(
+                            context.getString(R.string.widget_status_end_in, minutes),
+                            CourseStatus.ACTIVE
+                        )
                     }
-                    else -> null
+                    else -> CourseStatusInfo(null, CourseStatus.ACTIVE)
                 }
             } catch (e: Exception) {
                 Log.e("TwoDaysWidget", "获取课程状态失败", e)
-                return null
+                return CourseStatusInfo(null, CourseStatus.ACTIVE)
             }
         }
     }

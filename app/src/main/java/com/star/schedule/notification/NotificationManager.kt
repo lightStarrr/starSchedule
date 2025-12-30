@@ -62,9 +62,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
     companion object {
         const val CHANNEL_ID = "course_reminder"
-        const val CHANNEL_NAME = "课程提醒"
         const val LIVE_CHANNEL_ID = "live_notification_channel"
-        const val LIVE_CHANNEL_NAME = "实况通知"
         const val NOTIFICATION_ID = 1001
         private const val FINISH_NOTIFICATION_DISMISS_DELAY_MS = 5 * 60 * 1000L
 
@@ -82,12 +80,14 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
             .build()
 
+        val channelName = context.getString(R.string.channel_name_course_reminder)
+        val channelDescription = context.getString(R.string.channel_desc_course_reminder)
         val normalChannel = NotificationChannel(
             CHANNEL_ID,
-            CHANNEL_NAME,
+            channelName,
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "提醒您即将上课"
+            description = channelDescription
             enableLights(true)
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 250, 250, 250)
@@ -97,12 +97,14 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI, audioAttributes)
         }
 
+        val liveChannelName = context.getString(R.string.channel_name_live_notification)
+        val liveChannelDescription = context.getString(R.string.channel_desc_live_notification)
         val liveChannel = NotificationChannel(
             LIVE_CHANNEL_ID,
-            LIVE_CHANNEL_NAME,
+            liveChannelName,
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "魅族实况通知频道"
+            description = liveChannelDescription
             enableLights(true)
             enableVibration(true)
             setBypassDnd(true)
@@ -199,7 +201,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
     fun showCourseNotificationImmediate(
-        courseName: String = "课程提醒",
+        courseName: String = context.getString(R.string.notification_course_reminder),
         location: String = "",
         startTime: String = "",
         finish: Boolean
@@ -217,7 +219,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
     }
 
     fun showCourseNotification(
-        courseName: String = "课程提醒",
+        courseName: String = context.getString(R.string.notification_course_reminder),
         location: String = "",
         startTime: String = ""
     ) {
@@ -379,6 +381,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
         finish: Boolean,
         customIconPath: String?
     ) {
+        val reminderLabel = context.getString(R.string.notification_course_reminder)
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
@@ -391,15 +394,23 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
         val contentText = if (finish) {
             if (location.isNotEmpty()) {
-                "$startTime 已上课\n地点: $location"
+                context.getString(
+                    R.string.notification_finished_with_location,
+                    startTime,
+                    location
+                )
             } else {
-                "$startTime 已上课"
+                context.getString(R.string.notification_finished, startTime)
             }
         } else {
             if (location.isNotEmpty()) {
-                "$startTime 即将上课\n地点: $location"
+                context.getString(
+                    R.string.notification_upcoming_with_location,
+                    startTime,
+                    location
+                )
             } else {
-                "$startTime 即将上课"
+                context.getString(R.string.notification_upcoming, startTime)
             }
         }
 
@@ -413,12 +424,22 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             } else {
                 setSmallIcon(R.drawable.ic_notification)
             }
-            setContentTitle("$courseName | 课程提醒")
+            setContentTitle(
+                context.getString(
+                    R.string.notification_title_template,
+                    courseName,
+                    reminderLabel
+                )
+            )
             setContentText(contentText)
             setStyle(
                 NotificationCompat.BigTextStyle().bigText(
                     if (startTime.isNotEmpty()) {
-                        "$contentText\n时间: $startTime"
+                        context.getString(
+                            R.string.notification_big_text_with_time,
+                            contentText,
+                            startTime
+                        )
                     } else {
                         contentText
                     }
@@ -554,7 +575,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 CoroutineScope(Dispatchers.Main).launch {
                     Toast.makeText(
                         context,
-                        "无法设置精确闹钟，请检查系统设置",
+                        context.getString(R.string.exact_alarm_setup_failed),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -596,15 +617,15 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
         showCourseNotification(
-            courseName = "测试课程",
-            location = "测试教室A101",
+            courseName = context.getString(R.string.notification_test_course),
+            location = context.getString(R.string.notification_test_location),
             startTime = startTime,
         )
 
         CoroutineScope(Dispatchers.Main).launch {
             Toast.makeText(
                 context,
-                "测试通知已设置，更新时间为1分钟",
+                context.getString(R.string.notification_test_scheduled),
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -615,8 +636,8 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
         val intent = Intent(context, CourseReminderReceiver::class.java).apply {
-            putExtra("course_name", "测试课程")
-            putExtra("course_location", "测试教室A101")
+            putExtra("course_name", context.getString(R.string.notification_test_course))
+            putExtra("course_location", context.getString(R.string.notification_test_location))
             putExtra("course_time", startTime)
         }
 
@@ -641,7 +662,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 CoroutineScope(Dispatchers.Main).launch {
                     Toast.makeText(
                         context,
-                        "测试提醒已设置，将在10秒后推送通知",
+                        context.getString(R.string.reminder_test_scheduled),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -650,12 +671,12 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
                 val settingsIntent =
                     Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
+                }
                 context.startActivity(settingsIntent)
                 CoroutineScope(Dispatchers.Main).launch {
                     Toast.makeText(
                         context,
-                        "请允许应用使用精确闹钟，然后重试",
+                        context.getString(R.string.exact_alarm_permission_required),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -664,7 +685,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
             CoroutineScope(Dispatchers.Main).launch {
                 Toast.makeText(
                     context,
-                    "无法设置提醒，请检查系统设置",
+                    context.getString(R.string.reminder_setup_failed),
                     Toast.LENGTH_LONG
                 ).show()
             }

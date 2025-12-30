@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.rememberCoroutineScope
+import com.star.schedule.R
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import kotlinx.coroutines.launch
 
@@ -60,7 +62,7 @@ class WebActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebCaptureScreen(context: WebActivity, url: String, onHtmlReceived: (String) -> Unit) {
-    var webViewTitle by remember { mutableStateOf("网页加载中...") }
+    var webViewTitle by remember { mutableStateOf(context.getString(R.string.web_loading_title)) }
     var showDownloadSheet by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val sheetState = androidx.compose.material3.rememberModalBottomSheetState()
@@ -71,12 +73,18 @@ fun WebCaptureScreen(context: WebActivity, url: String, onHtmlReceived: (String)
                 title = { Text(webViewTitle) },
                 navigationIcon = {
                     IconButton(onClick = { context.finish() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = { showDownloadSheet = true }) {
-                        Icon(Icons.Default.Download, contentDescription = "下载")
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = stringResource(R.string.action_download)
+                        )
                     }
                 }
             )
@@ -109,12 +117,12 @@ fun WebCaptureScreen(context: WebActivity, url: String, onHtmlReceived: (String)
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "下载选项",
+                    text = stringResource(R.string.download_options_title),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 Text(
-                    text = "这里是下载功能的选项内容，可以根据需要添加相关功能",
+                    text = stringResource(R.string.download_options_description),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 Button(
@@ -125,7 +133,7 @@ fun WebCaptureScreen(context: WebActivity, url: String, onHtmlReceived: (String)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("示例下载按钮")
+                    Text(stringResource(R.string.download_button_sample))
                 }
             }
         }
@@ -170,7 +178,7 @@ fun WebViewContent(
                     }
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        onTitleReceived(view?.title ?: "未知标题")
+                        onTitleReceived(view?.title ?: context.getString(R.string.unknown_title))
                         evaluateJavascript(
                             "(function() { return document.documentElement.outerHTML; })();"
                         ) { html ->

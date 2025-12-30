@@ -99,6 +99,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -130,6 +131,7 @@ import android.widget.TextView
 import androidx.compose.ui.graphics.ColorFilter
 import java.io.File
 import java.io.FileOutputStream
+import androidx.core.graphics.scale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -226,7 +228,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     CoroutineScope(Dispatchers.Main).launch {
                         Toast.makeText(
                             context,
-                            "请允许应用使用精确闹钟，然后重试",
+                            context.getString(R.string.exact_alarm_permission_required),
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -240,7 +242,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         CoroutineScope(Dispatchers.Main).launch {
                             Toast.makeText(
                                 context,
-                                "未启用实况通知，请在设置中开启，否则将使用普通通知",
+                                context.getString(R.string.live_notification_not_enabled),
                                 Toast.LENGTH_LONG
                             ).show()
                         }
@@ -263,7 +265,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             context.contentResolver.openInputStream(uri)?.use { input ->
                 val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
                 val original = BitmapFactory.decodeStream(input, null, options)
-                    ?: throw IllegalStateException("无法读取图片")
+                    ?: throw IllegalStateException(context.getString(R.string.error_image_read_failed))
                 val targetSize = (256 * context.resources.displayMetrics.density).toInt().coerceAtLeast(64)
                 val scaled = scaleLiveIcon(original, targetSize)
                 val iconDir = File(context.filesDir, "live_icons").apply { mkdirs() }
@@ -272,7 +274,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
                 }
                 Pair(iconFile.absolutePath, scaled)
-            } ?: throw IllegalStateException("无法打开图片")
+            } ?: throw IllegalStateException(context.getString(R.string.error_image_open_failed))
         }
     }
 
@@ -291,11 +293,18 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 saveResult.onSuccess { (path, preview) ->
                     viewModel.updateLiveCapsuleIconPath(path)
                     liveCapsuleIconBitmap = preview
-                    Toast.makeText(context, "已更新实况通知图标", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.notification_icon_updated),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }.onFailure { error ->
                     Toast.makeText(
                         context,
-                        "更新图标失败: ${error.message ?: "未知错误"}",
+                        context.getString(
+                            R.string.notification_icon_update_failed,
+                            error.message ?: context.getString(R.string.error_unknown)
+                        ),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -310,7 +319,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             .verticalScroll(scrollState)
     ) {
         Text(
-            text = "设置",
+            text = stringResource(R.string.settings_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(16.dp),
@@ -341,9 +350,10 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 val currentName =
-                    timetables.firstOrNull { it.id == currentTimetableId }?.name ?: "未选择"
+                    timetables.firstOrNull { it.id == currentTimetableId }?.name
+                        ?: stringResource(R.string.timetable_not_selected)
                 Text(
-                    text = "当前课表: $currentName",
+                    text = stringResource(R.string.current_timetable_label, currentName),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimary
                 )
@@ -364,7 +374,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         .navigationBarsPadding()
                 ) {
                     Text(
-                        text = "选择课表",
+                        text = stringResource(R.string.select_timetable_title),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -398,7 +408,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                 ) {
                                     Icon(
                                         Icons.Rounded.CalendarMonth,
-                                        contentDescription = "课表",
+                                        contentDescription = stringResource(R.string.content_desc_timetable),
                                         modifier = Modifier.padding(end = 12.dp),
                                         tint = if (timetable.id == currentTimetableId)
                                             MaterialTheme.colorScheme.onSecondary
@@ -416,7 +426,10 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                         )
                                         if (timetable.id == currentTimetableId) {
                                             Text(
-                                                text = "当前课表",
+                                                text = stringResource(
+                                                    R.string.current_timetable_label,
+                                                    timetable.name
+                                                ),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSecondary
                                             )
@@ -449,19 +462,19 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Info,
-                        contentDescription = "提示",
+                        contentDescription = stringResource(R.string.content_desc_hint),
                         tint = MaterialTheme.colorScheme.onSecondary,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "请允许开机自启和后台运行",
+                            text = stringResource(R.string.startup_hint_primary),
                             style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSecondary)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "软件不会常驻后台，仅在需要发送通知时被系统唤起。",
+                            text = stringResource(R.string.startup_hint_secondary),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f)
                             )
@@ -474,7 +487,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     }) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
-                            contentDescription = "关闭提示",
+                            contentDescription = stringResource(R.string.content_desc_close_hint),
                             tint = MaterialTheme.colorScheme.onSecondary
                         )
                     }
@@ -501,12 +514,12 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
         // 课前提醒开关
         ListItem(
-            headlineContent = { Text("课前提醒") },
+            headlineContent = { Text(stringResource(R.string.reminder_toggle_title)) },
             supportingContent = {
                 val currentTimetable = timetables.firstOrNull { it.id == currentTimetableId }
-                val currentName = currentTimetable?.name ?: "未选择课表"
+                val currentName = currentTimetable?.name ?: stringResource(R.string.timetable_not_selected)
                 val reminderTime = currentTimetable?.reminderTime ?: 15
-                Text("为当前课表（$currentName）开启课前${reminderTime}分钟提醒")
+                Text(stringResource(R.string.reminder_toggle_support, currentName, reminderTime))
             },
             leadingContent = {
                 AnimatedContent(
@@ -585,8 +598,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
             Column {
                 // 只在连续课程的第一节课前发送通知的开关
                 ListItem(
-                    headlineContent = { Text("仅第一节连续课程提醒") },
-                    supportingContent = { Text("对于连续的课程，只在第一节课前发送通知") },
+                    headlineContent = { Text(stringResource(R.string.only_first_continuous_title)) },
+                    supportingContent = { Text(stringResource(R.string.only_first_continuous_support)) },
                     leadingContent = {
                         Icon(
                             Icons.Rounded.LooksOne,
@@ -604,11 +617,11 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 )
 
                 ListItem(
-                    headlineContent = { Text("通知图标") },
+                    headlineContent = { Text(stringResource(R.string.notification_icon_title)) },
                     supportingContent = {
                         Text(
-                            if (liveCapsuleIconPath.isNullOrEmpty()) "点击上传自定义图标"
-                            else "已设置自定义图标，点击更换或清除"
+                            if (liveCapsuleIconPath.isNullOrEmpty()) stringResource(R.string.notification_icon_subtitle_empty)
+                            else stringResource(R.string.notification_icon_subtitle_set)
                         )
                     },
                     leadingContent = {
@@ -644,7 +657,10 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                         liveCapsuleIconBitmap = null
                                     }
                                 ) {
-                                    Icon(Icons.Rounded.Close, contentDescription = "恢复默认")
+                                    Icon(
+                                        Icons.Rounded.Close,
+                                        contentDescription = stringResource(R.string.action_reset_default)
+                                    )
                                 }
                             }
                         }
@@ -672,8 +688,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     }
 
                     ListItem(
-                        headlineContent = { Text("实况通知胶囊背景颜色") },
-                        supportingContent = { Text("自定义实况通知胶囊的背景颜色") },
+                        headlineContent = { Text(stringResource(R.string.live_capsule_bg_title)) },
+                        supportingContent = { Text(stringResource(R.string.live_capsule_bg_support)) },
                         leadingContent = {
                             Icon(
                                 Icons.Rounded.ColorLens,
@@ -729,7 +745,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     .verticalScroll(rememberScrollState())
                             ) {
                                 Text(
-                                    text = "选择颜色",
+                                    text = stringResource(R.string.color_picker_title),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(bottom = 16.dp)
@@ -771,7 +787,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "测试内容",
+                                            text = stringResource(R.string.color_preview_sample),
                                             color = autoContentColorFor(selectedColor),
                                             style = MaterialTheme.typography.bodyMedium
                                         )
@@ -823,7 +839,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                         },
                                         modifier = Modifier.padding(end = 8.dp)
                                     ) {
-                                        Text("取消")
+                                        Text(stringResource(R.string.action_cancel))
                                     }
 
                                     // 确定按钮 - 固定样式
@@ -840,7 +856,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                             }
                                         }
                                     ) {
-                                        Text("确定")
+                                        Text(stringResource(R.string.action_confirm))
                                     }
                                 }
                             }
@@ -848,7 +864,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                     }
 
                     ListItem(
-                        headlineContent = { Text("实况通知模板") },
+                        headlineContent = { Text(stringResource(R.string.live_notification_template_title)) },
                         supportingContent = { Text(liveNotificationTemplate.description) },
                         leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
                         trailingContent = {
@@ -887,7 +903,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                                     .verticalScroll(rememberScrollState())
                             ) {
                                 Text(
-                                    text = "选择实况通知模板",
+                                    text = stringResource(R.string.live_notification_template_picker_title),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(bottom = 12.dp)
@@ -922,8 +938,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
                 // 通知测试项
                 ListItem(
-                    headlineContent = { Text("通知测试") },
-                    supportingContent = { Text("测试通知功能（即时）") },
+                    headlineContent = { Text(stringResource(R.string.notification_test_title)) },
+                    supportingContent = { Text(stringResource(R.string.notification_test_support_instant)) },
                     leadingContent = { Icon(Icons.Rounded.Science, contentDescription = null) },
                     modifier = Modifier.clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -934,8 +950,8 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                 )
 
                 ListItem(
-                    headlineContent = { Text("通知测试") },
-                    supportingContent = { Text("测试通知功能（延迟）") },
+                    headlineContent = { Text(stringResource(R.string.notification_test_title)) },
+                    supportingContent = { Text(stringResource(R.string.notification_test_support_delayed)) },
                     leadingContent = { Icon(Icons.Rounded.Science, contentDescription = null) },
                     modifier = Modifier.clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -944,11 +960,11 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
                         }
                     }
                 )
-                
+
                 // 应用在后台显示开关
                 ListItem(
-                    headlineContent = { Text("后台隐藏应用") },
-                    supportingContent = { Text("开启后应用将不在最近任务列表中显示") },
+                    headlineContent = { Text(stringResource(R.string.hide_from_recents_title)) },
+                    supportingContent = { Text(stringResource(R.string.hide_from_recents_support)) },
                     leadingContent = {
                         Icon(
                             Icons.Rounded.VisibilityOff,
@@ -968,13 +984,16 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         }
 
         ListItem(
-            headlineContent = { Text("关于应用") },
+            headlineContent = { Text(stringResource(R.string.about_app_title)) },
             supportingContent = {
                 Text(
-                    "版本 " + context.packageManager.getPackageInfo(
-                        context.packageName,
-                        0
-                    ).versionName
+                    stringResource(
+                        R.string.version_label,
+                        context.packageManager.getPackageInfo(
+                            context.packageName,
+                            0
+                        ).versionName ?: ""
+                    )
                 )
             },
             leadingContent = { Icon(Icons.Rounded.Info, contentDescription = null) },
@@ -1013,7 +1032,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         )
 
         ListItem(
-            headlineContent = { Text("QQ群聊") },
+            headlineContent = { Text(stringResource(R.string.qq_group_title)) },
             supportingContent = { Text("947574953") },
             leadingContent = { Icon(Icons.Rounded.Group, contentDescription = null) },
             modifier = Modifier.clickable {
@@ -1091,8 +1110,8 @@ private fun FlymeTemplatePreview(
     customIcon: Bitmap?
 ) {
     val context = LocalContext.current
-    val sampleCourse = "示例课程"
-    val sampleLocation = "示例教室 A101"
+    val sampleCourse = stringResource(R.string.sample_course)
+    val sampleLocation = stringResource(R.string.sample_location)
     val sampleTime = "10:00"
 
     @Composable
@@ -1157,8 +1176,8 @@ private fun FlymeTemplatePreview(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TemplateCard(label = "即将上课", layoutRes = template.ongoingLayout)
-        TemplateCard(label = "已上课", layoutRes = template.finishedLayout)
+        TemplateCard(label = stringResource(R.string.template_label_upcoming), layoutRes = template.ongoingLayout)
+        TemplateCard(label = stringResource(R.string.template_label_finished), layoutRes = template.finishedLayout)
     }
 }
 
@@ -1168,5 +1187,5 @@ private fun scaleLiveIcon(bitmap: Bitmap, targetSizePx: Int): Bitmap {
 
     val width = (bitmap.width * targetSizePx / maxSide).coerceAtLeast(1)
     val height = (bitmap.height * targetSizePx / maxSide).coerceAtLeast(1)
-    return Bitmap.createScaledBitmap(bitmap, width, height, true)
+    return bitmap.scale(width, height)
 }

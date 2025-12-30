@@ -1,5 +1,8 @@
 package com.star.schedule.utils
 
+import android.content.res.Resources
+import androidx.annotation.StringRes
+import com.star.schedule.R
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -18,6 +21,8 @@ object ValidationUtils {
         val isValid: Boolean,
         val errorMessage: String = ""
     )
+
+    private fun Resources.text(@StringRes id: Int, vararg args: Any): String = getString(id, *args)
 
     /**
      * 课程验证
@@ -64,10 +69,10 @@ object ValidationUtils {
         /**
          * 验证课程名称
          */
-        fun validateCourseName(name: String): ValidationResult {
+        fun validateCourseName(name: String, resources: Resources): ValidationResult {
             return when {
-                name.isBlank() -> ValidationResult(false, "课程名称不能为空")
-                name.length > 50 -> ValidationResult(false, "课程名称不能超过50个字符")
+                name.isBlank() -> ValidationResult(false, resources.text(R.string.error_course_name_required))
+                name.length > 50 -> ValidationResult(false, resources.text(R.string.error_course_name_too_long))
                 else -> ValidationResult(true)
             }
         }
@@ -75,9 +80,9 @@ object ValidationUtils {
         /**
          * 验证上课地点
          */
-        fun validateLocation(location: String): ValidationResult {
+        fun validateLocation(location: String, resources: Resources): ValidationResult {
             return when {
-                location.length > 100 -> ValidationResult(false, "上课地点不能超过100个字符")
+                location.length > 100 -> ValidationResult(false, resources.text(R.string.error_location_too_long))
                 else -> ValidationResult(true)
             }
         }
@@ -85,11 +90,11 @@ object ValidationUtils {
         /**
          * 验证星期几
          */
-        fun validateDayOfWeek(dayOfWeek: String): ValidationResult {
+        fun validateDayOfWeek(dayOfWeek: String, resources: Resources): ValidationResult {
             val day = dayOfWeek.toIntOrNull()
             return when {
-                day == null -> ValidationResult(false, "星期必须是数字")
-                day < 1 || day > 7 -> ValidationResult(false, "星期必须在1-7之间（1=周一，7=周日）")
+                day == null -> ValidationResult(false, resources.text(R.string.error_day_of_week_not_number))
+                day < 1 || day > 7 -> ValidationResult(false, resources.text(R.string.error_day_of_week_range))
                 else -> ValidationResult(true)
             }
         }
@@ -97,15 +102,15 @@ object ValidationUtils {
         /**
          * 验证节次
          */
-        fun validatePeriods(periods: String): ValidationResult {
+        fun validatePeriods(periods: String, resources: Resources): ValidationResult {
             if (periods.isBlank()) {
-                return ValidationResult(false, "节次不能为空")
+                return ValidationResult(false, resources.text(R.string.error_periods_empty))
             }
-            
+
             try {
                 val periodList = periods.split(",").map { it.trim() }
                 if (periodList.isEmpty()) {
-                    return ValidationResult(false, "至少需要一个节次")
+                    return ValidationResult(false, resources.text(R.string.error_periods_at_least_one))
                 }
                 
                 val periodNumbers = mutableListOf<Int>()
@@ -115,59 +120,62 @@ object ValidationUtils {
                         // 处理范围格式，如 "1-7"
                         val range = period.split("-")
                         if (range.size != 2) {
-                            return ValidationResult(false, "节次范围格式错误，应为：开始-结束")
+                            return ValidationResult(false, resources.text(R.string.error_period_range_format))
                         }
-                        
-                        val start = range[0].toIntOrNull() ?: return ValidationResult(false, "节次范围开始值必须是数字")
-                        val end = range[1].toIntOrNull() ?: return ValidationResult(false, "节次范围结束值必须是数字")
-                        
+
+                        val start = range[0].toIntOrNull()
+                            ?: return ValidationResult(false, resources.text(R.string.error_period_range_start_number))
+                        val end = range[1].toIntOrNull()
+                            ?: return ValidationResult(false, resources.text(R.string.error_period_range_end_number))
+
                         if (start > end) {
-                            return ValidationResult(false, "节次范围开始值不能大于结束值")
+                            return ValidationResult(false, resources.text(R.string.error_period_range_start_after_end))
                         }
-                        
+
                         if (start < 1 || end > 20) {
-                            return ValidationResult(false, "节次范围必须在1-20之间")
+                            return ValidationResult(false, resources.text(R.string.error_period_range))
                         }
-                        
+
                         periodNumbers.addAll(start..end)
                     } else {
                         // 处理单个数字
-                        val periodNum = period.toIntOrNull() ?: return ValidationResult(false, "节次必须是数字，格式如：1,2,3 或 1-7")
-                        
+                        val periodNum = period.toIntOrNull()
+                            ?: return ValidationResult(false, resources.text(R.string.error_periods_number_format))
+
                         if (periodNum < 1 || periodNum > 20) {
-                            return ValidationResult(false, "节次必须在1-20之间")
+                            return ValidationResult(false, resources.text(R.string.error_periods_range))
                         }
-                        
+
                         periodNumbers.add(periodNum)
                     }
                 }
-                
+
                 if (periodNumbers.any { it < 1 || it > 20 }) {
-                    return ValidationResult(false, "节次必须在1-20之间")
+                    return ValidationResult(false, resources.text(R.string.error_periods_range))
                 }
-                
+
                 if (periodNumbers.size != periodNumbers.toSet().size) {
-                    return ValidationResult(false, "节次不能重复")
+                    return ValidationResult(false, resources.text(R.string.error_periods_duplicate))
                 }
-                
+
                 return ValidationResult(true)
             } catch (e: Exception) {
-                return ValidationResult(false, "节次格式错误，支持：1,2,3 或 1-7")
+                return ValidationResult(false, resources.text(R.string.error_periods_format))
             }
         }
 
         /**
          * 验证周次
          */
-        fun validateWeeks(weeks: String): ValidationResult {
+        fun validateWeeks(weeks: String, resources: Resources): ValidationResult {
             if (weeks.isBlank()) {
-                return ValidationResult(false, "周次不能为空")
+                return ValidationResult(false, resources.text(R.string.error_weeks_empty))
             }
-            
+
             try {
                 val weekList = weeks.split(",").map { it.trim() }
                 if (weekList.isEmpty()) {
-                    return ValidationResult(false, "至少需要一个周次")
+                    return ValidationResult(false, resources.text(R.string.error_weeks_at_least_one))
                 }
                 
                 val weekNumbers = mutableListOf<Int>()
@@ -177,44 +185,47 @@ object ValidationUtils {
                         // 处理范围格式，如 "1-7"
                         val range = week.split("-")
                         if (range.size != 2) {
-                            return ValidationResult(false, "周次范围格式错误，应为：开始-结束")
+                            return ValidationResult(false, resources.text(R.string.error_week_range_format))
                         }
-                        
-                        val start = range[0].toIntOrNull() ?: return ValidationResult(false, "周次范围开始值必须是数字")
-                        val end = range[1].toIntOrNull() ?: return ValidationResult(false, "周次范围结束值必须是数字")
-                        
+
+                        val start = range[0].toIntOrNull()
+                            ?: return ValidationResult(false, resources.text(R.string.error_week_range_start_number))
+                        val end = range[1].toIntOrNull()
+                            ?: return ValidationResult(false, resources.text(R.string.error_week_range_end_number))
+
                         if (start > end) {
-                            return ValidationResult(false, "周次范围开始值不能大于结束值")
+                            return ValidationResult(false, resources.text(R.string.error_week_range_start_after_end))
                         }
-                        
+
                         if (start < 1 || end > 30) {
-                            return ValidationResult(false, "周次范围必须在1-30之间")
+                            return ValidationResult(false, resources.text(R.string.error_week_range))
                         }
-                        
+
                         weekNumbers.addAll(start..end)
                     } else {
                         // 处理单个数字
-                        val weekNum = week.toIntOrNull() ?: return ValidationResult(false, "周次必须是数字，格式如：1,2,3 或 1-7")
-                        
+                        val weekNum = week.toIntOrNull()
+                            ?: return ValidationResult(false, resources.text(R.string.error_weeks_number_format))
+
                         if (weekNum < 1 || weekNum > 30) {
-                            return ValidationResult(false, "周次必须在1-30之间")
+                            return ValidationResult(false, resources.text(R.string.error_weeks_range))
                         }
-                        
+
                         weekNumbers.add(weekNum)
                     }
                 }
-                
+
                 if (weekNumbers.any { it < 1 || it > 30 }) {
-                    return ValidationResult(false, "周次必须在1-30之间")
+                    return ValidationResult(false, resources.text(R.string.error_weeks_range))
                 }
-                
+
                 if (weekNumbers.size != weekNumbers.toSet().size) {
-                    return ValidationResult(false, "周次不能重复")
+                    return ValidationResult(false, resources.text(R.string.error_weeks_duplicate))
                 }
-                
+
                 return ValidationResult(true)
             } catch (e: Exception) {
-                return ValidationResult(false, "周次格式错误，支持：1,2,3 或 1-7")
+                return ValidationResult(false, resources.text(R.string.error_weeks_format))
             }
         }
 
@@ -256,23 +267,24 @@ object ValidationUtils {
             location: String,
             dayOfWeek: String,
             periods: String,
-            weeks: String
+            weeks: String,
+            resources: Resources
         ): ValidationResult {
-            val nameResult = validateCourseName(name)
+            val nameResult = validateCourseName(name, resources)
             if (!nameResult.isValid) return nameResult
-            
-            val locationResult = validateLocation(location)
+
+            val locationResult = validateLocation(location, resources)
             if (!locationResult.isValid) return locationResult
-            
-            val dayResult = validateDayOfWeek(dayOfWeek)
+
+            val dayResult = validateDayOfWeek(dayOfWeek, resources)
             if (!dayResult.isValid) return dayResult
-            
-            val periodsResult = validatePeriods(periods)
+
+            val periodsResult = validatePeriods(periods, resources)
             if (!periodsResult.isValid) return periodsResult
-            
-            val weeksResult = validateWeeks(weeks)
+
+            val weeksResult = validateWeeks(weeks, resources)
             if (!weeksResult.isValid) return weeksResult
-            
+
             return ValidationResult(true)
         }
     }
@@ -283,15 +295,15 @@ object ValidationUtils {
     object LessonTimeValidation {
         
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-        
+
         /**
          * 验证节次
          */
-        fun validatePeriod(period: String): ValidationResult {
+        fun validatePeriod(period: String, resources: Resources): ValidationResult {
             val periodNum = period.toIntOrNull()
             return when {
-                periodNum == null -> ValidationResult(false, "节次必须是数字")
-                periodNum < 1 || periodNum > 20 -> ValidationResult(false, "节次必须在1-20之间")
+                periodNum == null -> ValidationResult(false, resources.text(R.string.error_period_must_be_number))
+                periodNum < 1 || periodNum > 20 -> ValidationResult(false, resources.text(R.string.error_period_must_be_in_range))
                 else -> ValidationResult(true)
             }
         }
@@ -299,34 +311,34 @@ object ValidationUtils {
         /**
          * 验证时间格式
          */
-        fun validateTimeFormat(time: String, fieldName: String): ValidationResult {
+        fun validateTimeFormat(time: String, fieldName: String, resources: Resources): ValidationResult {
             if (time.isBlank()) {
-                return ValidationResult(false, "${fieldName}不能为空")
+                return ValidationResult(false, resources.text(R.string.error_field_required, fieldName))
             }
-            
+
             try {
                 LocalTime.parse(time, timeFormatter)
                 return ValidationResult(true)
             } catch (e: DateTimeParseException) {
-                return ValidationResult(false, "${fieldName}格式错误，请使用HH:mm格式，如：08:00")
+                return ValidationResult(false, resources.text(R.string.error_field_time_format, fieldName))
             }
         }
 
         /**
          * 验证开始时间和结束时间的逻辑关系
          */
-        fun validateTimeRange(startTime: String, endTime: String): ValidationResult {
+        fun validateTimeRange(startTime: String, endTime: String, resources: Resources): ValidationResult {
             try {
                 val start = LocalTime.parse(startTime, timeFormatter)
                 val end = LocalTime.parse(endTime, timeFormatter)
-                
+
                 if (start.isAfter(end) || start.equals(end)) {
-                    return ValidationResult(false, "结束时间必须晚于开始时间")
+                    return ValidationResult(false, resources.text(R.string.error_end_time_after_start))
                 }
-                
+
                 return ValidationResult(true)
             } catch (e: DateTimeParseException) {
-                return ValidationResult(false, "时间格式错误")
+                return ValidationResult(false, resources.text(R.string.error_time_format_generic))
             }
         }
 
@@ -336,20 +348,21 @@ object ValidationUtils {
         fun validateLessonTimeData(
             period: String,
             startTime: String,
-            endTime: String
+            endTime: String,
+            resources: Resources
         ): ValidationResult {
-            val periodResult = validatePeriod(period)
+            val periodResult = validatePeriod(period, resources)
             if (!periodResult.isValid) return periodResult
-            
-            val startTimeResult = validateTimeFormat(startTime, "开始时间")
+
+            val startTimeResult = validateTimeFormat(startTime, resources.text(R.string.label_start_time), resources)
             if (!startTimeResult.isValid) return startTimeResult
-            
-            val endTimeResult = validateTimeFormat(endTime, "结束时间")
+
+            val endTimeResult = validateTimeFormat(endTime, resources.text(R.string.label_end_time), resources)
             if (!endTimeResult.isValid) return endTimeResult
-            
-            val timeRangeResult = validateTimeRange(startTime, endTime)
+
+            val timeRangeResult = validateTimeRange(startTime, endTime, resources)
             if (!timeRangeResult.isValid) return timeRangeResult
-            
+
             return ValidationResult(true)
         }
     }
@@ -369,9 +382,9 @@ object ValidationUtils {
         /**
          * 检查字符串长度
          */
-        fun checkLength(value: String, maxLength: Int, fieldName: String): ValidationResult {
+        fun checkLength(value: String, maxLength: Int, fieldName: String, resources: Resources): ValidationResult {
             return when {
-                value.length > maxLength -> ValidationResult(false, "${fieldName}不能超过${maxLength}个字符")
+                value.length > maxLength -> ValidationResult(false, resources.text(R.string.error_field_length_exceed, fieldName, maxLength))
                 else -> ValidationResult(true)
             }
         }
@@ -379,11 +392,11 @@ object ValidationUtils {
         /**
          * 检查数字范围
          */
-        fun checkIntRange(value: String, min: Int, max: Int, fieldName: String): ValidationResult {
+        fun checkIntRange(value: String, min: Int, max: Int, fieldName: String, resources: Resources): ValidationResult {
             val num = value.toIntOrNull()
             return when {
-                num == null -> ValidationResult(false, "${fieldName}必须是数字")
-                num < min || num > max -> ValidationResult(false, "${fieldName}必须在${min}-${max}之间")
+                num == null -> ValidationResult(false, resources.text(R.string.error_field_not_number, fieldName))
+                num < min || num > max -> ValidationResult(false, resources.text(R.string.error_field_int_range, fieldName, min, max))
                 else -> ValidationResult(true)
             }
         }
@@ -399,10 +412,10 @@ object ValidationUtils {
         /**
          * 验证课程表名称
          */
-        fun validateTimetableName(name: String): ValidationResult {
+        fun validateTimetableName(name: String, resources: Resources): ValidationResult {
             return when {
-                name.isBlank() -> ValidationResult(false, "课程表名称不能为空")
-                name.length > 100 -> ValidationResult(false, "课程表名称不能超过100个字符")
+                name.isBlank() -> ValidationResult(false, resources.text(R.string.error_timetable_name_required))
+                name.length > 100 -> ValidationResult(false, resources.text(R.string.error_timetable_name_too_long))
                 else -> ValidationResult(true)
             }
         }
@@ -410,23 +423,23 @@ object ValidationUtils {
         /**
          * 验证学期开始日期
          */
-        fun validateStartDate(dateStr: String): ValidationResult {
+        fun validateStartDate(dateStr: String, resources: Resources): ValidationResult {
             if (dateStr.isBlank()) {
-                return ValidationResult(false, "学期开始日期不能为空")
+                return ValidationResult(false, resources.text(R.string.error_semester_start_date_required))
             }
-            
+
             try {
                 val date = LocalDate.parse(dateStr, dateFormatter)
-                
+
                 // 检查日期是否在合理范围内（2000年至2050年）
                 val currentYear = LocalDate.now().year
                 if (date.year < 2000 || date.year > 2050) {
-                    return ValidationResult(false, "学期开始日期年份必须在2000-2050年之间")
+                    return ValidationResult(false, resources.text(R.string.error_semester_start_year_range))
                 }
-                
+
                 return ValidationResult(true)
             } catch (e: DateTimeParseException) {
-                return ValidationResult(false, "日期格式错误，请使用yyyy-MM-dd格式，如：2024-09-01")
+                return ValidationResult(false, resources.text(R.string.error_date_format_detail))
             }
         }
 
@@ -435,14 +448,15 @@ object ValidationUtils {
          */
         fun validateTimetableData(
             name: String,
-            startDate: String
+            startDate: String,
+            resources: Resources
         ): ValidationResult {
-            val nameResult = validateTimetableName(name)
+            val nameResult = validateTimetableName(name, resources)
             if (!nameResult.isValid) return nameResult
-            
-            val dateResult = validateStartDate(startDate)
+
+            val dateResult = validateStartDate(startDate, resources)
             if (!dateResult.isValid) return dateResult
-            
+
             return ValidationResult(true)
         }
     }
