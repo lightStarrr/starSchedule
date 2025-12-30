@@ -90,9 +90,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
+import com.star.schedule.R
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.DatabaseProvider.dao
 import com.star.schedule.notification.UnifiedNotificationManager
@@ -179,8 +181,12 @@ fun Layout(context: Activity) {
             Log.d("StarSchedule", "New version available: $latestTag")
             coroutineScope.launch {
                 snackbarHostState.showSnackbar(
-                    message = "发现新版本：v$currentVersion => $latestTag",
-                    actionLabel = "更新",
+                    message = context.getString(
+                        R.string.update_available_message,
+                        currentVersion,
+                        latestTag
+                    ),
+                    actionLabel = context.getString(R.string.action_update),
                     duration = SnackbarDuration.Indefinite
                 )
             }
@@ -220,9 +226,9 @@ fun Layout(context: Activity) {
     )
 
     val items = listOf(
-        ItemData("日程", Icons.Rounded.CalendarMonth),
-        ItemData("课表设置", Icons.Rounded.EditCalendar),
-        ItemData("设置", Icons.Rounded.Settings)
+        ItemData(stringResource(R.string.tab_schedule), Icons.Rounded.CalendarMonth),
+        ItemData(stringResource(R.string.tab_timetable_settings), Icons.Rounded.EditCalendar),
+        ItemData(stringResource(R.string.settings_title), Icons.Rounded.Settings)
     )
 
     val exitAlwaysScrollBehavior =
@@ -270,7 +276,7 @@ fun Layout(context: Activity) {
                                         ) {
                                             Icon(
                                                 Icons.Rounded.ChevronLeft,
-                                                contentDescription = "上一周"
+                                                contentDescription = stringResource(R.string.content_desc_previous_week)
                                             )
                                         }
                                         ToggleButton(
@@ -284,7 +290,7 @@ fun Layout(context: Activity) {
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
                                         ) {
-                                            Text("第 $currentWeekNumber 周")
+                                            Text(stringResource(R.string.week_label_template, currentWeekNumber))
                                         }
                                         ToggleButton(
                                             checked = false,
@@ -304,7 +310,7 @@ fun Layout(context: Activity) {
                                         ) {
                                             Icon(
                                                 Icons.Rounded.ChevronRight,
-                                                contentDescription = "下一周"
+                                                contentDescription = stringResource(R.string.content_desc_next_week)
                                             )
                                         }
                                     }
@@ -468,7 +474,7 @@ fun WeekSelectorSheet(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "选择周数",
+            text = stringResource(R.string.select_week_number_title),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -531,7 +537,7 @@ fun WeekSelectorSheet(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "第 $week 周",
+                                    text = stringResource(R.string.week_label_template, week),
                                     style = MaterialTheme.typography.bodyLarge,
                                     maxLines = 1
                                 )
@@ -551,7 +557,7 @@ fun WeekSelectorSheet(
                                     .zIndex(2f)
                             ) {
                                 Text(
-                                    text = "本周",
+                                    text = stringResource(R.string.week_badge_current),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     maxLines = 1
@@ -674,7 +680,7 @@ fun UpdateSnackbarHost(snackbarHostState: SnackbarHostState, context: Context) {
                         .padding(bottom = 12.dp)
                 ) {
                     Text(
-                        text = "发现新版本",
+                        text = stringResource(R.string.update_available_title),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
@@ -704,7 +710,7 @@ fun UpdateSnackbarHost(snackbarHostState: SnackbarHostState, context: Context) {
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
-                            contentDescription = "关闭",
+                            contentDescription = stringResource(R.string.action_close),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -725,12 +731,12 @@ fun UpdateSnackbarHost(snackbarHostState: SnackbarHostState, context: Context) {
                         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onPrimary) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                                contentDescription = "更新",
+                                contentDescription = stringResource(R.string.action_update),
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "更新",
+                                text = stringResource(R.string.action_update),
                                 style = MaterialTheme.typography.labelMedium
                             )
                         }

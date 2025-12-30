@@ -74,11 +74,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.star.schedule.Constants
+import com.star.schedule.R
 import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
 import com.star.schedule.autoupdate.TimetableAutoUpdateJson
 import com.star.schedule.autoupdate.TimetableAutoUpdateTypes
@@ -160,7 +162,7 @@ fun TimetableSettings(dao: ScheduleDao) {
     ) {
         item {
             Text(
-                text = "课表管理",
+                text = stringResource(R.string.timetable_management_title),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -184,7 +186,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                         scope.launch {
                             dao.insertTimetableWithReminders(
                                 TimetableEntity(
-                                    name = "新建课表",
+                                    name = context.getString(R.string.timetable_new_name),
                                     showWeekend = true,
                                     startDate = LocalDate.now().toString()
                                 )
@@ -196,7 +198,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Add, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("新建")
+                        Text(stringResource(R.string.action_create))
                     }
                 }
 
@@ -218,7 +220,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.FileDownload, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("导入")
+                        Text(stringResource(R.string.action_import))
                     }
                 }
             }
@@ -233,12 +235,12 @@ fun TimetableSettings(dao: ScheduleDao) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "暂无课表",
+                            text = stringResource(R.string.timetable_empty_title),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "点击“新建”或使用导入功能，一键构建属于你的课程安排。",
+                            text = stringResource(R.string.timetable_empty_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -332,7 +334,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                                                 if (config == null) {
                                                     Toast.makeText(
                                                         context,
-                                                        "自动更新配置无效，请重新导入",
+                                                        context.getString(R.string.auto_update_config_invalid),
                                                         Toast.LENGTH_LONG
                                                     ).show()
                                                     return@IconButton
@@ -345,7 +347,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                                                             try {
                                                                 Toast.makeText(
                                                                     context,
-                                                                    "正在更新课程…",
+                                                                    context.getString(R.string.auto_update_in_progress),
                                                                     Toast.LENGTH_SHORT
                                                                 ).show()
 
@@ -368,7 +370,7 @@ fun TimetableSettings(dao: ScheduleDao) {
                                                                         WidgetRefreshManager.onCourseDataChanged(context)
                                                                         Toast.makeText(
                                                                             context,
-                                                                            "更新成功",
+                                                                            context.getString(R.string.auto_update_success),
                                                                             Toast.LENGTH_SHORT
                                                                         ).show()
                                                                     }
@@ -391,7 +393,10 @@ fun TimetableSettings(dao: ScheduleDao) {
                                             },
                                             enabled = !isRemoving && !isUpdating
                                         ) {
-                                            Icon(Icons.Rounded.Refresh, contentDescription = "更新课程")
+                                            Icon(
+                                                Icons.Rounded.Refresh,
+                                                contentDescription = stringResource(R.string.content_desc_refresh_courses)
+                                            )
                                         }
                                     }
 
@@ -420,7 +425,10 @@ fun TimetableSettings(dao: ScheduleDao) {
                                             dao.deleteTimetableWithReminders(timetable)
                                         }
                                     }, enabled = !isRemoving && !isUpdating) {
-                                        Icon(Icons.Rounded.Delete, contentDescription = "删除课表")
+                                        Icon(
+                                            Icons.Rounded.Delete,
+                                            contentDescription = stringResource(R.string.content_desc_delete_timetable)
+                                        )
                                     }
                                 }
                             }
@@ -622,6 +630,8 @@ fun EditLessonTimeSheet(
     var showEndTimePicker by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val startLabel = stringResource(R.string.label_start_time)
+    val endLabel = stringResource(R.string.label_end_time)
 
     OptimizedBottomSheet(
         onDismiss = onDismiss,
@@ -635,7 +645,7 @@ fun EditLessonTimeSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "编辑课程时间",
+                text = stringResource(R.string.title_edit_lesson_time),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -659,27 +669,38 @@ fun EditLessonTimeSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
+            val overlapMessages = remember(context) {
+                listOf(
+                    context.getString(R.string.error_time_overlap_lesson_time),
+                    context.getString(R.string.error_time_overlap_course)
+                )
+            }
+            val isOverlapError = overlapMessages.any { errorMessage == it }
+
             OutlinedTextField(
                 value = startTime,
                 onValueChange = {
                     startTime = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("开始时间") },
+                label = { Text(startLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 trailingIcon = {
                     IconButton(onClick = { showStartTimePicker = true }) {
-                        Icon(Icons.Rounded.AccessTime, contentDescription = "选择时间")
+                        Icon(
+                            Icons.Rounded.AccessTime,
+                            contentDescription = startLabel
+                        )
                     }
                 },
-                isError = errorMessage.contains("开始时间") || errorMessage.contains("重叠"),
-                supportingText = if (errorMessage.contains("开始时间")) {
-                    { Text("格式如：08:00") }
-                } else if (errorMessage.contains("重叠")) {
+                isError = errorMessage.contains(startLabel) || isOverlapError,
+                supportingText = if (errorMessage.contains(startLabel)) {
+                    { Text(stringResource(R.string.support_start_time_format)) }
+                } else if (isOverlapError) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("点击选择课程开始时间") }
+                    { Text(stringResource(R.string.support_start_time_hint)) }
                 }
             )
 
@@ -691,21 +712,24 @@ fun EditLessonTimeSheet(
                     endTime = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("结束时间") },
+                label = { Text(endLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 trailingIcon = {
                     IconButton(onClick = { showEndTimePicker = true }) {
-                        Icon(Icons.Rounded.AccessTime, contentDescription = "选择时间")
+                        Icon(
+                            Icons.Rounded.AccessTime,
+                            contentDescription = endLabel
+                        )
                     }
                 },
-                isError = errorMessage.contains("结束时间") || errorMessage.contains("重叠"),
-                supportingText = if (errorMessage.contains("结束时间")) {
-                    { Text("格式如：08:45，且必须晚于开始时间") }
-                } else if (errorMessage.contains("重叠")) {
+                isError = errorMessage.contains(endLabel) || isOverlapError,
+                supportingText = if (errorMessage.contains(endLabel)) {
+                    { Text(stringResource(R.string.support_end_time_format)) }
+                } else if (isOverlapError) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("点击选择课程结束时间") }
+                    { Text(stringResource(R.string.support_end_time_hint)) }
                 }
             )
 
@@ -715,13 +739,14 @@ fun EditLessonTimeSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     // 数据验证
                     val validationResult = ValidationUtils.LessonTimeValidation.validateTimeFormat(
                         startTime,
-                        "开始时间"
+                        startLabel,
+                        context.resources
                     )
                     if (!validationResult.isValid) {
                         errorMessage = validationResult.errorMessage
@@ -729,14 +754,22 @@ fun EditLessonTimeSheet(
                     }
 
                     val validationResult2 =
-                        ValidationUtils.LessonTimeValidation.validateTimeFormat(endTime, "结束时间")
+                        ValidationUtils.LessonTimeValidation.validateTimeFormat(
+                            endTime,
+                            endLabel,
+                            context.resources
+                        )
                     if (!validationResult2.isValid) {
                         errorMessage = validationResult2.errorMessage
                         return@Button
                     }
 
                     val timeRangeResult =
-                        ValidationUtils.LessonTimeValidation.validateTimeRange(startTime, endTime)
+                        ValidationUtils.LessonTimeValidation.validateTimeRange(
+                            startTime,
+                            endTime,
+                            context.resources
+                        )
                     if (!timeRangeResult.isValid) {
                         errorMessage = timeRangeResult.errorMessage
                         return@Button
@@ -751,7 +784,7 @@ fun EditLessonTimeSheet(
                     }
 
                     if (hasOverlap) {
-                        errorMessage = "时间重叠：与现有课程时间冲突"
+                        errorMessage = context.getString(R.string.error_time_overlap_lesson_time)
                         return@Button
                     }
 
@@ -771,10 +804,13 @@ fun EditLessonTimeSheet(
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("EditLessonTimeSheet", "更新课程时间失败", e)
-                            errorMessage = "保存失败: ${e.message}"
+                            errorMessage = context.getString(
+                                R.string.error_save_failed_with_reason,
+                                e.message.orEmpty()
+                            )
                         }
                     }
-                }) { Text("保存") }
+                }) { Text(stringResource(R.string.action_save)) }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -819,6 +855,14 @@ fun EditCourseSheet(
     sheetState: androidx.compose.material3.SheetState
 ) {
     val context = LocalContext.current
+    val startLabel = stringResource(R.string.label_start_time)
+    val endLabel = stringResource(R.string.label_end_time)
+    val courseNameLabel = stringResource(R.string.label_course_name)
+    val teacherLabel = stringResource(R.string.label_teacher_optional)
+    val locationLabel = stringResource(R.string.label_location_input)
+    val dayOfWeekLabel = stringResource(R.string.label_day_of_week)
+    val periodsLabel = stringResource(R.string.label_periods)
+    val weeksLabel = stringResource(R.string.label_weeks)
 
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(course.timetableId).collectAsState(initial = emptyList())
@@ -851,7 +895,7 @@ fun EditCourseSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "编辑课程",
+                text = stringResource(R.string.title_edit_course),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -875,17 +919,76 @@ fun EditCourseSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
+            val courseNameErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_course_name_required),
+                    context.getString(R.string.error_course_name_too_long)
+                )
+            }
+            val locationErrors = remember(context) {
+                listOf(context.getString(R.string.error_location_too_long))
+            }
+            val dayOfWeekErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_day_of_week_not_number),
+                    context.getString(R.string.error_day_of_week_range)
+                )
+            }
+            val periodErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_periods_empty),
+                    context.getString(R.string.error_periods_at_least_one),
+                    context.getString(R.string.error_period_range_format),
+                    context.getString(R.string.error_period_range_start_number),
+                    context.getString(R.string.error_period_range_end_number),
+                    context.getString(R.string.error_period_range_start_after_end),
+                    context.getString(R.string.error_period_range),
+                    context.getString(R.string.error_periods_number_format),
+                    context.getString(R.string.error_periods_range),
+                    context.getString(R.string.error_periods_duplicate),
+                    context.getString(R.string.error_periods_format)
+                )
+            }
+            val weekErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_weeks_empty),
+                    context.getString(R.string.error_weeks_at_least_one),
+                    context.getString(R.string.error_week_range_format),
+                    context.getString(R.string.error_week_range_start_number),
+                    context.getString(R.string.error_week_range_end_number),
+                    context.getString(R.string.error_week_range_start_after_end),
+                    context.getString(R.string.error_week_range),
+                    context.getString(R.string.error_weeks_number_format),
+                    context.getString(R.string.error_weeks_range),
+                    context.getString(R.string.error_weeks_duplicate),
+                    context.getString(R.string.error_weeks_format)
+                )
+            }
+            val overlapErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_time_overlap_course),
+                    context.getString(R.string.error_time_overlap_lesson_time)
+                )
+            }
+
+            val isCourseNameError = courseNameErrors.any { errorMessage == it }
+            val isLocationError = locationErrors.any { errorMessage == it }
+            val isDayError = dayOfWeekErrors.any { errorMessage == it }
+            val isPeriodError = periodErrors.any { errorMessage == it }
+            val isWeekError = weekErrors.any { errorMessage == it }
+            val isOverlapError = overlapErrors.any { errorMessage == it }
+
             OutlinedTextField(
                 value = name,
                 onValueChange = {
                     name = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("课程名称") },
+                label = { Text(courseNameLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("课程名称"),
-                supportingText = if (errorMessage.contains("课程名称")) {
-                    { Text("课程名称不能为空，且不超过50个字符") }
+                isError = isCourseNameError,
+                supportingText = if (isCourseNameError) {
+                    { Text(stringResource(R.string.support_course_name_required)) }
                 } else null
             )
 
@@ -897,9 +1000,9 @@ fun EditCourseSheet(
                     teacher = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("教师名称（可选）") },
+                label = { Text(teacherLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                supportingText = { Text("教师名称，不超过50个字符") }
+                supportingText = { Text(stringResource(R.string.support_teacher_hint)) }
             )
 
             Spacer(Modifier.height(8.dp))
@@ -910,11 +1013,11 @@ fun EditCourseSheet(
                     location = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("地点") },
+                label = { Text(locationLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("上课地点"),
-                supportingText = if (errorMessage.contains("上课地点")) {
-                    { Text("上课地点不能超过100个字符") }
+                isError = isLocationError,
+                supportingText = if (isLocationError) {
+                    { Text(stringResource(R.string.support_location_length)) }
                 } else null
             )
 
@@ -926,11 +1029,11 @@ fun EditCourseSheet(
                     dayOfWeek = it.filter { c -> c.isDigit() }
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("星期 (1-7)") },
+                label = { Text(dayOfWeekLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("星期"),
-                supportingText = if (errorMessage.contains("星期")) {
-                    { Text("1=周一，2=周二，...，7=周日") }
+                isError = isDayError,
+                supportingText = if (isDayError) {
+                    { Text(stringResource(R.string.support_day_of_week)) }
                 } else null
             )
 
@@ -942,15 +1045,15 @@ fun EditCourseSheet(
                     periods = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("节次 (如 1,2,3 或 1-7 或 1-5,7)") },
+                label = { Text(periodsLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("节次") || errorMessage.contains("重叠"),
-                supportingText = if (errorMessage.contains("节次")) {
-                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7") }
-                } else if (errorMessage.contains("重叠")) {
+                isError = isPeriodError || isOverlapError,
+                supportingText = if (isPeriodError) {
+                    { Text(stringResource(R.string.support_periods)) }
+                } else if (isOverlapError) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
+                    { Text(stringResource(R.string.support_periods_overlap)) }
                 }
             )
 
@@ -962,13 +1065,13 @@ fun EditCourseSheet(
                     weeks = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("周次 (如 1,2,3 或 1-7 或 1-5,7)") },
+                label = { Text(weeksLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("周次"),
-                supportingText = if (errorMessage.contains("周次")) {
-                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7，表示第几周上课") }
+                isError = isWeekError,
+                supportingText = if (isWeekError) {
+                    { Text(stringResource(R.string.support_weeks)) }
                 } else {
-                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
+                    { Text(stringResource(R.string.support_weeks_hint)) }
                 }
             )
 
@@ -978,7 +1081,7 @@ fun EditCourseSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     // 数据验证
@@ -987,7 +1090,8 @@ fun EditCourseSheet(
                         location = location,
                         dayOfWeek = dayOfWeek,
                         periods = periods,
-                        weeks = weeks
+                        weeks = weeks,
+                        resources = context.resources
                     )
 
                     if (!validationResult.isValid) {
@@ -1016,7 +1120,7 @@ fun EditCourseSheet(
                     }
 
                     if (hasTimeOverlap) {
-                        errorMessage = "时间重叠：与现有课程在同一时间"
+                        errorMessage = context.getString(R.string.error_time_overlap_course)
                         return@Button
                     }
 
@@ -1039,11 +1143,14 @@ fun EditCourseSheet(
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("EditCourseSheet", "更新课程失败", e)
-                            errorMessage = "保存失败: ${e.message}"
+                            errorMessage = context.getString(
+                                R.string.error_save_failed_with_reason,
+                                e.message.orEmpty()
+                            )
                         }
                     }
                 }) {
-                    Text("保存")
+                    Text(stringResource(R.string.action_save))
                 }
             }
 
@@ -1062,6 +1169,8 @@ fun AddLessonTimeSheet(
     sheetState: androidx.compose.material3.SheetState
 ) {
     val context = LocalContext.current
+    val startLabel = stringResource(R.string.label_start_time)
+    val endLabel = stringResource(R.string.label_end_time)
 
     // 获取当前课表的所有课程时间，用于重叠检测
     val lessonTimes by dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
@@ -1087,7 +1196,7 @@ fun AddLessonTimeSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "新增课程时间",
+                text = stringResource(R.string.title_add_lesson_time),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -1111,27 +1220,38 @@ fun AddLessonTimeSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
+            val overlapMessages = remember(context) {
+                listOf(
+                    context.getString(R.string.error_time_overlap_lesson_time),
+                    context.getString(R.string.error_time_overlap_course)
+                )
+            }
+            val isOverlapError = overlapMessages.any { errorMessage == it }
+
             OutlinedTextField(
                 value = startTime,
                 onValueChange = {
                     startTime = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("开始时间") },
+                label = { Text(startLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 trailingIcon = {
                     IconButton(onClick = { showStartTimePicker = true }) {
-                        Icon(Icons.Rounded.AccessTime, contentDescription = "选择时间")
+                        Icon(
+                            Icons.Rounded.AccessTime,
+                            contentDescription = startLabel
+                        )
                     }
                 },
-                isError = errorMessage.contains("开始时间") || errorMessage.contains("重叠"),
-                supportingText = if (errorMessage.contains("开始时间")) {
-                    { Text("格式如：08:00") }
-                } else if (errorMessage.contains("重叠")) {
+                isError = errorMessage.contains(startLabel) || isOverlapError,
+                supportingText = if (errorMessage.contains(startLabel)) {
+                    { Text(stringResource(R.string.support_start_time_format)) }
+                } else if (isOverlapError) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("点击选择课程开始时间") }
+                    { Text(stringResource(R.string.support_start_time_hint)) }
                 }
             )
 
@@ -1143,21 +1263,24 @@ fun AddLessonTimeSheet(
                     endTime = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("结束时间") },
+                label = { Text(endLabel) },
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
                 trailingIcon = {
                     IconButton(onClick = { showEndTimePicker = true }) {
-                        Icon(Icons.Rounded.AccessTime, contentDescription = "选择时间")
+                        Icon(
+                            Icons.Rounded.AccessTime,
+                            contentDescription = endLabel
+                        )
                     }
                 },
-                isError = errorMessage.contains("结束时间") || errorMessage.contains("重叠"),
-                supportingText = if (errorMessage.contains("结束时间")) {
-                    { Text("格式如：08:45，且必须晚于开始时间") }
-                } else if (errorMessage.contains("重叠")) {
+                isError = errorMessage.contains(endLabel) || isOverlapError,
+                supportingText = if (errorMessage.contains(endLabel)) {
+                    { Text(stringResource(R.string.support_end_time_format)) }
+                } else if (isOverlapError) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("点击选择课程结束时间") }
+                    { Text(stringResource(R.string.support_end_time_hint)) }
                 }
             )
 
@@ -1167,13 +1290,14 @@ fun AddLessonTimeSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     // 数据验证
                     val validationResult = ValidationUtils.LessonTimeValidation.validateTimeFormat(
                         startTime,
-                        "开始时间"
+                        startLabel,
+                        context.resources
                     )
                     if (!validationResult.isValid) {
                         errorMessage = validationResult.errorMessage
@@ -1181,14 +1305,22 @@ fun AddLessonTimeSheet(
                     }
 
                     val validationResult2 =
-                        ValidationUtils.LessonTimeValidation.validateTimeFormat(endTime, "结束时间")
+                        ValidationUtils.LessonTimeValidation.validateTimeFormat(
+                            endTime,
+                            endLabel,
+                            context.resources
+                        )
                     if (!validationResult2.isValid) {
                         errorMessage = validationResult2.errorMessage
                         return@Button
                     }
 
                     val timeRangeResult =
-                        ValidationUtils.LessonTimeValidation.validateTimeRange(startTime, endTime)
+                        ValidationUtils.LessonTimeValidation.validateTimeRange(
+                            startTime,
+                            endTime,
+                            context.resources
+                        )
                     if (!timeRangeResult.isValid) {
                         errorMessage = timeRangeResult.errorMessage
                         return@Button
@@ -1203,7 +1335,7 @@ fun AddLessonTimeSheet(
                     }
 
                     if (hasOverlap) {
-                        errorMessage = "时间重叠：与现有课程时间冲突"
+                        errorMessage = context.getString(R.string.error_time_overlap_lesson_time)
                         return@Button
                     }
 
@@ -1224,11 +1356,14 @@ fun AddLessonTimeSheet(
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("AddLessonTimeSheet", "新增课程时间失败", e)
-                            errorMessage = "保存失败: ${e.message}"
+                            errorMessage = context.getString(
+                                R.string.error_save_failed_with_reason,
+                                e.message.orEmpty()
+                            )
                         }
                     }
                 }) {
-                    Text("保存")
+                    Text(stringResource(R.string.action_save))
                 }
             }
 
@@ -1274,6 +1409,12 @@ fun AddCourseSheet(
     sheetState: androidx.compose.material3.SheetState
 ) {
     val context = LocalContext.current
+    val courseNameLabel = stringResource(R.string.label_course_name)
+    val teacherLabel = stringResource(R.string.label_teacher_optional)
+    val locationLabel = stringResource(R.string.label_location_input)
+    val dayOfWeekLabel = stringResource(R.string.label_day_of_week)
+    val periodsLabel = stringResource(R.string.label_periods)
+    val weeksLabel = stringResource(R.string.label_weeks)
 
     // 获取当前课表的课程和课程时间，用于重叠检测
     val courses by dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
@@ -1299,7 +1440,7 @@ fun AddCourseSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "新增课程",
+                text = stringResource(R.string.title_add_course),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -1323,17 +1464,76 @@ fun AddCourseSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
+            val courseNameErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_course_name_required),
+                    context.getString(R.string.error_course_name_too_long)
+                )
+            }
+            val locationErrors = remember(context) {
+                listOf(context.getString(R.string.error_location_too_long))
+            }
+            val dayOfWeekErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_day_of_week_not_number),
+                    context.getString(R.string.error_day_of_week_range)
+                )
+            }
+            val periodErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_periods_empty),
+                    context.getString(R.string.error_periods_at_least_one),
+                    context.getString(R.string.error_period_range_format),
+                    context.getString(R.string.error_period_range_start_number),
+                    context.getString(R.string.error_period_range_end_number),
+                    context.getString(R.string.error_period_range_start_after_end),
+                    context.getString(R.string.error_period_range),
+                    context.getString(R.string.error_periods_number_format),
+                    context.getString(R.string.error_periods_range),
+                    context.getString(R.string.error_periods_duplicate),
+                    context.getString(R.string.error_periods_format)
+                )
+            }
+            val weekErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_weeks_empty),
+                    context.getString(R.string.error_weeks_at_least_one),
+                    context.getString(R.string.error_week_range_format),
+                    context.getString(R.string.error_week_range_start_number),
+                    context.getString(R.string.error_week_range_end_number),
+                    context.getString(R.string.error_week_range_start_after_end),
+                    context.getString(R.string.error_week_range),
+                    context.getString(R.string.error_weeks_number_format),
+                    context.getString(R.string.error_weeks_range),
+                    context.getString(R.string.error_weeks_duplicate),
+                    context.getString(R.string.error_weeks_format)
+                )
+            }
+            val overlapErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_time_overlap_course),
+                    context.getString(R.string.error_time_overlap_lesson_time)
+                )
+            }
+
+            val isCourseNameError = courseNameErrors.any { errorMessage == it }
+            val isLocationError = locationErrors.any { errorMessage == it }
+            val isDayError = dayOfWeekErrors.any { errorMessage == it }
+            val isPeriodError = periodErrors.any { errorMessage == it }
+            val isWeekError = weekErrors.any { errorMessage == it }
+            val isOverlapError = overlapErrors.any { errorMessage == it }
+
             OutlinedTextField(
                 value = name,
                 onValueChange = {
                     name = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("课程名称") },
+                label = { Text(courseNameLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("课程名称"),
-                supportingText = if (errorMessage.contains("课程名称")) {
-                    { Text("课程名称不能为空，且不超过50个字符") }
+                isError = isCourseNameError,
+                supportingText = if (isCourseNameError) {
+                    { Text(stringResource(R.string.support_course_name_required)) }
                 } else null
             )
 
@@ -1345,9 +1545,9 @@ fun AddCourseSheet(
                     teacher = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("教师名称（可选）") },
+                label = { Text(teacherLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                supportingText = { Text("教师名称，不超过50个字符") }
+                supportingText = { Text(stringResource(R.string.support_teacher_hint)) }
             )
 
             Spacer(Modifier.height(8.dp))
@@ -1358,11 +1558,11 @@ fun AddCourseSheet(
                     location = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("地点") },
+                label = { Text(locationLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("上课地点"),
-                supportingText = if (errorMessage.contains("上课地点")) {
-                    { Text("上课地点不能超过100个字符") }
+                isError = isLocationError,
+                supportingText = if (isLocationError) {
+                    { Text(stringResource(R.string.support_location_length)) }
                 } else null
             )
 
@@ -1374,11 +1574,11 @@ fun AddCourseSheet(
                     dayOfWeek = it.filter { c -> c.isDigit() }
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("星期 (1-7)") },
+                label = { Text(dayOfWeekLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("星期"),
-                supportingText = if (errorMessage.contains("星期")) {
-                    { Text("1=周一，2=周二，...，7=周日") }
+                isError = isDayError,
+                supportingText = if (isDayError) {
+                    { Text(stringResource(R.string.support_day_of_week)) }
                 } else null
             )
 
@@ -1390,15 +1590,15 @@ fun AddCourseSheet(
                     periods = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("节次 (如 1,2,3 或 1-7 或 1-5,7)") },
+                label = { Text(periodsLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("节次") || errorMessage.contains("重叠"),
-                supportingText = if (errorMessage.contains("节次")) {
-                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7") }
-                } else if (errorMessage.contains("重叠")) {
+                isError = isPeriodError || isOverlapError,
+                supportingText = if (isPeriodError) {
+                    { Text(stringResource(R.string.support_periods)) }
+                } else if (isOverlapError) {
                     { Text(errorMessage) }
                 } else {
-                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
+                    { Text(stringResource(R.string.support_periods_overlap)) }
                 }
             )
 
@@ -1410,13 +1610,13 @@ fun AddCourseSheet(
                     weeks = it
                     errorMessage = "" // 清除错误信息
                 },
-                label = { Text("周次 (如 1,2,3 或 1-7 或 1-5,7)") },
+                label = { Text(weeksLabel) },
                 modifier = Modifier.fillMaxWidth(),
-                isError = errorMessage.contains("周次"),
-                supportingText = if (errorMessage.contains("周次")) {
-                    { Text("用逗号分隔，如：1,2,3 或范围格式：1-7，表示第几周上课") }
+                isError = isWeekError,
+                supportingText = if (isWeekError) {
+                    { Text(stringResource(R.string.support_weeks)) }
                 } else {
-                    { Text("支持单个数字、逗号分隔或范围格式，如：1,2,3 或 1-7 或 1-5,7") }
+                    { Text(stringResource(R.string.support_weeks_hint)) }
                 }
             )
 
@@ -1426,7 +1626,7 @@ fun AddCourseSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     // 数据验证
@@ -1435,7 +1635,8 @@ fun AddCourseSheet(
                         location = location,
                         dayOfWeek = dayOfWeek,
                         periods = periods,
-                        weeks = weeks
+                        weeks = weeks,
+                        resources = context.resources
                     )
 
                     if (!validationResult.isValid) {
@@ -1464,7 +1665,7 @@ fun AddCourseSheet(
                     }
 
                     if (hasTimeOverlap) {
-                        errorMessage = "时间重叠：与现有课程在同一时间"
+                        errorMessage = context.getString(R.string.error_time_overlap_course)
                         return@Button
                     }
 
@@ -1488,11 +1689,14 @@ fun AddCourseSheet(
                             onDismiss()
                         } catch (e: Exception) {
                             Log.e("AddCourseSheet", "新增课程失败", e)
-                            errorMessage = "保存失败: ${e.message}"
+                            errorMessage = context.getString(
+                                R.string.error_save_failed_with_reason,
+                                e.message.orEmpty()
+                            )
                         }
                     }
                 }) {
-                    Text("保存")
+                    Text(stringResource(R.string.action_save))
                 }
             }
 
@@ -1617,9 +1821,17 @@ fun TimetableDetailSheet(
                     outputStream.write(jsonText.toByteArray(Charsets.UTF_8))
                 } ?: error("无法写入文件")
 
-                Toast.makeText(context, "模板已导出", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.toast_template_exported),
+                    Toast.LENGTH_SHORT
+                ).show()
             } catch (e: Exception) {
-                Toast.makeText(context, "导出失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.toast_template_export_failed, e.message.orEmpty()),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -1657,14 +1869,22 @@ fun TimetableDetailSheet(
                 }
 
                 if (normalized.isEmpty()) {
-                    Toast.makeText(context, "未解析到模板", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.toast_template_parse_none),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     return@launch
                 }
 
                 pendingImportTemplates = normalized
                 showImportTemplateConflictDialog = true
             } catch (e: Exception) {
-                Toast.makeText(context, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.toast_template_import_failed_reason, e.message.orEmpty()),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -1685,9 +1905,16 @@ fun TimetableDetailSheet(
                         var index = 1
                         while (true) {
                             val candidate = if (index == 1) {
-                                "$baseName (导入)"
+                                context.getString(
+                                    R.string.template_import_rename_format,
+                                    baseName
+                                )
                             } else {
-                                "$baseName (导入 $index)"
+                                context.getString(
+                                    R.string.template_import_rename_format_indexed,
+                                    baseName,
+                                    index
+                                )
                             }
                             if (dao.getLessonTimeTemplateByNameOnce(candidate) == null) return candidate
                             index++
@@ -1773,16 +2000,38 @@ fun TimetableDetailSheet(
 
                 val suffix = when (strategy) {
                     LessonTimeTemplateImportConflictStrategy.OVERWRITE ->
-                        if (overwritten > 0) "（覆盖 $overwritten 个）" else ""
+                        if (overwritten > 0) context.getString(
+                            R.string.template_import_suffix_overwrite,
+                            overwritten
+                        ) else ""
 
                     LessonTimeTemplateImportConflictStrategy.RENAME -> ""
                     LessonTimeTemplateImportConflictStrategy.SKIP ->
-                        if (skipped > 0) "（跳过 $skipped 个）" else ""
+                        if (skipped > 0) context.getString(
+                            R.string.template_import_suffix_skip,
+                            skipped
+                        ) else ""
                 }
 
-                Toast.makeText(context, "已导入 $imported 个模板$suffix", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        R.string.toast_template_imported,
+                        imported,
+                        suffix,
+                        ""
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
             } catch (e: Exception) {
-                Toast.makeText(context, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        R.string.toast_template_import_failed_reason,
+                        e.message.orEmpty()
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -1816,6 +2065,22 @@ fun TimetableDetailSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
+            val timetableNameErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_timetable_name_required),
+                    context.getString(R.string.error_timetable_name_too_long)
+                )
+            }
+            val startDateErrors = remember(context) {
+                listOf(
+                    context.getString(R.string.error_semester_start_date_required),
+                    context.getString(R.string.error_semester_start_year_range),
+                    context.getString(R.string.error_date_format_detail)
+                )
+            }
+            val isTimetableNameError = timetableNameErrors.any { errorMessage == it }
+            val isStartDateError = startDateErrors.any { errorMessage == it }
+
             // 课表信息编辑
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -1831,11 +2096,11 @@ fun TimetableDetailSheet(
                             name = it
                             errorMessage = "" // 清除错误信息
                         },
-                        label = { Text("课表名称") },
+                        label = { Text(stringResource(R.string.label_timetable_name)) },
                         modifier = Modifier.fillMaxWidth(),
-                        isError = errorMessage.contains("课程表名称"),
-                        supportingText = if (errorMessage.contains("课程表名称")) {
-                            { Text("课程表名称不能为空，且不超过100个字符") }
+                        isError = isTimetableNameError,
+                        supportingText = if (isTimetableNameError) {
+                            { Text(stringResource(R.string.support_timetable_name_required)) }
                         } else null
                     )
 
@@ -1845,20 +2110,20 @@ fun TimetableDetailSheet(
                             startDate = it
                             errorMessage = "" // 清除错误信息
                         },
-                        label = { Text("开学日期") },
+                        label = { Text(stringResource(R.string.label_start_date)) },
                         modifier = Modifier.fillMaxWidth(),
                         readOnly = true,
                         trailingIcon = {
                             IconButton(onClick = { showDatePicker = true }) {
-                                Icon(Icons.Rounded.CalendarMonth, contentDescription = "选择日期")
+                                Icon(
+                                    Icons.Rounded.CalendarMonth,
+                                    contentDescription = stringResource(R.string.content_desc_select_date)
+                                )
                             }
                         },
-                        isError = errorMessage.contains("日期") || errorMessage.contains("学期"),
-                        supportingText = if (errorMessage.contains("日期") || errorMessage.contains(
-                                "学期"
-                            )
-                        ) {
-                            { Text("请使用有效的日期格式") }
+                        isError = isStartDateError,
+                        supportingText = if (isStartDateError) {
+                            { Text(stringResource(R.string.support_invalid_date)) }
                         } else null
                     )
 
@@ -1867,7 +2132,7 @@ fun TimetableDetailSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("显示周末")
+                        Text(stringResource(R.string.toggle_show_weekend))
                         Switch(
                             checked = showWeekend,
                             onCheckedChange = { showWeekend = it }
@@ -1879,7 +2144,7 @@ fun TimetableDetailSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("显示非本周课程")
+                        Text(stringResource(R.string.toggle_show_other_weeks))
                         Switch(
                             checked = showFuture,
                             onCheckedChange = { showFuture = it }
@@ -1895,9 +2160,12 @@ fun TimetableDetailSheet(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("课时行高度")
+                            Text(stringResource(R.string.label_row_height))
                             Text(
-                                text = "${rowHeight.toInt()} dp",
+                                text = stringResource(
+                                    R.string.row_height_value,
+                                    rowHeight.toInt()
+                                ),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -1916,11 +2184,11 @@ fun TimetableDetailSheet(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "40 dp",
+                                text = stringResource(R.string.row_height_min),
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                text = "240 dp",
+                                text = stringResource(R.string.row_height_max),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -1935,9 +2203,12 @@ fun TimetableDetailSheet(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("课前提醒时间")
+                            Text(stringResource(R.string.label_reminder_lead_time))
                             Text(
-                                text = "${reminderTime.toInt()} 分钟",
+                                text = stringResource(
+                                    R.string.reminder_minutes_value,
+                                    reminderTime.toInt()
+                                ),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -1956,11 +2227,11 @@ fun TimetableDetailSheet(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "5 分钟",
+                                text = stringResource(R.string.option_minutes_5),
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                text = "60 分钟",
+                                text = stringResource(R.string.option_minutes_60),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -1972,7 +2243,8 @@ fun TimetableDetailSheet(
                             val validationResult =
                                 ValidationUtils.TimetableValidation.validateTimetableData(
                                     name = name,
-                                    startDate = startDate
+                                    startDate = startDate,
+                                    resources = context.resources
                                 )
 
                             if (!validationResult.isValid) {
@@ -1999,7 +2271,7 @@ fun TimetableDetailSheet(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("保存修改")
+                        Text(stringResource(R.string.action_save_changes))
                     }
                 }
             }
@@ -2020,20 +2292,26 @@ fun TimetableDetailSheet(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("课程时间管理", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.title_course_time_management),
+                            style = MaterialTheme.typography.titleSmall
+                        )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { showLessonTimeTemplateDialog = true }) {
-                                Text("模板")
+                                Text(stringResource(R.string.label_template))
                             }
                             IconButton(onClick = { showAddLessonSheet = true }) {
-                                Icon(Icons.Rounded.Add, contentDescription = "新增课程时间")
+                                Icon(
+                                    Icons.Rounded.Add,
+                                    contentDescription = stringResource(R.string.content_desc_add_lesson_time)
+                                )
                             }
                         }
                     }
 
                     if (sortedLessonTimes.isEmpty()) {
                         Text(
-                            text = "暂无课程时间",
+                            text = stringResource(R.string.label_no_lesson_time),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(8.dp)
                         )
@@ -2047,7 +2325,12 @@ fun TimetableDetailSheet(
                                     .padding(vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = "第${lesson.period}节 ${lesson.startTime}-${lesson.endTime}",
+                                    text = stringResource(
+                                        R.string.lesson_time_item,
+                                        lesson.period,
+                                        lesson.startTime,
+                                        lesson.endTime
+                                    ),
                                     modifier = Modifier.weight(1f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -2059,7 +2342,7 @@ fun TimetableDetailSheet(
                                     IconButton(onClick = { showEditLessonSheet = lesson }) {
                                         Icon(
                                             Icons.Rounded.Edit,
-                                            contentDescription = "编辑课程时间"
+                                            contentDescription = stringResource(R.string.content_desc_edit_lesson_time)
                                         )
                                     }
                                     IconButton(onClick = {
@@ -2073,7 +2356,7 @@ fun TimetableDetailSheet(
                                     }) {
                                         Icon(
                                             Icons.Rounded.Delete,
-                                            contentDescription = "删除课程时间"
+                                            contentDescription = stringResource(R.string.content_desc_delete_lesson_time)
                                         )
                                     }
                                 }
@@ -2099,20 +2382,36 @@ fun TimetableDetailSheet(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("课程管理", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.title_courses_management),
+                            style = MaterialTheme.typography.titleSmall
+                        )
                         IconButton(onClick = { showAddCourseSheet = true }) {
-                            Icon(Icons.Rounded.Add, contentDescription = "新增课程")
+                            Icon(
+                                Icons.Rounded.Add,
+                                contentDescription = stringResource(R.string.content_desc_add_course)
+                            )
                         }
                     }
 
                     if (courses.isEmpty()) {
                         Text(
-                            text = "暂无课程",
+                            text = stringResource(R.string.label_no_course),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(8.dp)
                         )
                     } else {
                         courses.forEach { course ->
+                            val teacherSuffix =
+                                if (course.teacher.isNotEmpty()) stringResource(
+                                    R.string.course_teacher_suffix,
+                                    course.teacher
+                                ) else ""
+                            val periodText =
+                                ValidationUtils.CourseValidation.formatNumberList(course.periods)
+                            val timeBrief =
+                                stringResource(R.string.course_time_brief, course.dayOfWeek, periodText)
+                            val titleText = "${course.name}$teacherSuffix ($timeBrief)"
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
@@ -2121,9 +2420,7 @@ fun TimetableDetailSheet(
                                     .padding(vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = "${course.name}${if (course.teacher.isNotEmpty()) " (${course.teacher})" else ""} (周${course.dayOfWeek} 节次:${
-                                        ValidationUtils.CourseValidation.formatNumberList(course.periods)
-                                    })",
+                                    text = titleText,
                                     modifier = Modifier.weight(1f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -2133,7 +2430,10 @@ fun TimetableDetailSheet(
                                     modifier = Modifier.width(IntrinsicSize.Min)
                                 ) {
                                     IconButton(onClick = { showEditCourseSheet = course }) {
-                                        Icon(Icons.Rounded.Edit, contentDescription = "编辑课程")
+                                        Icon(
+                                            Icons.Rounded.Edit,
+                                            contentDescription = stringResource(R.string.content_desc_edit_course)
+                                        )
                                     }
                                     IconButton(onClick = {
                                         scope.launch {
@@ -2144,7 +2444,10 @@ fun TimetableDetailSheet(
                                             WidgetRefreshManager.onCourseDataChanged(context)
                                         }
                                     }) {
-                                        Icon(Icons.Rounded.Delete, contentDescription = "删除课程")
+                                        Icon(
+                                            Icons.Rounded.Delete,
+                                            contentDescription = stringResource(R.string.content_desc_delete_course)
+                                        )
                                     }
                                 }
                             }
@@ -2181,7 +2484,7 @@ fun TimetableDetailSheet(
                         showDatePicker = false
                     }
                 ) {
-                    Text("确定")
+                    Text(stringResource(R.string.action_confirm))
                 }
             },
             dismissButton = {
@@ -2190,7 +2493,7 @@ fun TimetableDetailSheet(
                         showDatePicker = false
                     }
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         ) {
@@ -2202,7 +2505,7 @@ fun TimetableDetailSheet(
     if (showLessonTimeTemplateDialog) {
         AlertDialog(
             onDismissRequest = { showLessonTimeTemplateDialog = false },
-            title = { Text("课程时间模板") },
+            title = { Text(stringResource(R.string.title_course_time_templates)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
@@ -2213,7 +2516,11 @@ fun TimetableDetailSheet(
                         TextButton(
                             onClick = {
                                 if (sortedLessonTimes.isEmpty()) {
-                                    Toast.makeText(context, "当前课表暂无课程时间，无法保存模板", Toast.LENGTH_SHORT)
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.toast_no_lessons_to_save_template),
+                                        Toast.LENGTH_SHORT
+                                    )
                                         .show()
                                     return@TextButton
                                 }
@@ -2223,7 +2530,7 @@ fun TimetableDetailSheet(
                                 showSaveLessonTimeTemplateDialog = true
                             }
                         ) {
-                            Text("保存当前为模板")
+                            Text(stringResource(R.string.action_save_current_as_template))
                         }
                         TextButton(
                             onClick = {
@@ -2231,12 +2538,16 @@ fun TimetableDetailSheet(
                                 importTemplateLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                             }
                         ) {
-                            Text("导入")
+                            Text(stringResource(R.string.action_import_template))
                         }
                         TextButton(
                             onClick = {
                                 if (lessonTimeTemplates.isEmpty()) {
-                                    Toast.makeText(context, "暂无模板可导出", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.toast_no_template_to_export),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                     return@TextButton
                                 }
                                 exportAllTemplates = true
@@ -2244,13 +2555,13 @@ fun TimetableDetailSheet(
                                 exportTemplateLauncher.launch("lesson_time_templates.json")
                             }
                         ) {
-                            Text("导出全部")
+                            Text(stringResource(R.string.action_export_all))
                         }
                     }
 
                     if (lessonTimeTemplates.isEmpty()) {
                         Text(
-                            text = "暂无模板",
+                            text = stringResource(R.string.label_no_template),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -2282,7 +2593,7 @@ fun TimetableDetailSheet(
                                         ) {
                                             Icon(
                                                 Icons.Rounded.FileDownload,
-                                                contentDescription = "应用模板"
+                                                contentDescription = stringResource(R.string.content_desc_apply_template)
                                             )
                                         }
                                         IconButton(
@@ -2295,7 +2606,7 @@ fun TimetableDetailSheet(
                                         ) {
                                             Icon(
                                                 Icons.Rounded.Polyline,
-                                                contentDescription = "导出模板"
+                                                contentDescription = stringResource(R.string.content_desc_export_template)
                                             )
                                         }
                                         IconButton(
@@ -2306,7 +2617,7 @@ fun TimetableDetailSheet(
                                         ) {
                                             Icon(
                                                 Icons.Rounded.Delete,
-                                                contentDescription = "删除模板"
+                                                contentDescription = stringResource(R.string.content_desc_delete_template)
                                             )
                                         }
                                     }
@@ -2318,7 +2629,7 @@ fun TimetableDetailSheet(
             },
             confirmButton = {
                 TextButton(onClick = { showLessonTimeTemplateDialog = false }) {
-                    Text("关闭")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         )
@@ -2330,20 +2641,25 @@ fun TimetableDetailSheet(
                 showImportTemplateConflictDialog = false
                 pendingImportTemplates = emptyList()
             },
-            title = { Text("导入模板") },
+            title = { Text(stringResource(R.string.title_import_template)) },
             text = {
-                Text("共解析到 ${pendingImportTemplates.size} 个模板，若存在同名模板，如何处理？")
+                Text(
+                    stringResource(
+                        R.string.import_template_parsed_count,
+                        pendingImportTemplates.size
+                    )
+                )
             },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { runTemplateImport(LessonTimeTemplateImportConflictStrategy.OVERWRITE) }) {
-                        Text("覆盖")
+                        Text(stringResource(R.string.action_overwrite))
                     }
                     TextButton(onClick = { runTemplateImport(LessonTimeTemplateImportConflictStrategy.RENAME) }) {
-                        Text("重命名")
+                        Text(stringResource(R.string.action_rename))
                     }
                     TextButton(onClick = { runTemplateImport(LessonTimeTemplateImportConflictStrategy.SKIP) }) {
-                        Text("跳过")
+                        Text(stringResource(R.string.action_skip))
                     }
                 }
             },
@@ -2354,7 +2670,7 @@ fun TimetableDetailSheet(
                         pendingImportTemplates = emptyList()
                     }
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -2363,7 +2679,7 @@ fun TimetableDetailSheet(
     if (showSaveLessonTimeTemplateDialog) {
         AlertDialog(
             onDismissRequest = { showSaveLessonTimeTemplateDialog = false },
-            title = { Text("保存课程时间模板") },
+            title = { Text(stringResource(R.string.title_save_template)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -2372,7 +2688,7 @@ fun TimetableDetailSheet(
                             templateName = it
                             templateNameError = ""
                         },
-                        label = { Text("模板名称") },
+                        label = { Text(stringResource(R.string.label_template_name)) },
                         modifier = Modifier.fillMaxWidth(),
                         isError = templateNameError.isNotEmpty(),
                         supportingText = if (templateNameError.isNotEmpty()) {
@@ -2380,7 +2696,7 @@ fun TimetableDetailSheet(
                         } else null
                     )
                     Text(
-                        text = "将当前课表的课程时间保存为模板，可用于其他课表。",
+                        text = stringResource(R.string.save_template_helper),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -2391,11 +2707,11 @@ fun TimetableDetailSheet(
                     onClick = {
                         val nameToSave = templateName.trim()
                         if (nameToSave.isBlank()) {
-                            templateNameError = "模板名称不能为空"
+                            templateNameError = context.getString(R.string.error_template_name_empty)
                             return@TextButton
                         }
                         if (nameToSave.length > 100) {
-                            templateNameError = "模板名称不能超过100个字符"
+                            templateNameError = context.getString(R.string.error_template_name_too_long)
                             return@TextButton
                         }
 
@@ -2409,27 +2725,45 @@ fun TimetableDetailSheet(
                                     )
                                 }
                                 showSaveLessonTimeTemplateDialog = false
-                                Toast.makeText(context, "已保存为模板", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_template_saved),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } catch (e: IllegalStateException) {
                                 if (e.message == "TEMPLATE_EXISTS") {
                                     showSaveLessonTimeTemplateDialog = false
                                     overwriteTemplateName = nameToSave
                                 } else {
-                                    Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT)
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(
+                                            R.string.toast_template_save_failed,
+                                            e.message.orEmpty()
+                                        ),
+                                        Toast.LENGTH_SHORT
+                                    )
                                         .show()
                                 }
                             } catch (e: Exception) {
-                                Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        R.string.toast_template_save_failed,
+                                        e.message.orEmpty()
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     }
                 ) {
-                    Text("保存")
+                    Text(stringResource(R.string.action_save))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSaveLessonTimeTemplateDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -2438,8 +2772,15 @@ fun TimetableDetailSheet(
     overwriteTemplateName?.let { nameToOverwrite ->
         AlertDialog(
             onDismissRequest = { overwriteTemplateName = null },
-            title = { Text("覆盖模板？") },
-            text = { Text("模板“$nameToOverwrite”已存在，是否覆盖？") },
+            title = { Text(stringResource(R.string.title_overwrite_template)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.text_overwrite_template,
+                        nameToOverwrite
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -2448,25 +2789,36 @@ fun TimetableDetailSheet(
                                 withContext(Dispatchers.IO) {
                                     dao.saveLessonTimeTemplateFromTimetable(
                                         timetableId = timetable.id,
-                                        templateName = nameToOverwrite,
-                                        overwrite = true
-                                    )
+                                    templateName = nameToOverwrite,
+                                    overwrite = true
+                                )
                                 }
-                                Toast.makeText(context, "已覆盖模板", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_template_overwritten),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } catch (e: Exception) {
-                                Toast.makeText(context, "覆盖失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        R.string.toast_template_overwrite_failed,
+                                        e.message.orEmpty()
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } finally {
                                 overwriteTemplateName = null
                             }
                         }
                     }
                 ) {
-                    Text("覆盖")
+                    Text(stringResource(R.string.action_overwrite))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { overwriteTemplateName = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -2475,8 +2827,15 @@ fun TimetableDetailSheet(
     confirmApplyTemplate?.let { template ->
         AlertDialog(
             onDismissRequest = { confirmApplyTemplate = null },
-            title = { Text("应用模板？") },
-            text = { Text("应用“${template.name}”将覆盖当前课表的课程时间，是否继续？") },
+            title = { Text(stringResource(R.string.title_apply_template)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.text_apply_template,
+                        template.name
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -2489,21 +2848,32 @@ fun TimetableDetailSheet(
                                     )
                                 }
                                 WidgetRefreshManager.onCourseDataChanged(context)
-                                Toast.makeText(context, "已应用模板", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_template_applied),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } catch (e: Exception) {
-                                Toast.makeText(context, "应用失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        R.string.toast_template_apply_failed,
+                                        e.message.orEmpty()
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } finally {
                                 confirmApplyTemplate = null
                             }
                         }
                     }
                 ) {
-                    Text("应用")
+                    Text(stringResource(R.string.action_apply))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmApplyTemplate = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -2512,8 +2882,15 @@ fun TimetableDetailSheet(
     confirmDeleteTemplate?.let { template ->
         AlertDialog(
             onDismissRequest = { confirmDeleteTemplate = null },
-            title = { Text("删除模板？") },
-            text = { Text("确定删除模板“${template.name}”？") },
+            title = { Text(stringResource(R.string.title_delete_template)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.text_delete_template,
+                        template.name
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -2522,21 +2899,32 @@ fun TimetableDetailSheet(
                                 withContext(Dispatchers.IO) {
                                     dao.deleteLessonTimeTemplate(template)
                                 }
-                                Toast.makeText(context, "模板已删除", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_template_deleted),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } catch (e: Exception) {
-                                Toast.makeText(context, "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        R.string.toast_template_delete_failed,
+                                        e.message.orEmpty()
+                                    ),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } finally {
                                 confirmDeleteTemplate = null
                             }
                         }
                     }
                 ) {
-                    Text("删除")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDeleteTemplate = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -2624,12 +3012,12 @@ fun TimePickerDialog(
             TextButton(onClick = {
                 onConfirm(timePickerState.hour, timePickerState.minute)
             }) {
-                Text("确定")
+                Text(stringResource(R.string.action_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.action_cancel))
             }
         },
         text = {
@@ -2660,7 +3048,7 @@ fun ImportOptionsSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "选择导入方式",
+                text = stringResource(R.string.import_options_title),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -2679,16 +3067,16 @@ fun ImportOptionsSheet(
                 ) {
                     Icon(
                         Icons.Rounded.CalendarMonth,
-                        contentDescription = "WakeUp课程表",
+                        contentDescription = stringResource(R.string.import_wakeup_title),
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column {
                         Text(
-                            text = "WakeUp课程表",
+                            text = stringResource(R.string.import_wakeup_title),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "从WakeUp课程表在线导入",
+                            text = stringResource(R.string.import_wakeup_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2712,16 +3100,16 @@ fun ImportOptionsSheet(
                 ) {
                     Icon(
                         Icons.Rounded.FileOpen,
-                        contentDescription = "学习通导入",
+                        contentDescription = stringResource(R.string.import_xuexitong_content_description),
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column {
                         Text(
-                            text = "从xls文件导入",
+                            text = stringResource(R.string.import_xls_title),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "自动匹配xls内容格式，如无法导入请联系作者",
+                            text = stringResource(R.string.import_xls_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2743,16 +3131,16 @@ fun ImportOptionsSheet(
                 ) {
                     Icon(
                         Icons.Rounded.CalendarMonth,
-                        contentDescription = "强智教务系统",
+                        contentDescription = stringResource(R.string.import_qiangzhi_title),
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column {
                         Text(
-                            text = "强智教务系统",
+                            text = stringResource(R.string.import_qiangzhi_title),
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "账号密码登录教务系统导入（需填写网址）",
+                            text = stringResource(R.string.import_qiangzhi_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2798,7 +3186,7 @@ fun ImportOptionsSheet(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text = "更多导入方式即将推出...",
+                text = stringResource(R.string.import_more_coming),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -2820,6 +3208,7 @@ fun WakeUpImportSheet(
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     OptimizedBottomSheet(
         onDismiss = onDismiss,
@@ -2833,14 +3222,14 @@ fun WakeUpImportSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "从WakeUp课程表在线导入",
+                text = stringResource(R.string.wakeup_import_title),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
             Text(
-                text = "请完整复制分享口令",
+                text = stringResource(R.string.wakeup_import_instruction),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -2851,7 +3240,7 @@ fun WakeUpImportSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "[示例]这是来自「WakeUp课程表」的课表分享，30分钟内有效哦，如果失效请朋友再分享一遍叭。为了保护隐私我们选择不监听你的剪贴板，请复制这条消息后，打开App的主界面，右上角第二个按钮 -> 从分享口令导入，按操作提示即可完成导入~分享口令为「0000000000000000」",
+                    text = stringResource(R.string.wakeup_import_example),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(12.dp)
                 )
@@ -2865,17 +3254,17 @@ fun WakeUpImportSheet(
                     shareText = it
                     errorMessage = ""
                 },
-                label = { Text("分享口令或口令内容") },
+                label = { Text(stringResource(R.string.wakeup_share_code_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 isError = errorMessage.isNotEmpty(),
                 supportingText = {
                     if (errorMessage.isNotEmpty()) {
                         Text(errorMessage)
                     } else {
-                        Text("可粘贴完整分享口令或直接输入口令内容")
+                        Text(stringResource(R.string.wakeup_share_code_supporting))
                     }
                 },
-                placeholder = { Text("粘贴分享口令或输入口令内容") }
+                placeholder = { Text(stringResource(R.string.wakeup_share_code_placeholder)) }
             )
 
             Spacer(Modifier.height(16.dp))
@@ -2889,14 +3278,14 @@ fun WakeUpImportSheet(
                 Button(
                     onClick = {
                         if (shareText.isBlank()) {
-                            errorMessage = "请输入分享口令"
+                            errorMessage = context.getString(R.string.wakeup_error_empty_code)
                             return@Button
                         }
 
                         // 提取口令内容
                         val key = extractKeyFromShareText(shareText)
                         if (key.isBlank()) {
-                            errorMessage = "未找到有效的分享口令"
+                            errorMessage = context.getString(R.string.wakeup_error_invalid_code)
                             return@Button
                         }
 
@@ -2904,14 +3293,18 @@ fun WakeUpImportSheet(
                         scope.launch {
                             try {
                                 // 调用WakeUp API导入课表
-                                val result = importFromWakeUp(key, dao)
+                                val result = importFromWakeUp(key, dao, context)
                                 if (result) {
                                     onDismiss()
                                 } else {
-                                    errorMessage = "导入失败，请检查分享口令是否有效"
+                                    errorMessage =
+                                        context.getString(R.string.wakeup_error_import_failed)
                                 }
                             } catch (e: Exception) {
-                                errorMessage = "导入失败: ${e.message}"
+                                errorMessage = context.getString(
+                                    R.string.wakeup_error_import_failed_reason,
+                                    e.message.orEmpty()
+                                )
                             } finally {
                                 isLoading = false
                             }
@@ -2920,7 +3313,7 @@ fun WakeUpImportSheet(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading
                 ) {
-                    Text("导入")
+                    Text(stringResource(R.string.action_import))
                 }
             }
         }
@@ -2971,7 +3364,7 @@ fun QiangzhiImportSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "强智教务系统导入",
+                text = stringResource(R.string.qiangzhi_import_title),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -2982,7 +3375,10 @@ fun QiangzhiImportSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "将使用账号密码登录强智教务系统并抓取“学期理论课表”。\n请填写教务系统网址，例如：${QiangzhiJwImporter.EXAMPLE_BASE_URL}\n账号密码将保存在课程表数据库中，用于一键更新课程。",
+                    text = stringResource(
+                        R.string.qiangzhi_info_text,
+                        QiangzhiJwImporter.EXAMPLE_BASE_URL
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(12.dp)
                 )
@@ -3012,7 +3408,7 @@ fun QiangzhiImportSheet(
                     baseUrl = it
                     errorMessage = ""
                 },
-                label = { Text("网址") },
+                label = { Text(stringResource(R.string.label_base_url)) },
                 placeholder = { Text(QiangzhiJwImporter.EXAMPLE_BASE_URL) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -3026,7 +3422,7 @@ fun QiangzhiImportSheet(
                     account = it
                     errorMessage = ""
                 },
-                label = { Text("账号") },
+                label = { Text(stringResource(R.string.label_account)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -3039,7 +3435,7 @@ fun QiangzhiImportSheet(
                     password = it
                     errorMessage = ""
                 },
-                label = { Text("密码") },
+                label = { Text(stringResource(R.string.label_password)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation()
@@ -3057,17 +3453,18 @@ fun QiangzhiImportSheet(
                     onClick = {
                         val normalizedBaseUrl = baseUrl.trim().removeSuffix("/")
                         if (normalizedBaseUrl.isBlank()) {
-                            errorMessage = "请输入网址"
+                            errorMessage = context.getString(R.string.qiangzhi_error_empty_url)
                             return@Button
                         }
                         if (!normalizedBaseUrl.startsWith("http://") && !normalizedBaseUrl.startsWith("https://")) {
-                            errorMessage = "网址需要以 http:// 或 https:// 开头"
+                            errorMessage = context.getString(R.string.qiangzhi_error_invalid_url)
                             return@Button
                         }
 
                         val trimmedAccount = account.trim()
                         if (trimmedAccount.isBlank() || password.isBlank()) {
-                            errorMessage = "请输入账号和密码"
+                            errorMessage =
+                                context.getString(R.string.qiangzhi_error_empty_credentials)
                             return@Button
                         }
 
@@ -3101,7 +3498,7 @@ fun QiangzhiImportSheet(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading
                 ) {
-                    Text("登录并导入")
+                    Text(stringResource(R.string.action_login_and_import))
                 }
             }
         }
@@ -3117,7 +3514,7 @@ fun extractKeyFromShareText(text: String): String {
 }
 
 // WakeUp导入函数
-suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withContext(Dispatchers.IO) {
+suspend fun importFromWakeUp(key: String, dao: ScheduleDao, context: Context): Boolean = withContext(Dispatchers.IO) {
     try {
         val client = OkHttpClient.Builder()
             .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
@@ -3171,7 +3568,8 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao): Boolean = withConte
 
         val timetableId = dao.insertTimetableWithReminders(
             TimetableEntity(
-                name = configInfo["tableName"]?.jsonPrimitive?.content ?: "未命名WakeUp课程表",
+                name = configInfo["tableName"]?.jsonPrimitive?.content
+                    ?: context.getString(R.string.wakeup_default_timetable_name),
                 showWeekend = configInfo["showSun"]?.jsonPrimitive?.boolean ?: true,
                 startDate = configInfo["startDate"]?.jsonPrimitive?.content?.let {
                     parseDateAutoFix(
@@ -3293,7 +3691,8 @@ fun XuexitongImportSheet(
         onResult = { uri ->
             uri?.let {
                 selectedFileUri = it
-                fileName = getFileNameFromUri(context, it) ?: "未知文件"
+                fileName = getFileNameFromUri(context, it)
+                    ?: context.getString(R.string.label_selected_file_unknown)
                 errorMessage = ""
             }
         }
@@ -3311,14 +3710,14 @@ fun XuexitongImportSheet(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "从xls文件导入",
+                text = stringResource(R.string.import_xls_title),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
             Text(
-                text = "自动匹配xls内容格式，如无法导入请联系作者",
+                text = stringResource(R.string.import_xls_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -3329,7 +3728,7 @@ fun XuexitongImportSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "从教务系统导出课程表为xls文件，然后在此处选择该文件进行导入。",
+                    text = stringResource(R.string.import_xls_instruction),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(12.dp)
                 )
@@ -3346,9 +3745,12 @@ fun XuexitongImportSheet(
                 shape = MaterialTheme.shapes.large
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.FileOpen, contentDescription = "选择文件")
+                    Icon(
+                        Icons.Rounded.FileOpen,
+                        contentDescription = stringResource(R.string.content_desc_select_file)
+                    )
                     Spacer(Modifier.width(8.dp))
-                    Text("选择xls文件")
+                    Text(stringResource(R.string.import_xls_title))
                 }
             }
 
@@ -3363,7 +3765,10 @@ fun XuexitongImportSheet(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Rounded.FileOpen, contentDescription = "已选择文件")
+                        Icon(
+                            Icons.Rounded.FileOpen,
+                            contentDescription = stringResource(R.string.content_desc_selected_file)
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = fileName,
@@ -3402,7 +3807,7 @@ fun XuexitongImportSheet(
                 Button(
                     onClick = {
                         if (selectedFileUri == null) {
-                            errorMessage = "请先选择xls文件"
+                            errorMessage = context.getString(R.string.error_select_xls_first)
                             return@Button
                         }
 
@@ -3416,10 +3821,14 @@ fun XuexitongImportSheet(
                                     WidgetRefreshManager.onTimetableSwitched(context)
                                     onDismiss()
                                 } else {
-                                    errorMessage = "导入失败，请检查文件格式是否正确"
+                                    errorMessage =
+                                        context.getString(R.string.error_import_failed_generic)
                                 }
                             } catch (e: Exception) {
-                                errorMessage = "导入失败: ${e.message}"
+                                errorMessage = context.getString(
+                                    R.string.error_import_failed_reason,
+                                    e.message.orEmpty()
+                                )
                             } finally {
                                 isLoading = false
                             }
@@ -3428,7 +3837,7 @@ fun XuexitongImportSheet(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading && selectedFileUri != null
                 ) {
-                    Text("导入")
+                    Text(stringResource(R.string.action_import))
                 }
             }
         }
