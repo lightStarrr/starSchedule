@@ -82,6 +82,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.star.schedule.Constants
 import com.star.schedule.R
@@ -127,7 +128,7 @@ private enum class LessonTimeTemplateImportConflictStrategy {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimetableSettings(dao: ScheduleDao) {
+fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
     val scope = rememberCoroutineScope()
     val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
     val haptic = LocalHapticFeedback.current
@@ -441,6 +442,9 @@ fun TimetableSettings(dao: ScheduleDao) {
                     }
                 }
             }
+        }
+        item {
+            Spacer(Modifier.height(floatingToolbarHeight + 32.dp))
         }
     }
 
