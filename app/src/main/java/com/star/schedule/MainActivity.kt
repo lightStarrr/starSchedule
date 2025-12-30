@@ -87,6 +87,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -200,6 +201,9 @@ fun Layout(context: Activity) {
     var weeksWithCourses by remember { mutableStateOf<List<Int>>(emptyList()) }
     var showWeekSelector by remember { mutableStateOf(false) }
     val weekSelectorSheetState = rememberModalBottomSheetState()
+    var floatingToolbarHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+
 
     val haptic = LocalHapticFeedback.current
     val dao = DatabaseProvider.dao()
@@ -245,6 +249,9 @@ fun Layout(context: Activity) {
                 expanded = true,
                 shape = MaterialTheme.shapes.largeIncreased,
                 scrollBehavior = exitAlwaysScrollBehavior,
+                modifier = Modifier.onGloballyPositioned { coordinates ->
+                    floatingToolbarHeight = with(density) { coordinates.size.height.toDp() }
+                },
                 colors = FloatingToolbarDefaults.standardFloatingToolbarColors(),
                 content = {
                     items.forEachIndexed { index, item ->
@@ -412,6 +419,7 @@ fun Layout(context: Activity) {
                     context = context,
                     dao = dao,
                     currentWeekNumber = currentWeekNumber,
+                    floatingToolbarHeight = floatingToolbarHeight,
                     onCurrentWeekNumberChange = { newWeekNumber ->
                         currentWeekNumber = newWeekNumber
                     },
@@ -424,10 +432,12 @@ fun Layout(context: Activity) {
                 )
 
                 1 -> TimetableSettings(
+                    floatingToolbarHeight = floatingToolbarHeight,
                     dao = dao
                 )
 
                 2 -> Settings(
+                    floatingToolbarHeight = floatingToolbarHeight,
                     context = context,
                     dao = dao,
                     notificationManager = notificationManager

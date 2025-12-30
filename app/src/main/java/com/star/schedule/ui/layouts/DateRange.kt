@@ -100,6 +100,7 @@ fun DateRange(
     context: Activity,
     dao: ScheduleDao,
     currentWeekNumber: Int,
+    floatingToolbarHeight: Dp,
     onCurrentWeekNumberChange: (Int) -> Unit,
     onWeeksCalculated: (List<Int>) -> Unit = {},
     upDateRealCurrentWeek: (Int) -> Unit
@@ -119,12 +120,12 @@ fun DateRange(
     val courses by if (timetableId != null) {
         // 总是加载所有课程，后续根据showNonCurrent设置来决定显示哪些课程
         dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
-    } else remember { mutableStateOf(emptyList<CourseEntity>()) }
+    } else remember { mutableStateOf(emptyList()) }
 
     // 当前课表的作息时间
     val lessonTimes by if (timetableId != null) {
         dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
-    } else remember { mutableStateOf(emptyList<LessonTimeEntity>()) }
+    } else remember { mutableStateOf(emptyList()) }
 
     // 当天便签
     val dayNotes by if (timetableId != null) {
@@ -214,6 +215,7 @@ fun DateRange(
 
     Box(modifier = Modifier.fillMaxSize()) {
         ScheduleScreen(
+            floatingToolbarHeight = floatingToolbarHeight,
             courses = visibleEntities.map { entity ->
                 Course(
                     name = entity.name,
@@ -258,7 +260,7 @@ fun DateRange(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(16.dp, 16.dp, 16.dp, 0.dp),
             ) {
                 Text(
                     text = stringResource(
@@ -366,6 +368,7 @@ fun buildCourseBlocks(courses: List<Course>): List<CourseBlock> {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
+    floatingToolbarHeight: Dp,
     courses: List<Course>,
     lessonTimes: List<LessonTime>,
     cellHeight: Dp = 60.dp,
@@ -422,7 +425,7 @@ fun ScheduleScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            Column(modifier = Modifier.fillMaxSize().padding(bottom = 32.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(bottom = floatingToolbarHeight + 32.dp)) {
                 val firstDayOfCurrentWeek = LocalDate.now()
                     .with(java.time.DayOfWeek.MONDAY)
                     .plusWeeks(((currentWeek ?: 1) - (realCurrentWeek ?: 1)).toLong())

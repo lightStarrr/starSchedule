@@ -129,13 +129,14 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.unit.Dp
 import java.io.File
 import java.io.FileOutputStream
 import androidx.core.graphics.scale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
-fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNotificationManager) {
+fun Settings(floatingToolbarHeight: Dp,context: Activity, dao: ScheduleDao, notificationManager: UnifiedNotificationManager) {
     val viewModel: SettingsViewModel = viewModel(
         factory = remember(dao, notificationManager) {
             SettingsViewModelFactory(dao, notificationManager)
@@ -317,6 +318,7 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
+            .padding(bottom = floatingToolbarHeight + 32.dp)
     ) {
         Text(
             text = stringResource(R.string.settings_title),

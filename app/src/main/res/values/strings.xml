@@ -324,7 +324,7 @@
     <string name="day_note_placeholder">Write todos, exam reminders, etc.</string>
     <string name="day_note_existing">Note added</string>
     <string name="day_note_add">Add note</string>
-    <string name="month_label_format">Month %1$d</string>
+    <string name="month_label_format">%1$d</string>
     <string name="weekday_column_label">%1$s</string>
     <string name="course_name_with_week_prefix">[Week %1$d] %2$s</string>
     <string name="course_name_not_this_week_prefix">[Not this week] %1$s</string>
