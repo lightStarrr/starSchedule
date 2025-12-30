@@ -48,6 +48,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -56,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.star.schedule.Constants
+import com.star.schedule.R
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.DayNoteEntity
 import com.star.schedule.db.LessonTimeEntity
@@ -259,12 +261,16 @@ fun DateRange(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "便签 · ${targetDate.monthValue}/${targetDate.dayOfMonth}",
+                    text = stringResource(
+                        R.string.day_note_title_format,
+                        targetDate.monthValue,
+                        targetDate.dayOfMonth
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 Text(
-                    text = "将备注钉在当天课表上，方便回看。",
+                    text = stringResource(R.string.day_note_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
@@ -274,8 +280,8 @@ fun DateRange(
                     onValueChange = { noteDraft = it },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
-                    label = { Text("便签内容") },
-                    placeholder = { Text("写下待办、考试提醒等…") }
+                    label = { Text(stringResource(R.string.day_note_label)) },
+                    placeholder = { Text(stringResource(R.string.day_note_placeholder)) }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
@@ -290,7 +296,7 @@ fun DateRange(
                             noteDraft = ""
                         }
                     }) {
-                        Text("取消")
+                        Text(stringResource(R.string.action_cancel))
                     }
                     if (notesByDate.containsKey(targetDate.toString())) {
                         TextButton(onClick = {
@@ -304,7 +310,7 @@ fun DateRange(
                                 noteDraft = ""
                             }
                         }) {
-                            Text("删除")
+                            Text(stringResource(R.string.action_delete))
                         }
                     }
                     Button(onClick = {
@@ -329,7 +335,7 @@ fun DateRange(
                             noteDraft = ""
                         }
                     }) {
-                        Text("保存")
+                        Text(stringResource(R.string.action_save))
                     }
                 }
             }
@@ -374,7 +380,15 @@ fun ScheduleScreen(
 ) {
     var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
     val haptic = LocalHapticFeedback.current
-    val allDayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
+    val allDayLabels = listOf(
+        stringResource(R.string.weekday_short_monday),
+        stringResource(R.string.weekday_short_tuesday),
+        stringResource(R.string.weekday_short_wednesday),
+        stringResource(R.string.weekday_short_thursday),
+        stringResource(R.string.weekday_short_friday),
+        stringResource(R.string.weekday_short_saturday),
+        stringResource(R.string.weekday_short_sunday)
+    )
     val visibleDays = if (showWeekend) (1..7).toList() else (1..5).toList()
     val visibleDayLabels = visibleDays.map { allDayLabels[it - 1] }
     val courseBlocks = buildCourseBlocks(courses)
@@ -434,7 +448,10 @@ fun ScheduleScreen(
                     ) {
                         if (currentWeek != null) {
                             Text(
-                                text = "${firstDayOfCurrentWeek.monthValue}月",
+                                text = stringResource(
+                                    R.string.month_label_format,
+                                    firstDayOfCurrentWeek.monthValue
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -467,7 +484,7 @@ fun ScheduleScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = "周$dayLabel",
+                                    text = stringResource(R.string.weekday_column_label, dayLabel),
                                     textAlign = TextAlign.Center,
                                     style = MaterialTheme.typography.bodySmall
                                 )
@@ -479,7 +496,7 @@ fun ScheduleScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 if (note != null) {
                                     Text(
-                                        text = "有便签哦",
+                                        text = stringResource(R.string.day_note_existing),
                                         textAlign = TextAlign.Center,
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelSmall,
@@ -487,7 +504,7 @@ fun ScheduleScreen(
                                     )
                                 } else {
                                     Text(
-                                        text = "添加便签",
+                                        text = stringResource(R.string.day_note_add),
                                         textAlign = TextAlign.Center,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
@@ -604,9 +621,16 @@ fun ScheduleScreen(
                         val name = if (block.course.weeks.contains(currentWeek)) {
                             block.course.name
                         } else if (nextWeek != null) {
-                            "[第${nextWeek}周] ${block.course.name}"
+                            stringResource(
+                                R.string.course_name_with_week_prefix,
+                                nextWeek,
+                                block.course.name
+                            )
                         } else {
-                            "[非本周] ${block.course.name}"
+                            stringResource(
+                                R.string.course_name_not_this_week_prefix,
+                                block.course.name
+                            )
                         }
                         Text(
                             text = name,

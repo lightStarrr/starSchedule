@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FileDownload
@@ -43,6 +45,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -357,7 +361,8 @@ fun TimetableSettings(dao: ScheduleDao) {
                                                                         baseUrl = config.baseUrl,
                                                                         account = config.account,
                                                                         password = config.password,
-                                                                        dao = dao
+                                                                        dao = dao,
+                                                                        context = context
                                                                     )) {
                                                                     is QiangzhiJwImporter.ImportResult.Success -> {
                                                                         result.warning?.let {
@@ -1819,7 +1824,7 @@ fun TimetableDetailSheet(
 
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.write(jsonText.toByteArray(Charsets.UTF_8))
-                } ?: error("无法写入文件")
+                } ?: error("Unable to write file")
 
                 Toast.makeText(
                     context,
@@ -1846,7 +1851,7 @@ fun TimetableDetailSheet(
                 val jsonText = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use { inputStream ->
                         String(inputStream.readBytes(), Charsets.UTF_8)
-                    } ?: error("无法读取文件")
+                    } ?: error("Unable to read file")
                 }
 
                 val templates = try {
@@ -2503,136 +2508,178 @@ fun TimetableDetailSheet(
 
     // 课程时间模板
     if (showLessonTimeTemplateDialog) {
-        AlertDialog(
-            onDismissRequest = { showLessonTimeTemplateDialog = false },
-            title = { Text(stringResource(R.string.title_course_time_templates)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(
-                            onClick = {
-                                if (sortedLessonTimes.isEmpty()) {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.toast_no_lessons_to_save_template),
-                                        Toast.LENGTH_SHORT
-                                    )
-                                        .show()
-                                    return@TextButton
-                                }
-                                templateName = ""
-                                templateNameError = ""
-                                showLessonTimeTemplateDialog = false
-                                showSaveLessonTimeTemplateDialog = true
-                            }
-                        ) {
-                            Text(stringResource(R.string.action_save_current_as_template))
-                        }
-                        TextButton(
-                            onClick = {
-                                showLessonTimeTemplateDialog = false
-                                importTemplateLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
-                            }
-                        ) {
-                            Text(stringResource(R.string.action_import_template))
-                        }
-                        TextButton(
-                            onClick = {
-                                if (lessonTimeTemplates.isEmpty()) {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.toast_no_template_to_export),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    return@TextButton
-                                }
-                                exportAllTemplates = true
-                                exportTemplate = null
-                                exportTemplateLauncher.launch("lesson_time_templates.json")
-                            }
-                        ) {
-                            Text(stringResource(R.string.action_export_all))
-                        }
-                    }
+        val lessonTimeTemplateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        OptimizedBottomSheet(
+            sheetState = lessonTimeTemplateSheetState,
+            onDismiss = { showLessonTimeTemplateDialog = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.title_course_time_templates),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-                    if (lessonTimeTemplates.isEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            if (sortedLessonTimes.isEmpty()) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_no_lessons_to_save_template),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@OutlinedButton
+                            }
+                            templateName = ""
+                            templateNameError = ""
+                            showLessonTimeTemplateDialog = false
+                            showSaveLessonTimeTemplateDialog = true
+                        }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_save_current_as_template),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            showLessonTimeTemplateDialog = false
+                            importTemplateLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                        }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_import_template),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            if (lessonTimeTemplates.isEmpty()) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_no_template_to_export),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@Button
+                            }
+                            exportAllTemplates = true
+                            exportTemplate = null
+                            exportTemplateLauncher.launch("lesson_time_templates.json")
+                        }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_export_all),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                if (lessonTimeTemplates.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
                             text = stringResource(R.string.label_no_template),
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 4.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    } else {
-                        LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                            itemsIndexed(
-                                items = lessonTimeTemplates,
-                                key = { _, item -> item.id }
-                            ) { _, template ->
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(
+                            items = lessonTimeTemplates,
+                            key = { _, item -> item.id }
+                        ) { _, template ->
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = template.name,
-                                        modifier = Modifier.weight(1f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Row(modifier = Modifier.width(IntrinsicSize.Min)) {
-                                        IconButton(
-                                            onClick = {
-                                                confirmApplyTemplate = template
-                                                showLessonTimeTemplateDialog = false
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.FileDownload,
-                                                contentDescription = stringResource(R.string.content_desc_apply_template)
-                                            )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = template.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            confirmApplyTemplate = template
+                                            showLessonTimeTemplateDialog = false
                                         }
-                                        IconButton(
-                                            onClick = {
-                                                exportTemplate = template
-                                                exportAllTemplates = false
-                                                showLessonTimeTemplateDialog = false
-                                                exportTemplateLauncher.launch("${sanitizeFileName(template.name)}.json")
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.Polyline,
-                                                contentDescription = stringResource(R.string.content_desc_export_template)
-                                            )
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.FileDownload,
+                                            contentDescription = stringResource(R.string.content_desc_apply_template)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            exportTemplate = template
+                                            exportAllTemplates = false
+                                            showLessonTimeTemplateDialog = false
+                                            exportTemplateLauncher.launch("${sanitizeFileName(template.name)}.json")
                                         }
-                                        IconButton(
-                                            onClick = {
-                                                confirmDeleteTemplate = template
-                                                showLessonTimeTemplateDialog = false
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.Delete,
-                                                contentDescription = stringResource(R.string.content_desc_delete_template)
-                                            )
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Polyline,
+                                            contentDescription = stringResource(R.string.content_desc_export_template)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            confirmDeleteTemplate = template
+                                            showLessonTimeTemplateDialog = false
                                         }
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Delete,
+                                            contentDescription = stringResource(R.string.content_desc_delete_template)
+                                        )
                                     }
                                 }
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showLessonTimeTemplateDialog = false }) {
-                    Text(stringResource(R.string.action_close))
-                }
             }
-        )
+        }
     }
 
     if (showImportTemplateConflictDialog) {
@@ -3476,7 +3523,8 @@ fun QiangzhiImportSheet(
                                         baseUrl = normalizedBaseUrl,
                                         account = trimmedAccount,
                                         password = password,
-                                        dao = dao
+                                        dao = dao,
+                                        context = context
                                     )) {
                                     is QiangzhiJwImporter.ImportResult.Success -> {
                                         result.warning?.let {

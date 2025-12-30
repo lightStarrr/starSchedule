@@ -3,6 +3,7 @@ package com.star.schedule.utils
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.star.schedule.R
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
@@ -43,7 +44,7 @@ object ImportManager {
 
             val timetableId = dao.insertTimetableWithReminders(
                 TimetableEntity(
-                    name = "自动导入课表",
+                    name = context.getString(R.string.auto_imported_timetable_name),
                     showWeekend = true,
                     startDate = LocalDate.now().toString()
                 )
