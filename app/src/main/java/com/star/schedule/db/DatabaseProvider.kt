@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.star.schedule.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,7 +44,9 @@ object DatabaseProvider {
                 // 确保在初始化后就有“当前课表”，避免其他读取逻辑拿到空值
                 runBlocking {
                     withContext(Dispatchers.IO) {
-                        db.scheduleDao().initializeDefaultTimetable()
+                        db.scheduleDao().initializeDefaultTimetable(
+                            context.getString(R.string.default_timetable_name)
+                        )
                     }
                 }
                 

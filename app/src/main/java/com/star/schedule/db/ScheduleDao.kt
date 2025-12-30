@@ -82,7 +82,7 @@ abstract class ScheduleDao {
 
     // 自动初始化默认课表
     @Transaction
-    open suspend fun initializeDefaultTimetable(): Long {
+    open suspend fun initializeDefaultTimetable(defaultName: String): Long {
         val prefIdStr = getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
             .map { it?.toLongOrNull() }
             .firstOrNull()
@@ -92,7 +92,7 @@ abstract class ScheduleDao {
         val timetableId = if (timetables.isEmpty()) {
             insertTimetable(
                 TimetableEntity(
-                    name = "默认课表",
+                    name = defaultName,
                     showWeekend = true,
                     startDate = LocalDate.now().toString()
                 )

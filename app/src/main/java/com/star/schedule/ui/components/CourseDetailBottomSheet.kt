@@ -9,8 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.star.schedule.R
 import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 
@@ -42,7 +44,7 @@ fun CourseDetailBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "课程详情",
+                    text = stringResource(R.string.course_detail_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -65,13 +67,13 @@ fun CourseDetailBottomSheet(
                 ) {
                     Icon(
                         Icons.Rounded.Class,
-                        contentDescription = "课程名称",
+                        contentDescription = stringResource(R.string.label_course_name),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column {
                         Text(
-                            text = "课程名称",
+                            text = stringResource(R.string.label_course_name),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
@@ -102,13 +104,13 @@ fun CourseDetailBottomSheet(
                 ) {
                     Icon(
                         Icons.Rounded.Schedule,
-                        contentDescription = "上课时间",
+                        contentDescription = stringResource(R.string.course_detail_time_label),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column {
                         Text(
-                            text = "上课时间",
+                            text = stringResource(R.string.course_detail_time_label),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -142,13 +144,13 @@ fun CourseDetailBottomSheet(
                     ) {
                         Icon(
                             Icons.Rounded.LocationOn,
-                            contentDescription = "上课地点",
+                            contentDescription = stringResource(R.string.label_location_input),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(end = 12.dp)
                         )
                         Column {
                             Text(
-                                text = "上课地点",
+                                text = stringResource(R.string.label_location_input),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
@@ -180,13 +182,13 @@ fun CourseDetailBottomSheet(
                     ) {
                         Icon(
                             Icons.Rounded.Person,
-                            contentDescription = "授课老师",
+                            contentDescription = stringResource(R.string.course_detail_teacher_label),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(end = 12.dp)
                         )
                         Column {
                             Text(
-                                text = "授课老师",
+                                text = stringResource(R.string.course_detail_teacher_label),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
@@ -218,13 +220,13 @@ fun CourseDetailBottomSheet(
                     ) {
                         Icon(
                             Icons.Rounded.CalendarToday,
-                            contentDescription = "上课周次",
+                            contentDescription = stringResource(R.string.course_detail_weeks_label),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(end = 12.dp)
                         )
                         Column {
                             Text(
-                                text = "上课周次",
+                                text = stringResource(R.string.course_detail_weeks_label),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
@@ -243,45 +245,55 @@ fun CourseDetailBottomSheet(
     }
 }
 
+@Composable
 private fun getCourseTimeInfo(course: CourseEntity, lessonTimes: List<LessonTimeEntity>): String {
-    return try {
-        val sortedPeriods = course.periods.sorted()
-        if (sortedPeriods.isEmpty()) {
-            "未设置节次"
-        } else {
-            val startPeriod = sortedPeriods.first()
-            val endPeriod = sortedPeriods.last()
+    val sortedPeriods = course.periods.sorted()
+    if (sortedPeriods.isEmpty()) {
+        return stringResource(R.string.course_detail_periods_not_set)
+    }
 
-            val startLessonTime = lessonTimes.find { it.period == startPeriod }
-            val endLessonTime = lessonTimes.find { it.period == endPeriod }
+    val startPeriod = sortedPeriods.first()
+    val endPeriod = sortedPeriods.last()
 
-            val startTime = startLessonTime?.startTime ?: ""
-            val endTime = endLessonTime?.endTime ?: ""
+    val startLessonTime = lessonTimes.find { it.period == startPeriod }
+    val endLessonTime = lessonTimes.find { it.period == endPeriod }
 
-            val dayOfWeekText = when (course.dayOfWeek) {
-                1 -> "周一"
-                2 -> "周二"
-                3 -> "周三"
-                4 -> "周四"
-                5 -> "周五"
-                6 -> "周六"
-                7 -> "周日"
-                else -> "未知"
-            }
+    val startTime = startLessonTime?.startTime.orEmpty()
+    val endTime = endLessonTime?.endTime.orEmpty()
 
-            if (startTime.isNotBlank() && endTime.isNotBlank()) {
-                "$dayOfWeekText 第${startPeriod}-${endPeriod}节\n$startTime - $endTime"
-            } else {
-                "$dayOfWeekText 第${startPeriod}-${endPeriod}节"
-            }
-        }
-    } catch (e: Exception) {
-        "时间信息异常"
+    val dayOfWeekText = when (course.dayOfWeek) {
+        1 -> stringResource(R.string.weekday_short_monday)
+        2 -> stringResource(R.string.weekday_short_tuesday)
+        3 -> stringResource(R.string.weekday_short_wednesday)
+        4 -> stringResource(R.string.weekday_short_thursday)
+        5 -> stringResource(R.string.weekday_short_friday)
+        6 -> stringResource(R.string.weekday_short_saturday)
+        7 -> stringResource(R.string.weekday_short_sunday)
+        else -> stringResource(R.string.course_detail_day_unknown)
+    }
+
+    return if (startTime.isNotBlank() && endTime.isNotBlank()) {
+        stringResource(
+            R.string.course_detail_day_period_with_time,
+            dayOfWeekText,
+            startPeriod,
+            endPeriod,
+            startTime,
+            endTime
+        )
+    } else {
+        stringResource(
+            R.string.course_detail_day_period,
+            dayOfWeekText,
+            startPeriod,
+            endPeriod
+        )
     }
 }
 
+@Composable
 private fun formatWeeks(weeks: List<Int>): String {
-    if (weeks.isEmpty()) return "无"
+    if (weeks.isEmpty()) return stringResource(R.string.course_detail_weeks_none)
 
     val sortedWeeks = weeks.sorted()
     val ranges = mutableListOf<String>()
@@ -299,5 +311,5 @@ private fun formatWeeks(weeks: List<Int>): String {
     }
     ranges.add(if (start == end) start.toString() else "$start-$end")
 
-    return "第 ${ranges.joinToString(", ")} 周"
+    return stringResource(R.string.course_detail_weeks_format, ranges.joinToString(", "))
 }

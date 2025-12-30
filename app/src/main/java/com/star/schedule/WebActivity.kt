@@ -52,7 +52,7 @@ class WebActivity : ComponentActivity() {
         setContent {
             StarScheduleTheme {
                 WebCaptureScreen(this, "http://shldxyjw.yinghuaonline.com/shldzyjsxy/") { html ->
-                    println("网页内容: $html")
+                    println("Page content: $html")
                 }
             }
         }
@@ -172,7 +172,7 @@ fun WebViewContent(
                             false
                         } else {
                             // 忽略自定义 scheme 或提示用户
-                            println("忽略非 http/https URL: $url")
+                            println("Ignore non http/https URL: $url")
                             true
                         }
                     }

@@ -1,6 +1,8 @@
 package com.star.schedule.utils
 
+import android.content.Context
 import android.util.Log
+import com.star.schedule.R
 import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
 import com.star.schedule.autoupdate.TimetableAutoUpdateJson
 import com.star.schedule.db.CourseEntity
@@ -8,8 +10,8 @@ import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.FormBody
@@ -66,11 +68,14 @@ object QiangzhiJwImporter {
         baseUrl: String,
         account: String,
         password: String,
-        dao: ScheduleDao
+        dao: ScheduleDao,
+        context: Context
     ): ImportResult = withContext(Dispatchers.IO) {
         try {
             val endpoints = endpoints(baseUrl)
-                ?: return@withContext ImportResult.Error("网址格式不正确，请输入形如 http(s)://.../xxx_jsxsd")
+                ?: return@withContext ImportResult.Error(
+                    context.getString(R.string.qiangzhi_error_invalid_base_url)
+                )
 
             val cookieJar = InMemoryCookieJar()
             val client = OkHttpClient.Builder()
@@ -97,7 +102,11 @@ object QiangzhiJwImporter {
                 if (code !in 300..399) {
                     Log.e(TAG, "Login request unexpected status. http=${response.code}, message=${response.message}")
                     return@withContext ImportResult.Error(
-                        if (code in 200..299) "登录失败，请检查账号密码是否正确" else "登录请求失败：HTTP ${response.code}"
+                        if (code in 200..299) {
+                            context.getString(R.string.qiangzhi_error_login_failed)
+                        } else {
+                            context.getString(R.string.qiangzhi_error_login_request_failed, response.code)
+                        }
                     )
                 }
 
@@ -105,7 +114,9 @@ object QiangzhiJwImporter {
                 val resolved = location?.let { loginRequest.url.resolve(it)?.toString() } ?: ""
                 if (resolved.isBlank() || !resolved.startsWith(endpoints.mainUrl)) {
                     Log.w(TAG, "Login redirect unexpected. http=${response.code}, location=$location")
-                    return@withContext ImportResult.Error("登录失败，请检查账号密码是否正确")
+                    return@withContext ImportResult.Error(
+                        context.getString(R.string.qiangzhi_error_login_failed)
+                    )
                 }
                 resolved
             }
@@ -132,22 +143,28 @@ object QiangzhiJwImporter {
             ).execute().use { response ->
                 if (!response.isSuccessful) {
                     Log.e(TAG, "Fetch timetable failed. http=${response.code}, message=${response.message}")
-                    return@withContext ImportResult.Error("获取课表失败：HTTP ${response.code}")
+                    return@withContext ImportResult.Error(
+                        context.getString(R.string.qiangzhi_error_fetch_failed, response.code)
+                    )
                 }
                 response.body?.string() ?: run {
                     Log.e(TAG, "Response body is null")
-                    return@withContext ImportResult.Error("获取课表失败：响应内容为空")
+                    return@withContext ImportResult.Error(
+                        context.getString(R.string.qiangzhi_error_response_empty)
+                    )
                 }
             }
 
             val parsed = parseTimetableHtml(html)
             if (parsed.courses.isEmpty()) {
-                return@withContext ImportResult.Error("未解析到课程，请确认课表页可正常访问")
+                return@withContext ImportResult.Error(
+                    context.getString(R.string.qiangzhi_error_no_courses)
+                )
             }
 
-            val (startDate, warning) = inferStartDate(parsed.termId)
+            val (startDate, warning) = inferStartDate(parsed.termId, context)
             val timetableName = buildString {
-                append("强智教务")
+                append(context.getString(R.string.qiangzhi_timetable_name_prefix))
                 hostLabel(endpoints.baseUrl)?.let { append(" ").append(it) }
                 if (!parsed.termId.isNullOrBlank()) {
                     append(" ").append(parsed.termId)
@@ -198,7 +215,12 @@ object QiangzhiJwImporter {
             ImportResult.Success(warning = warning)
         } catch (e: Exception) {
             Log.e(TAG, "Import failed", e)
-            ImportResult.Error("导入失败：${e.message ?: "未知错误"}")
+            ImportResult.Error(
+                context.getString(
+                    R.string.qiangzhi_error_import_failed_with_reason,
+                    e.message ?: context.getString(R.string.error_unknown)
+                )
+            )
         }
     }
 
@@ -207,15 +229,20 @@ object QiangzhiJwImporter {
         baseUrl: String,
         account: String,
         password: String,
-        dao: ScheduleDao
+        dao: ScheduleDao,
+        context: Context
     ): ImportResult = withContext(Dispatchers.IO) {
         try {
             val endpoints = endpoints(baseUrl)
-                ?: return@withContext ImportResult.Error("网址格式不正确，请检查课表的自动更新配置")
+                ?: return@withContext ImportResult.Error(
+                    context.getString(R.string.qiangzhi_error_invalid_auto_update_config)
+                )
 
             val timetable = dao.getTimetableFlow(timetableId).firstOrNull()
             if (timetable == null) {
-                return@withContext ImportResult.Error("课表不存在，无法更新")
+                return@withContext ImportResult.Error(
+                    context.getString(R.string.qiangzhi_error_missing_timetable)
+                )
             }
 
             val cookieJar = InMemoryCookieJar()
@@ -243,7 +270,11 @@ object QiangzhiJwImporter {
                 if (code !in 300..399) {
                     Log.e(TAG, "Login request unexpected status. http=${response.code}, message=${response.message}")
                     return@withContext ImportResult.Error(
-                        if (code in 200..299) "登录失败，请检查账号密码是否正确" else "登录请求失败：HTTP ${response.code}"
+                        if (code in 200..299) {
+                            context.getString(R.string.qiangzhi_error_login_failed)
+                        } else {
+                            context.getString(R.string.qiangzhi_error_login_request_failed, response.code)
+                        }
                     )
                 }
 
@@ -251,7 +282,9 @@ object QiangzhiJwImporter {
                 val resolved = location?.let { loginRequest.url.resolve(it)?.toString() } ?: ""
                 if (resolved.isBlank() || !resolved.startsWith(endpoints.mainUrl)) {
                     Log.w(TAG, "Login redirect unexpected. http=${response.code}, location=$location")
-                    return@withContext ImportResult.Error("登录失败，请检查账号密码是否正确")
+                    return@withContext ImportResult.Error(
+                        context.getString(R.string.qiangzhi_error_login_failed)
+                    )
                 }
                 resolved
             }
@@ -278,17 +311,23 @@ object QiangzhiJwImporter {
             ).execute().use { response ->
                 if (!response.isSuccessful) {
                     Log.e(TAG, "Fetch timetable failed. http=${response.code}, message=${response.message}")
-                    return@withContext ImportResult.Error("获取课表失败：HTTP ${response.code}")
+                    return@withContext ImportResult.Error(
+                        context.getString(R.string.qiangzhi_error_fetch_failed, response.code)
+                    )
                 }
                 response.body?.string() ?: run {
                     Log.e(TAG, "Response body is null")
-                    return@withContext ImportResult.Error("获取课表失败：响应内容为空")
+                    return@withContext ImportResult.Error(
+                        context.getString(R.string.qiangzhi_error_response_empty)
+                    )
                 }
             }
 
             val parsed = parseTimetableHtml(html)
             if (parsed.courses.isEmpty()) {
-                return@withContext ImportResult.Error("未解析到课程，请确认课表页可正常访问")
+                return@withContext ImportResult.Error(
+                    context.getString(R.string.qiangzhi_error_no_courses)
+                )
             }
 
             val courseEntities = parsed.courses.map { course ->
@@ -307,7 +346,12 @@ object QiangzhiJwImporter {
             ImportResult.Success()
         } catch (e: Exception) {
             Log.e(TAG, "Update failed", e)
-            ImportResult.Error("更新失败：${e.message ?: "未知错误"}")
+            ImportResult.Error(
+                context.getString(
+                    R.string.qiangzhi_error_update_failed_with_reason,
+                    e.message ?: context.getString(R.string.error_unknown)
+                )
+            )
         }
     }
 
@@ -492,8 +536,8 @@ object QiangzhiJwImporter {
         return extended
     }
 
-    private fun inferStartDate(termId: String?): Pair<LocalDate, String?> {
-        return LocalDate.now() to "无法确定开学日期，已使用当前日期代替"
+    private fun inferStartDate(termId: String?, context: Context): Pair<LocalDate, String?> {
+        return LocalDate.now() to context.getString(R.string.qiangzhi_warning_unknown_start_date)
     }
 
     private class InMemoryCookieJar : CookieJar {

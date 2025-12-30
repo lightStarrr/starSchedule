@@ -865,11 +865,11 @@ fun Settings(context: Activity, dao: ScheduleDao, notificationManager: UnifiedNo
 
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.live_notification_template_title)) },
-                        supportingContent = { Text(liveNotificationTemplate.description) },
+                        supportingContent = { Text(stringResource(liveNotificationTemplate.descriptionRes)) },
                         leadingContent = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
                         trailingContent = {
                             Text(
-                                text = liveNotificationTemplate.title,
+                                text = stringResource(liveNotificationTemplate.titleRes),
                                 color = MaterialTheme.colorScheme.primary
                             )
                         },
@@ -1076,12 +1076,12 @@ private fun FlymeTemplateOption(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = template.title,
+                        text = stringResource(template.titleRes),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = template.description,
+                        text = stringResource(template.descriptionRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
