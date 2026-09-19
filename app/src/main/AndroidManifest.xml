@@ -94,6 +94,12 @@
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="true" />
 
+        <provider
+            android:name=".provider.ScheduleExportProvider"
+            android:authorities="com.star.schedule.export"
+            android:enabled="true"
+            android:exported="true" />
+
         <!-- 小组件定时更新广播接收器 -->
         <receiver
             android:name=".receiver.WidgetBootReceiver"

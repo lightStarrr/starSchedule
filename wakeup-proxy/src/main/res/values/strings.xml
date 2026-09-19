@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WakeUp课程表</string>
+    <string name="source_app_missing">请先安装星课程表</string>
+</resources>
