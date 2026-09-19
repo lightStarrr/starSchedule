@@ -25,4 +25,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "starSchedule"
 include(":app")
- 
+include(":wakeup-proxy")
