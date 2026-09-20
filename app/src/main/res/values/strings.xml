@@ -190,6 +190,9 @@
     <string name="startup_hint_secondary">The app won\'t stay in the background; the system wakes it only to send notifications.</string>
     <string name="content_desc_close_hint">Dismiss hint</string>
     <string name="reminder_toggle_title">Pre–class reminder</string>
+    <string name="wakeup_simulation_title">WakeUp simulation</string>
+    <string name="wakeup_simulation_support">Simulate WakeUp timetable data; mutually exclusive with pre–class reminders</string>
+    <string name="wakeup_simulation_proxy_missing">Install the WakeUp simulation shell first</string>
     <string name="reminder_toggle_support">Enable %2$d–minute pre–class reminders for "%1$s"</string>
     <string name="only_first_continuous_title">Remind only for the first class of continuous sessions</string>
     <string name="only_first_continuous_support">For back–to–back classes, send a notification before the first one only</string>

@@ -45,6 +45,15 @@ class SettingsViewModel(
             initialValue = false
         )
 
+    val wakeUpSimulationEnabled = dao
+        .getPreferenceFlow(Constants.PREF_WAKEUP_SIMULATION_ENABLED)
+        .map { it == "true" }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false
+        )
+
     val hideFromRecents = dao
         .getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS)
         .map { it == "true" }
@@ -134,6 +143,7 @@ class SettingsViewModel(
     fun enableRemindersForCurrentTimetable() {
         val timetableId = currentTimetableId.value ?: return
         viewModelScope.launch {
+            dao.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "false")
             notificationManager.enableRemindersForTimetable(timetableId)
             _reminderEnabled.value = true
         }
@@ -143,6 +153,20 @@ class SettingsViewModel(
         viewModelScope.launch {
             notificationManager.disableReminders()
             _reminderEnabled.value = false
+        }
+    }
+
+    fun enableWakeUpSimulation() {
+        viewModelScope.launch {
+            notificationManager.disableReminders()
+            dao.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "true")
+            _reminderEnabled.value = false
+        }
+    }
+
+    fun disableWakeUpSimulation() {
+        viewModelScope.launch {
+            dao.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "false")
         }
     }
 

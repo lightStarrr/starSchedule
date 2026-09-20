@@ -190,6 +190,9 @@
     <string name="startup_hint_secondary">软件不会常驻后台，仅在需要发送通知时被系统唤起。</string>
     <string name="content_desc_close_hint">关闭提示</string>
     <string name="reminder_toggle_title">课前提醒</string>
+    <string name="wakeup_simulation_title">WakeUp模拟</string>
+    <string name="wakeup_simulation_support">模拟WakeUp课程表数据，与课前提醒互斥</string>
+    <string name="wakeup_simulation_proxy_missing">请先安装WakeUp模拟壳</string>
     <string name="reminder_toggle_support">为当前课表（%1$s）开启课前%2$d分钟提醒</string>
     <string name="only_first_continuous_title">仅第一节连续课程提醒</string>
     <string name="only_first_continuous_support">对于连续的课程，只在第一节课前发送通知</string>

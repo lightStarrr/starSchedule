@@ -262,8 +262,7 @@ public final class WakeUpProxyProvider extends ContentProvider {
             if (code != 0 || data == null || data.trim().isEmpty()) {
                 return false;
             }
-            return !("course_list".equals(path) || "next_course_list".equals(path))
-                    || !"[]".equals(data.trim());
+            return true;
         }
     }
 }
