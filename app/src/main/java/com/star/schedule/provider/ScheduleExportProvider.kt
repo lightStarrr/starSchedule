@@ -64,13 +64,13 @@ class ScheduleExportProvider : ContentProvider() {
         selectionArgs: Array<out String>?,
         sortOrder: String?
     ): Cursor? = when (uri.pathSegments.firstOrNull()) {
-        "has_init" -> oneRow("{\"has_init\":true}")
-        "show_table_id" -> oneRow(
+        "has_init" -> oneRow(if (isWakeUpSimulationEnabled()) "{\"has_init\":true}" else "{\"has_init\":false}")
+        "show_table_id" -> oneRow(if (isWakeUpSimulationEnabled()) {
             databaseJson("{\"table_id\":1}") {
                 "{\"table_id\":${currentTimetableId()}}"
             }
-        )
-        "table_list" -> oneRow(
+        } else "{\"table_id\":0}")
+        "table_list" -> oneRow(if (isWakeUpSimulationEnabled()) {
             databaseJson("[{\"id\":1,\"tableName\":\"星课程表\"}]") {
                 buildJsonArray {
                     DatabaseProvider.dao().getAllTimetablesOnce().forEach { timetable ->
@@ -81,9 +81,9 @@ class ScheduleExportProvider : ContentProvider() {
                     }
                 }.toString()
             }
-        )
-        "course_list" -> oneRow(courseJson(uri, tomorrow = false))
-        "next_course_list" -> oneRow(courseJson(uri, tomorrow = true))
+        } else "[]")
+        "course_list" -> oneRow(if (isWakeUpSimulationEnabled()) courseJson(uri, tomorrow = false) else "[]")
+        "next_course_list" -> oneRow(if (isWakeUpSimulationEnabled()) courseJson(uri, tomorrow = true) else "[]")
         "refresh" -> null
         else -> null
     }
@@ -120,6 +120,14 @@ class ScheduleExportProvider : ContentProvider() {
             ?: dao.getAllTimetablesOnce().firstOrNull()?.id
             ?: 1L
     }
+
+    private fun isWakeUpSimulationEnabled(): Boolean = runCatching {
+        runBlocking(Dispatchers.IO) {
+            DatabaseProvider.dao()
+                .getPreferenceFlow(Constants.PREF_WAKEUP_SIMULATION_ENABLED)
+                .first() == "true"
+        }
+    }.getOrDefault(false)
 
     private fun databaseJson(fallback: String, block: suspend () -> String): String = try {
         runBlocking(Dispatchers.IO) { block() }

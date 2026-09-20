@@ -115,6 +115,7 @@ import com.star.schedule.notification.FlymeLiveTemplate
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.ui.viewmodel.SettingsViewModel
 import com.star.schedule.ui.viewmodel.SettingsViewModelFactory
+import com.star.schedule.wakeup.WakeUpSupport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -160,12 +161,14 @@ fun Settings(floatingToolbarHeight: Dp,context: Activity, dao: ScheduleDao, noti
     val timetables by viewModel.timetables.collectAsState()
     val currentTimetableId by viewModel.currentTimetableId.collectAsState()
     val reminderEnabled by viewModel.reminderEnabled.collectAsState()
+    val wakeUpSimulationEnabled by viewModel.wakeUpSimulationEnabled.collectAsState()
     val notifyOnlyForFirstContinuousClass by viewModel.notifyOnlyForFirstContinuousClass.collectAsState()
     val hideFromRecents by viewModel.hideFromRecents.collectAsState()
     val startupHintClosed by viewModel.startupHintClosed.collectAsState()
     val liveCapsuleBgColorPref by viewModel.liveCapsuleBgColor.collectAsState()
     val liveNotificationTemplate by viewModel.liveNotificationTemplate.collectAsState()
     val liveCapsuleIconPath by viewModel.liveCapsuleIconPath.collectAsState()
+    val showWakeUpSimulationSetting = remember { WakeUpSupport.isColorOs() }
     var liveCapsuleIconBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     // 控制 BottomSheet 显示
@@ -568,6 +571,36 @@ fun Settings(floatingToolbarHeight: Dp,context: Activity, dao: ScheduleDao, noti
                     )
             }
         )
+
+        if (showWakeUpSimulationSetting) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.wakeup_simulation_title)) },
+                supportingContent = { Text(stringResource(R.string.wakeup_simulation_support)) },
+                leadingContent = {
+                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
+                },
+                trailingContent = {
+                    Switch(
+                        checked = wakeUpSimulationEnabled,
+                        enabled = true,
+                        onCheckedChange = { enabled ->
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            if (!enabled) {
+                                viewModel.disableWakeUpSimulation()
+                            } else if (!WakeUpSupport.isProxyInstalled(context)) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.wakeup_simulation_proxy_missing),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                viewModel.enableWakeUpSimulation()
+                            }
+                        }
+                    )
+                }
+            )
+        }
 
         // 通知设置项 - 作为一个整体一起出现
         val reminderEnterTransition =
