@@ -276,7 +276,7 @@ fun Layout(context: Activity) {
                                                     onCurrentWeekNumberChange(weeksWithCourses[index - 1])
                                                 }
                                             },
-                                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                            colors = ToggleButtonDefaults.colors(
                                                 containerColor = MaterialTheme.colorScheme.primary,
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
@@ -292,7 +292,7 @@ fun Layout(context: Activity) {
                                                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                                                 showWeekSelector = true
                                             },
-                                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                            colors = ToggleButtonDefaults.colors(
                                                 containerColor = MaterialTheme.colorScheme.primary,
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
                                             )
@@ -310,7 +310,7 @@ fun Layout(context: Activity) {
                                                     onCurrentWeekNumberChange(weeksWithCourses[index + 1])
                                                 }
                                             },
-                                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                            colors = ToggleButtonDefaults.colors(
                                                 containerColor = MaterialTheme.colorScheme.primary,
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
                                             )

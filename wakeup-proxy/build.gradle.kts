@@ -4,7 +4,8 @@ plugins {
 
 android {
     namespace = "com.suda.yzune.wakeupschedule"
-    compileSdk = 36
+    compileSdk = 37
+    enableKotlin = false
 
     defaultConfig {
         applicationId = "com.suda.yzune.wakeupschedule"
