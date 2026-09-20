@@ -39,6 +39,10 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        // M3E alpha28 brings Compose 1.13 lint, which flags existing context resource reads.
+        disable += "LocalContextGetResourceValueCall"
+    }
 }
 
 dependencies {
