@@ -133,7 +133,18 @@ class ScheduleExportProvider : ContentProvider() {
     }
 
     private fun notifyWakeUpRefresh() {
-        context?.contentResolver?.notifyChange(WAKE_UP_REFRESH_URI, null)
+        val resolver = context?.contentResolver ?: return
+        val providerExists = context?.packageManager
+            ?.resolveContentProvider(WAKE_UP_AUTHORITY, 0) != null
+        if (!providerExists) {
+            Log.d(TAG, "WakeUp 代理未安装，跳过刷新通知")
+            return
+        }
+        try {
+            resolver.notifyChange(WAKE_UP_REFRESH_URI, null)
+        } catch (error: SecurityException) {
+            Log.w(TAG, "WakeUp 代理不可用，跳过刷新通知", error)
+        }
     }
 
     override fun getType(uri: Uri): String? = null
@@ -155,8 +166,8 @@ class ScheduleExportProvider : ContentProvider() {
         private const val TAG = "ScheduleExportProvider"
         private const val REFRESH_DEBOUNCE_MS = 250L
         private const val SECOND_REFRESH_DELAY_MS = 1_000L
-        private val WAKE_UP_REFRESH_URI =
-            "content://com.suda.yzune.wakeupschedule.provider/refresh".toUri()
+        private const val WAKE_UP_AUTHORITY = "com.suda.yzune.wakeupschedule.provider"
+        private val WAKE_UP_REFRESH_URI = "content://$WAKE_UP_AUTHORITY/refresh".toUri()
     }
 }
 
