@@ -54,6 +54,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
@@ -517,6 +518,61 @@ fun Settings(floatingToolbarHeight: Dp,context: Activity, dao: ScheduleDao, noti
             }
         }
 
+        if (showWakeUpSimulationSetting) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.wakeup_simulation_title)) },
+                supportingContent = { Text(stringResource(R.string.wakeup_simulation_support)) },
+                leadingContent = {
+                    AnimatedContent(
+                        targetState = wakeUpSimulationEnabled,
+                        transitionSpec = {
+                            if (reminderAnimationsReady) {
+                                (scaleIn(
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    ),
+                                    initialScale = 0.8f
+                                ) + fadeIn() togetherWith
+                                        scaleOut(
+                                            animationSpec = tween(100),
+                                            targetScale = 0.8f
+                                        ) + fadeOut())
+                            } else {
+                                (EnterTransition.None).togetherWith(ExitTransition.None)
+                            }
+                        }, label = "WakeUpSimulationIcon"
+                    ) { enabled ->
+                        Icon(
+                            imageVector = if (enabled) Icons.Rounded.CalendarMonth else Icons.Rounded.CalendarToday,
+                            contentDescription = null,
+                            tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                trailingContent = {
+                    Switch(
+                        checked = wakeUpSimulationEnabled,
+                        enabled = true,
+                        onCheckedChange = { enabled ->
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            if (!enabled) {
+                                viewModel.disableWakeUpSimulation()
+                            } else if (!WakeUpSupport.isProxyInstalled(context)) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.wakeup_simulation_proxy_missing),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } else {
+                                viewModel.enableWakeUpSimulation()
+                            }
+                        }
+                    )
+                }
+            )
+        }
+
         // 课前提醒开关
         ListItem(
             headlineContent = { Text(stringResource(R.string.reminder_toggle_title)) },
@@ -571,36 +627,6 @@ fun Settings(floatingToolbarHeight: Dp,context: Activity, dao: ScheduleDao, noti
                     )
             }
         )
-
-        if (showWakeUpSimulationSetting) {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.wakeup_simulation_title)) },
-                supportingContent = { Text(stringResource(R.string.wakeup_simulation_support)) },
-                leadingContent = {
-                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
-                },
-                trailingContent = {
-                    Switch(
-                        checked = wakeUpSimulationEnabled,
-                        enabled = true,
-                        onCheckedChange = { enabled ->
-                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                            if (!enabled) {
-                                viewModel.disableWakeUpSimulation()
-                            } else if (!WakeUpSupport.isProxyInstalled(context)) {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.wakeup_simulation_proxy_missing),
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            } else {
-                                viewModel.enableWakeUpSimulation()
-                            }
-                        }
-                    )
-                }
-            )
-        }
 
         // 通知设置项 - 作为一个整体一起出现
         val reminderEnterTransition =
