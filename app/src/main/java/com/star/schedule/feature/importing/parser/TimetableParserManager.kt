@@ -1,4 +1,4 @@
-package com.star.schedule.utils.parser
+package com.star.schedule.feature.importing.parser
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers

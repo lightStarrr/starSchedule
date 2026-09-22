@@ -1,7 +1,7 @@
-package com.star.schedule.utils.parser.algorithms
+package com.star.schedule.feature.importing.parser.algorithms
 
 import android.util.Log
-import com.star.schedule.utils.parser.*
+import com.star.schedule.feature.importing.parser.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
