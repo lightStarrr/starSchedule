@@ -1,4 +1,4 @@
-package com.star.schedule.utils
+package com.star.schedule.feature.importing.data
 
 import android.content.Context
 import android.net.Uri
@@ -8,11 +8,11 @@ import com.star.schedule.db.CourseEntity
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
-import com.star.schedule.utils.parser.ParseResult
-import com.star.schedule.utils.parser.TimetableParserManager
-import com.star.schedule.utils.parser.algorithms.XuexitongParser
-import com.star.schedule.utils.parser.algorithms.XuexitongParser2
-import com.star.schedule.utils.parser.algorithms.YinghuaParser1
+import com.star.schedule.feature.importing.parser.ParseResult
+import com.star.schedule.feature.importing.parser.TimetableParserManager
+import com.star.schedule.feature.importing.parser.algorithms.XuexitongParser
+import com.star.schedule.feature.importing.parser.algorithms.XuexitongParser2
+import com.star.schedule.feature.importing.parser.algorithms.YinghuaParser1
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate

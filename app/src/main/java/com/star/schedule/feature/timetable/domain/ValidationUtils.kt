@@ -1,4 +1,4 @@
-package com.star.schedule.utils
+package com.star.schedule.feature.timetable.domain
 
 import android.content.res.Resources
 import androidx.annotation.StringRes

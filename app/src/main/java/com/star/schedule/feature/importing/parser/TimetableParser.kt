@@ -1,4 +1,4 @@
-package com.star.schedule.utils.parser
+package com.star.schedule.feature.importing.parser
 
 import java.io.InputStream
 

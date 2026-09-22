@@ -1,4 +1,4 @@
-package com.star.schedule.utils
+package com.star.schedule.feature.timetable.data
 
 import kotlinx.serialization.Serializable
 
