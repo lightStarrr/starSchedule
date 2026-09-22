@@ -93,7 +93,6 @@ import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.LessonTimeTemplateEntity
 import com.star.schedule.core.database.LessonTimeTemplateItemEntity
-import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.feature.timetable.domain.TimetableRepository
 import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.importing.wakeup.data.createWakeUpImportUseCase
@@ -125,8 +124,7 @@ private enum class LessonTimeTemplateImportConflictStrategy {
 @Composable
 fun TimetableSettings(
     floatingToolbarHeight: Dp,
-    repository: TimetableRepository,
-    dao: ScheduleDao
+    repository: TimetableRepository
 ) {
     val scope = rememberCoroutineScope()
     val timetables by repository.observeTimetables().collectAsState(initial = emptyList())
@@ -361,7 +359,7 @@ fun TimetableSettings(
                                                                         baseUrl = config.baseUrl,
                                                                         account = config.account,
                                                                         password = config.password,
-                                                                        dao = dao,
+                                                                        repository = repository,
                                                                         context = context
                                                                     )) {
                                                                     is QiangzhiJwImporter.ImportResult.Success -> {
@@ -577,7 +575,7 @@ fun TimetableSettings(
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = wakeUpImportSheetState
         )
     }
@@ -592,7 +590,7 @@ fun TimetableSettings(
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = xuexitongImportSheetState
         )
     }
@@ -607,7 +605,7 @@ fun TimetableSettings(
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = qiangzhiImportSheetState
         )
     }
@@ -3251,7 +3249,7 @@ fun ImportOptionsSheet(
 @Composable
 fun WakeUpImportSheet(
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     var shareText by remember { mutableStateOf("") }
@@ -3260,9 +3258,9 @@ fun WakeUpImportSheet(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val defaultTimetableName = stringResource(R.string.wakeup_default_timetable_name)
-    val importWakeUpSchedule = remember(dao, defaultTimetableName) {
+    val importWakeUpSchedule = remember(repository, defaultTimetableName) {
         createWakeUpImportUseCase(
-            dao = dao,
+            repository = repository,
             defaultTimetableName = defaultTimetableName,
         )
     }
@@ -3381,7 +3379,7 @@ fun WakeUpImportSheet(
 @Composable
 fun QiangzhiImportSheet(
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     var baseUrl by remember { mutableStateOf(QiangzhiJwImporter.EXAMPLE_BASE_URL) }
@@ -3394,7 +3392,7 @@ fun QiangzhiImportSheet(
 
     LaunchedEffect(Unit) {
         val config = withContext(Dispatchers.IO) {
-            dao.getAllTimetablesOnce()
+            repository.getAllTimetablesOnce()
                 .asSequence()
                 .mapNotNull { timetable -> TimetableAutoUpdateJson.decode(timetable.autoUpdateJson) }
                 .firstOrNull { it is QiangzhiJwAutoUpdateConfig }
@@ -3532,7 +3530,7 @@ fun QiangzhiImportSheet(
                                         baseUrl = normalizedBaseUrl,
                                         account = trimmedAccount,
                                         password = password,
-                                        dao = dao,
+                                        repository = repository,
                                         context = context
                                     )) {
                                     is QiangzhiJwImporter.ImportResult.Success -> {
@@ -3567,7 +3565,7 @@ fun QiangzhiImportSheet(
 @Composable
 fun XuexitongImportSheet(
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
@@ -3707,7 +3705,7 @@ fun XuexitongImportSheet(
                         scope.launch {
                             try {
                                 // 调用导入函数
-                                val result = importTimetable(selectedFileUri!!, context, dao)
+                                val result = importTimetable(selectedFileUri!!, context, repository)
                                 if (result) {
                                     // 课表导入成功后立即刷新小组件
                                     WidgetRefreshManager.onTimetableSwitched(context)

@@ -2,19 +2,19 @@ package com.star.schedule.feature.importing.wakeup.data
 
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportPlan
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpScheduleWriter
+import com.star.schedule.feature.timetable.domain.TimetableRepository
 import java.time.LocalDate
 
 class RoomWakeUpScheduleWriter(
-    private val dao: ScheduleDao,
+    private val repository: TimetableRepository,
     private val defaultTimetableName: String,
     private val currentDate: () -> LocalDate = LocalDate::now,
 ) : WakeUpScheduleWriter {
     override suspend fun write(plan: WakeUpImportPlan) {
-        val timetableId = dao.insertTimetableWithReminders(
+        val timetableId = repository.insertTimetableWithReminders(
             TimetableEntity(
                 name = plan.timetableName ?: defaultTimetableName,
                 showWeekend = plan.showWeekend,
@@ -23,7 +23,7 @@ class RoomWakeUpScheduleWriter(
         )
 
         plan.lessonTimes.forEach { lessonTime ->
-            dao.insertOrUpdateLessonTimeAutoSort(
+            repository.insertOrUpdateLessonTimeAutoSort(
                 LessonTimeEntity(
                     timetableId = timetableId,
                     period = lessonTime.period,
@@ -34,7 +34,7 @@ class RoomWakeUpScheduleWriter(
         }
 
         plan.courses.forEach { course ->
-            dao.insertCourseWithReminders(
+            repository.insertCourseWithReminders(
                 CourseEntity(
                     timetableId = timetableId,
                     name = course.name,

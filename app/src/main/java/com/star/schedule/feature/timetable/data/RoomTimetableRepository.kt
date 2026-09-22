@@ -15,6 +15,9 @@ class RoomTimetableRepository(
     override fun observeTimetables(): Flow<List<TimetableEntity>> =
         dao.getAllTimetables()
 
+    override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> =
+        dao.getTimetableFlow(timetableId)
+
     override suspend fun getAllTimetablesOnce(): List<TimetableEntity> =
         dao.getAllTimetablesOnce()
 
@@ -27,6 +30,13 @@ class RoomTimetableRepository(
 
     override suspend fun deleteTimetableWithReminders(timetable: TimetableEntity) {
         dao.deleteTimetableWithReminders(timetable)
+    }
+
+    override suspend fun replaceCoursesForTimetable(
+        timetableId: Long,
+        courses: List<CourseEntity>
+    ) {
+        dao.replaceCoursesForTimetable(timetableId, courses)
     }
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =

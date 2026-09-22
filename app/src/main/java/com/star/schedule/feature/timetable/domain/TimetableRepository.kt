@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 interface TimetableRepository {
     fun observeTimetables(): Flow<List<TimetableEntity>>
 
+    fun observeTimetable(timetableId: Long): Flow<TimetableEntity?>
+
     suspend fun getAllTimetablesOnce(): List<TimetableEntity>
 
     suspend fun insertTimetableWithReminders(timetable: TimetableEntity): Long
@@ -17,6 +19,8 @@ interface TimetableRepository {
     suspend fun updateTimetableWithReminders(timetable: TimetableEntity)
 
     suspend fun deleteTimetableWithReminders(timetable: TimetableEntity)
+
+    suspend fun replaceCoursesForTimetable(timetableId: Long, courses: List<CourseEntity>)
 
     fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>>
 

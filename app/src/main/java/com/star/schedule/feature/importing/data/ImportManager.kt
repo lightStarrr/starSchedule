@@ -6,8 +6,8 @@ import android.util.Log
 import com.star.schedule.R
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.feature.timetable.domain.TimetableRepository
 import com.star.schedule.feature.importing.parser.ParseResult
 import com.star.schedule.feature.importing.parser.TimetableParserManager
 import com.star.schedule.feature.importing.parser.algorithms.XuexitongParser
@@ -26,7 +26,11 @@ object ImportManager {
         TimetableParserManager.register(YinghuaParser1())
     }
 
-    suspend fun importTimetable(fileUri: Uri, context: Context, dao: ScheduleDao): Boolean =
+    suspend fun importTimetable(
+        fileUri: Uri,
+        context: Context,
+        repository: TimetableRepository
+    ): Boolean =
         withContext(Dispatchers.IO) {
             val inputStream = context.contentResolver.openInputStream(fileUri)
             if (inputStream == null) {
@@ -42,7 +46,7 @@ object ImportManager {
                 return@withContext false
             }
 
-            val timetableId = dao.insertTimetableWithReminders(
+            val timetableId = repository.insertTimetableWithReminders(
                 TimetableEntity(
                     name = context.getString(R.string.auto_imported_timetable_name),
                     showWeekend = true,
@@ -51,7 +55,7 @@ object ImportManager {
             )
 
             result.timeSlots.forEachIndexed { index, slot ->
-                dao.insertOrUpdateLessonTimeAutoSort(
+                repository.insertOrUpdateLessonTimeAutoSort(
                     LessonTimeEntity(
                         timetableId = timetableId,
                         period = index + 1,
@@ -62,7 +66,7 @@ object ImportManager {
             }
 
             result.courses.forEach { course ->
-                dao.insertCourseWithReminders(
+                repository.insertCourseWithReminders(
                     CourseEntity(
                         timetableId = timetableId,
                         name = course.name,
