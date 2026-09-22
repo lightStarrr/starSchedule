@@ -37,9 +37,9 @@ import com.star.schedule.R
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.NotificationManagerProvider
 import com.star.schedule.core.database.ReminderEntity
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
+import com.star.schedule.feature.timetable.domain.ReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -55,7 +55,7 @@ import java.time.format.DateTimeFormatter
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 
-class UnifiedNotificationManager(private val context: Context) : NotificationManagerProvider {
+class UnifiedNotificationManager(private val context: Context) : ReminderScheduler {
 
     private val notificationManager = context.getSystemService<NotificationManager>()!!
     private val alarmManager = context.getSystemService<AlarmManager>()!!
