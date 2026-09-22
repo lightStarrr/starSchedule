@@ -101,6 +101,7 @@ import com.star.schedule.core.common.isNewerVersion
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.DatabaseProvider.dao
 import com.star.schedule.feature.settings.data.RoomSettingsRepository
+import com.star.schedule.feature.timetable.data.RoomTimetableRepository
 import com.star.schedule.feature.update.data.GitHubLatestReleaseSource
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
@@ -208,6 +209,9 @@ fun Layout(context: Activity) {
     val notificationManager = UnifiedNotificationManager(context)
     val settingsRepository = remember(dao, notificationManager) {
         RoomSettingsRepository(dao, notificationManager)
+    }
+    val timetableRepository = remember(dao) {
+        RoomTimetableRepository(dao)
     }
 
     // 注入 notificationManager 到 dao 中
@@ -432,6 +436,7 @@ fun Layout(context: Activity) {
 
                 1 -> TimetableSettings(
                     floatingToolbarHeight = floatingToolbarHeight,
+                    repository = timetableRepository,
                     dao = dao
                 )
 
