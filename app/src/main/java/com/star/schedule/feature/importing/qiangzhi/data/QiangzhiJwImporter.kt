@@ -7,8 +7,8 @@ import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
 import com.star.schedule.autoupdate.TimetableAutoUpdateJson
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.feature.timetable.domain.TimetableRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
@@ -68,7 +68,7 @@ object QiangzhiJwImporter {
         baseUrl: String,
         account: String,
         password: String,
-        dao: ScheduleDao,
+        repository: TimetableRepository,
         context: Context
     ): ImportResult = withContext(Dispatchers.IO) {
         try {
@@ -171,7 +171,7 @@ object QiangzhiJwImporter {
                 }
             }
 
-            val timetableId = dao.insertTimetableWithReminders(
+            val timetableId = repository.insertTimetableWithReminders(
                 TimetableEntity(
                     name = timetableName,
                     showWeekend = true,
@@ -188,7 +188,7 @@ object QiangzhiJwImporter {
 
             val maxPeriod = parsed.courses.flatMap { it.periods }.maxOrNull() ?: 0
             defaultLessonTimes(maxPeriod).forEach { slot ->
-                dao.insertOrUpdateLessonTimeAutoSort(
+                repository.insertOrUpdateLessonTimeAutoSort(
                     LessonTimeEntity(
                         timetableId = timetableId,
                         period = slot.period,
@@ -199,7 +199,7 @@ object QiangzhiJwImporter {
             }
 
             parsed.courses.forEach { course ->
-                dao.insertCourseWithReminders(
+                repository.insertCourseWithReminders(
                     CourseEntity(
                         timetableId = timetableId,
                         name = course.name,
@@ -229,7 +229,7 @@ object QiangzhiJwImporter {
         baseUrl: String,
         account: String,
         password: String,
-        dao: ScheduleDao,
+        repository: TimetableRepository,
         context: Context
     ): ImportResult = withContext(Dispatchers.IO) {
         try {
@@ -238,7 +238,7 @@ object QiangzhiJwImporter {
                     context.getString(R.string.qiangzhi_error_invalid_auto_update_config)
                 )
 
-            val timetable = dao.getTimetableFlow(timetableId).firstOrNull()
+            val timetable = repository.observeTimetable(timetableId).firstOrNull()
             if (timetable == null) {
                 return@withContext ImportResult.Error(
                     context.getString(R.string.qiangzhi_error_missing_timetable)
@@ -342,7 +342,7 @@ object QiangzhiJwImporter {
                 )
             }
 
-            dao.replaceCoursesForTimetable(timetableId, courseEntities)
+            repository.replaceCoursesForTimetable(timetableId, courseEntities)
             ImportResult.Success()
         } catch (e: Exception) {
             Log.e(TAG, "Update failed", e)

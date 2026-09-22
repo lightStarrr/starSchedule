@@ -440,8 +440,7 @@ fun Layout(context: Activity) {
 
                 1 -> TimetableSettings(
                     floatingToolbarHeight = floatingToolbarHeight,
-                    repository = timetableRepository,
-                    dao = dao
+                    repository = timetableRepository
                 )
 
                 2 -> Settings(
