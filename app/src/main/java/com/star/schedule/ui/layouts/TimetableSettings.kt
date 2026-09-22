@@ -95,8 +95,9 @@ import com.star.schedule.db.LessonTimeTemplateEntity
 import com.star.schedule.db.LessonTimeTemplateItemEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
+import com.star.schedule.feature.importing.wakeup.data.createWakeUpImportUseCase
 import com.star.schedule.feature.importing.wakeup.domain.extractKeyFromShareText
-import com.star.schedule.feature.importing.wakeup.domain.parseWakeUpDate
+import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportResult
 import com.star.schedule.service.WidgetRefreshManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.utils.ImportManager.importTimetable
@@ -109,14 +110,6 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -3261,6 +3254,13 @@ fun WakeUpImportSheet(
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val defaultTimetableName = stringResource(R.string.wakeup_default_timetable_name)
+    val importWakeUpSchedule = remember(dao, defaultTimetableName) {
+        createWakeUpImportUseCase(
+            dao = dao,
+            defaultTimetableName = defaultTimetableName,
+        )
+    }
 
     OptimizedBottomSheet(
         onDismiss = onDismiss,
@@ -3344,9 +3344,8 @@ fun WakeUpImportSheet(
                         isLoading = true
                         scope.launch {
                             try {
-                                // 调用WakeUp API导入课表
-                                val result = importFromWakeUp(key, dao, context)
-                                if (result) {
+                                val result = importWakeUpSchedule(key)
+                                if (result is WakeUpImportResult.Success) {
                                     onDismiss()
                                 } else {
                                     errorMessage =
@@ -3555,153 +3554,6 @@ fun QiangzhiImportSheet(
                 }
             }
         }
-    }
-}
-
-// WakeUp导入函数
-suspend fun importFromWakeUp(key: String, dao: ScheduleDao, context: Context): Boolean = withContext(Dispatchers.IO) {
-    try {
-        val client = OkHttpClient.Builder()
-            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        val request = Request.Builder()
-            .url("https://i.wakeup.fun/share_schedule/get?key=$key")
-            .get()
-            .addHeader("User-Agent", "StarSchedule/1.0")
-            .build()
-        val response = client.newCall(request).execute()
-        
-        if (!response.isSuccessful) {
-            Log.e("WakeUpImport", "请求失败: ${response.code} - ${response.message}")
-            return@withContext false
-        }
-        
-        val body = response.body?.string() ?: run {
-            Log.e("WakeUpImport", "响应体为空")
-            return@withContext false
-        }
-
-        val rootJson = Json.parseToJsonElement(body).jsonObject
-        if (rootJson["status"]?.jsonPrimitive?.int != 1) {
-            Log.e("WakeUpImport", "API返回错误状态: ${rootJson["status"]}")
-            return@withContext false
-        }
-
-        val dataStr = rootJson["data"]?.jsonPrimitive?.content ?: run {
-            Log.e("WakeUpImport", "API返回数据为空")
-            return@withContext false
-        }
-        val segments = dataStr.split("\n")
-        if (segments.size < 4) {
-            Log.e("WakeUpImport", "API返回数据格式错误，段数: ${segments.size}")
-            return@withContext false
-        }
-
-        val timetableInfo = Json.decodeFromString<JsonObject>(segments[0])
-        val lessonTimes = Json.decodeFromString<JsonArray>(segments[1])
-        val configInfo = Json.decodeFromString<JsonObject>(segments[2])
-        val courses = Json.decodeFromString<JsonArray>(segments[3])
-        val courseInfo = Json.decodeFromString<JsonArray>(segments[4])
-
-        Log.d("WakeUp", "timetableInfo: $timetableInfo")
-        Log.d("WakeUp", "lessonTimes: $lessonTimes")
-        Log.d("WakeUp", "configInfo: $configInfo")
-        Log.d("WakeUp", "courses: $courses")
-        Log.d("WakeUp", "courseInfo: $courseInfo")
-
-
-        val timetableId = dao.insertTimetableWithReminders(
-            TimetableEntity(
-                name = configInfo["tableName"]?.jsonPrimitive?.content
-                    ?: context.getString(R.string.wakeup_default_timetable_name),
-                showWeekend = configInfo["showSun"]?.jsonPrimitive?.boolean ?: true,
-                startDate = configInfo["startDate"]?.jsonPrimitive?.content?.let {
-                    parseWakeUpDate(
-                        it
-                    )
-                }
-                    ?: LocalDate.now().toString()
-            )
-        )
-
-        // 用于存储已经处理过的时间段，避免重复
-        val processedTimes = mutableSetOf<String>()
-
-        lessonTimes.forEach { jsonElement ->
-            val lessonObject = jsonElement.jsonObject
-            val period = lessonObject["node"]?.jsonPrimitive?.int ?: 1
-            val startTime = lessonObject["startTime"]?.jsonPrimitive?.content ?: return@forEach
-            val endTime = lessonObject["endTime"]?.jsonPrimitive?.content ?: return@forEach
-
-            if (startTime == endTime) {
-                return@forEach
-            }
-
-            // 创建时间段的唯一标识符
-            val timeKey = "${startTime}_${endTime}"
-
-            // 如果已经处理过相同的时间段，则跳过
-            if (processedTimes.contains(timeKey)) {
-                return@forEach
-            }
-
-            // 将当前时间段添加到已处理集合中
-            processedTimes.add(timeKey)
-
-            dao.insertOrUpdateLessonTimeAutoSort(
-                LessonTimeEntity(
-                    timetableId = timetableId,
-                    period = period,
-                    startTime = startTime,
-                    endTime = endTime
-                )
-            )
-        }
-
-        courseInfo.forEach { jsonElement ->
-            val courseInfoObject = jsonElement.jsonObject
-            val startWeek = courseInfoObject["startWeek"]?.jsonPrimitive?.int ?: return@forEach
-            val endWeek = courseInfoObject["endWeek"]?.jsonPrimitive?.int ?: return@forEach
-            val type = courseInfoObject["type"]?.jsonPrimitive?.int ?: return@forEach
-            val weeks = when (type) {
-                1 -> (startWeek..endWeek).toList().filter { it and 1 == 1 }
-                2 -> (startWeek..endWeek).toList().filter { it and 1 == 0 }
-                else -> (startWeek..endWeek).toList()
-            }
-
-            val startPeriod = courseInfoObject["startNode"]?.jsonPrimitive?.int ?: return@forEach
-            val endPeriod =
-                startPeriod + (courseInfoObject["step"]?.jsonPrimitive?.int ?: return@forEach) - 1
-            val periods = (startPeriod..endPeriod).toList()
-            val location = courseInfoObject["room"]?.jsonPrimitive?.content ?: return@forEach
-            val courseId = courseInfoObject["id"]?.jsonPrimitive?.int ?: return@forEach
-            val teacher = courseInfoObject["teacher"]?.jsonPrimitive?.content ?: return@forEach
-            val courseInfo = courses.firstOrNull { course ->
-                course.jsonObject["id"]?.jsonPrimitive?.int == courseId
-            }
-            if (courseInfo == null) return@withContext false
-            val courseName =
-                courseInfo.jsonObject["courseName"]?.jsonPrimitive?.content ?: return@forEach
-
-            val dayOfWeek = courseInfoObject["day"]?.jsonPrimitive?.int ?: return@forEach
-
-            dao.insertCourseWithReminders(
-                CourseEntity(
-                    timetableId = timetableId,
-                    name = courseName,
-                    location = location,
-                    dayOfWeek = dayOfWeek,
-                    periods = periods,
-                    weeks = weeks,
-                    teacher = teacher
-                )
-            )
-        }
-        true
-    } catch (e: Exception) {
-        Log.e("WakeUpImport", "导入失败", e)
-        false
     }
 }
 
