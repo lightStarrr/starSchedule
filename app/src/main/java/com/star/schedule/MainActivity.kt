@@ -106,8 +106,6 @@ import com.star.schedule.ui.layouts.DateRange
 import com.star.schedule.ui.layouts.Settings
 import com.star.schedule.ui.layouts.TimetableSettings
 import com.star.schedule.ui.theme.StarScheduleTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -212,9 +210,7 @@ fun Layout(context: Activity) {
 
     // 在应用启动时初始化提醒系统
     LaunchedEffect(Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            notificationManager.initializeOnAppStart()
-        }
+        notificationManager.initializeOnAppStart()
     }
 
     // 定义更新周数的函数
