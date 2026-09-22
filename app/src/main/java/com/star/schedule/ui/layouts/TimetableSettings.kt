@@ -94,6 +94,7 @@ import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.LessonTimeTemplateEntity
 import com.star.schedule.core.database.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.feature.timetable.domain.TimetableRepository
 import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.importing.wakeup.data.createWakeUpImportUseCase
 import com.star.schedule.feature.importing.wakeup.domain.extractKeyFromShareText
@@ -122,9 +123,13 @@ private enum class LessonTimeTemplateImportConflictStrategy {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
+fun TimetableSettings(
+    floatingToolbarHeight: Dp,
+    repository: TimetableRepository,
+    dao: ScheduleDao
+) {
     val scope = rememberCoroutineScope()
-    val timetables by dao.getAllTimetables().collectAsState(initial = emptyList())
+    val timetables by repository.observeTimetables().collectAsState(initial = emptyList())
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
 
@@ -183,7 +188,7 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                         scope.launch {
-                            dao.insertTimetableWithReminders(
+                            repository.insertTimetableWithReminders(
                                 TimetableEntity(
                                     name = context.getString(R.string.timetable_new_name),
                                     showWeekend = true,
@@ -422,7 +427,7 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
                                             }
                                             fadeJob.join()
                                             slideJob.join()
-                                            dao.deleteTimetableWithReminders(timetable)
+                                            repository.deleteTimetableWithReminders(timetable)
                                         }
                                     }, enabled = !isRemoving && !isUpdating) {
                                         Icon(
@@ -453,7 +458,7 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = timetableDetailSheetState
         )
     }
@@ -470,7 +475,7 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = addLessonSheetState
         )
     }
@@ -487,7 +492,7 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = addCourseSheetState
         )
     }
@@ -503,7 +508,7 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = editLessonSheetState
         )
     }
@@ -519,7 +524,7 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = editCourseSheetState
         )
     }
@@ -614,11 +619,11 @@ fun TimetableSettings(floatingToolbarHeight: Dp,dao: ScheduleDao) {
 fun EditLessonTimeSheet(
     lesson: LessonTimeEntity,
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     // 获取当前课表的所有课程时间，用于重叠检测
-    val lessonTimes by dao.getLessonTimesFlow(lesson.timetableId)
+    val lessonTimes by repository.observeLessonTimes(lesson.timetableId)
         .collectAsState(initial = emptyList())
     val sortedLessonTimes =
         lessonTimes.filter { it.id != lesson.id }.sortedBy { it.period } // 排除当前正在编辑的课程时间
@@ -794,7 +799,7 @@ fun EditLessonTimeSheet(
                     // 验证通过，保存数据（节次将自动分配）
                     scope.launch {
                         try {
-                            val result = dao.insertOrUpdateLessonTimeAutoSort(
+                            val result = repository.insertOrUpdateLessonTimeAutoSort(
                                 lesson.copy(
                                     startTime = startTime,
                                     endTime = endTime
@@ -854,7 +859,7 @@ fun EditLessonTimeSheet(
 fun EditCourseSheet(
     course: CourseEntity,
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     val context = LocalContext.current
@@ -868,7 +873,7 @@ fun EditCourseSheet(
     val weeksLabel = stringResource(R.string.label_weeks)
 
     // 获取当前课表的课程和课程时间，用于重叠检测
-    val courses by dao.getCoursesFlow(course.timetableId).collectAsState(initial = emptyList())
+    val courses by repository.observeCourses(course.timetableId).collectAsState(initial = emptyList())
     val filteredCourses = courses.filter { it.id != course.id } // 排除当前正在编辑的课程
 
     var name by remember { mutableStateOf(course.name) }
@@ -1130,7 +1135,7 @@ fun EditCourseSheet(
                     // 验证通过，保存数据
                     scope.launch {
                         try {
-                            dao.updateCourseWithReminders(
+                            repository.updateCourseWithReminders(
                                 course.copy(
                                     name = name,
                                     teacher = teacher,
@@ -1168,7 +1173,7 @@ fun EditCourseSheet(
 fun AddLessonTimeSheet(
     timetableId: Long,
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     val context = LocalContext.current
@@ -1176,7 +1181,7 @@ fun AddLessonTimeSheet(
     val endLabel = stringResource(R.string.label_end_time)
 
     // 获取当前课表的所有课程时间，用于重叠检测
-    val lessonTimes by dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
+    val lessonTimes by repository.observeLessonTimes(timetableId).collectAsState(initial = emptyList())
 
     var startTime by remember { mutableStateOf("08:00") }
     var endTime by remember { mutableStateOf("08:45") }
@@ -1345,7 +1350,7 @@ fun AddLessonTimeSheet(
                     // 验证通过，保存数据（节次将自动分配）
                     scope.launch {
                         try {
-                            val result = dao.insertOrUpdateLessonTimeAutoSort(
+                            val result = repository.insertOrUpdateLessonTimeAutoSort(
                                 LessonTimeEntity(
                                     timetableId = timetableId,
                                     period = 1, // 临时值，会被自动排序方法覆盖
@@ -1408,7 +1413,7 @@ fun AddLessonTimeSheet(
 fun AddCourseSheet(
     timetableId: Long,
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     val context = LocalContext.current
@@ -1420,7 +1425,7 @@ fun AddCourseSheet(
     val weeksLabel = stringResource(R.string.label_weeks)
 
     // 获取当前课表的课程和课程时间，用于重叠检测
-    val courses by dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
+    val courses by repository.observeCourses(timetableId).collectAsState(initial = emptyList())
 
     var name by remember { mutableStateOf("") }
     var teacher by remember { mutableStateOf("") }
@@ -1675,7 +1680,7 @@ fun AddCourseSheet(
                     // 验证通过，保存数据
                     scope.launch {
                         try {
-                            val result = dao.insertCourseWithReminders(
+                            val result = repository.insertCourseWithReminders(
                                 CourseEntity(
                                     timetableId = timetableId,
                                     name = name,
@@ -1713,7 +1718,7 @@ fun AddCourseSheet(
 fun TimetableDetailSheet(
     timetable: TimetableEntity,
     onDismiss: () -> Unit,
-    dao: ScheduleDao,
+    repository: TimetableRepository,
     sheetState: androidx.compose.material3.SheetState
 ) {
     val context = LocalContext.current
@@ -1733,11 +1738,11 @@ fun TimetableDetailSheet(
     var showDatePicker by remember { mutableStateOf(false) }
 
     // 课程时间管理 (按节次排序)
-    val lessonTimes by dao.getLessonTimesFlow(timetable.id).collectAsState(initial = emptyList())
+    val lessonTimes by repository.observeLessonTimes(timetable.id).collectAsState(initial = emptyList())
     val sortedLessonTimes = lessonTimes.sortedBy { it.period }
 
     // 课程管理
-    val courses by dao.getCoursesFlow(timetable.id).collectAsState(initial = emptyList())
+    val courses by repository.observeCourses(timetable.id).collectAsState(initial = emptyList())
 
     // 子 BottomSheet 状态
     var showAddLessonSheet by remember { mutableStateOf(false) }
@@ -1752,7 +1757,7 @@ fun TimetableDetailSheet(
     val editCourseSheetState = rememberModalBottomSheetState()
 
     // 课程时间模板
-    val lessonTimeTemplates by dao.getLessonTimeTemplatesFlow().collectAsState(initial = emptyList())
+    val lessonTimeTemplates by repository.observeLessonTimeTemplates().collectAsState(initial = emptyList())
     var showLessonTimeTemplateDialog by remember { mutableStateOf(false) }
     var showSaveLessonTimeTemplateDialog by remember { mutableStateOf(false) }
     var templateName by remember { mutableStateOf("") }
@@ -1785,7 +1790,7 @@ fun TimetableDetailSheet(
                 val jsonText = withContext(Dispatchers.IO) {
                     if (exportAll) {
                         val exports = lessonTimeTemplates.map { t ->
-                            val items = dao.getLessonTimeTemplateItemsOnce(t.id)
+                            val items = repository.getLessonTimeTemplateItemsOnce(t.id)
                             LessonTimeTemplateExport(
                                 templateName = t.name,
                                 createdAt = t.createdAt,
@@ -1803,7 +1808,7 @@ fun TimetableDetailSheet(
                         templateExportJson.encodeToString(bundle)
                     } else {
                         requireNotNull(template) { "No template selected" }
-                        val items = dao.getLessonTimeTemplateItemsOnce(template.id)
+                        val items = repository.getLessonTimeTemplateItemsOnce(template.id)
                         val exportData = LessonTimeTemplateExport(
                             templateName = template.name,
                             createdAt = template.createdAt,
@@ -1903,7 +1908,7 @@ fun TimetableDetailSheet(
             try {
                 val (imported, overwritten, skipped) = withContext(Dispatchers.IO) {
                     suspend fun findAvailableName(baseName: String): String {
-                        if (dao.getLessonTimeTemplateByNameOnce(baseName) == null) return baseName
+                        if (repository.getLessonTimeTemplateByNameOnce(baseName) == null) return baseName
 
                         var index = 1
                         while (true) {
@@ -1919,7 +1924,7 @@ fun TimetableDetailSheet(
                                     index
                                 )
                             }
-                            if (dao.getLessonTimeTemplateByNameOnce(candidate) == null) return candidate
+                            if (repository.getLessonTimeTemplateByNameOnce(candidate) == null) return candidate
                             index++
                         }
                     }
@@ -1956,8 +1961,8 @@ fun TimetableDetailSheet(
 
                         when (strategy) {
                             LessonTimeTemplateImportConflictStrategy.OVERWRITE -> {
-                                val exists = dao.getLessonTimeTemplateByNameOnce(baseName) != null
-                                dao.saveLessonTimeTemplateFromItems(
+                                val exists = repository.getLessonTimeTemplateByNameOnce(baseName) != null
+                                repository.saveLessonTimeTemplateFromItems(
                                     templateName = baseName,
                                     lessonTimes = lessonTimes,
                                     overwrite = true,
@@ -1970,7 +1975,7 @@ fun TimetableDetailSheet(
 
                             LessonTimeTemplateImportConflictStrategy.RENAME -> {
                                 val finalName = findAvailableName(baseName)
-                                dao.saveLessonTimeTemplateFromItems(
+                                repository.saveLessonTimeTemplateFromItems(
                                     templateName = finalName,
                                     lessonTimes = lessonTimes,
                                     overwrite = false,
@@ -1981,12 +1986,12 @@ fun TimetableDetailSheet(
                             }
 
                             LessonTimeTemplateImportConflictStrategy.SKIP -> {
-                                if (dao.getLessonTimeTemplateByNameOnce(baseName) != null) {
+                                if (repository.getLessonTimeTemplateByNameOnce(baseName) != null) {
                                     skippedCount++
                                     return@forEach
                                 }
 
-                                dao.saveLessonTimeTemplateFromItems(
+                                repository.saveLessonTimeTemplateFromItems(
                                     templateName = baseName,
                                     lessonTimes = lessonTimes,
                                     overwrite = false,
@@ -2257,7 +2262,7 @@ fun TimetableDetailSheet(
 
                             // 验证通过，保存数据
                             scope.launch {
-                                dao.updateTimetableWithReminders(
+                                repository.updateTimetableWithReminders(
                                     timetable.copy(
                                         name = name,
                                         startDate = startDate,
@@ -2350,7 +2355,7 @@ fun TimetableDetailSheet(
                                     }
                                     IconButton(onClick = {
                                         scope.launch {
-                                            dao.deleteLessonTimeAutoSort(
+                                            repository.deleteLessonTimeAutoSort(
                                                 lesson
                                             )
                                             // 课程时间删除后立即刷新小组件
@@ -2440,7 +2445,7 @@ fun TimetableDetailSheet(
                                     }
                                     IconButton(onClick = {
                                         scope.launch {
-                                            dao.deleteCourseWithReminders(
+                                            repository.deleteCourseWithReminders(
                                                 course
                                             )
                                             // 课程删除后立即刷新小组件
@@ -2763,7 +2768,7 @@ fun TimetableDetailSheet(
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    dao.saveLessonTimeTemplateFromTimetable(
+                                    repository.saveLessonTimeTemplateFromTimetable(
                                         timetableId = timetable.id,
                                         templateName = nameToSave,
                                         overwrite = false
@@ -2832,7 +2837,7 @@ fun TimetableDetailSheet(
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    dao.saveLessonTimeTemplateFromTimetable(
+                                    repository.saveLessonTimeTemplateFromTimetable(
                                         timetableId = timetable.id,
                                     templateName = nameToOverwrite,
                                     overwrite = true
@@ -2887,7 +2892,7 @@ fun TimetableDetailSheet(
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    dao.applyLessonTimeTemplateToTimetable(
+                                    repository.applyLessonTimeTemplateToTimetable(
                                         timetableId = timetable.id,
                                         templateId = template.id
                                     )
@@ -2942,7 +2947,7 @@ fun TimetableDetailSheet(
                         scope.launch {
                             try {
                                 withContext(Dispatchers.IO) {
-                                    dao.deleteLessonTimeTemplate(template)
+                                    repository.deleteLessonTimeTemplate(template)
                                 }
                                 Toast.makeText(
                                     context,
@@ -2986,7 +2991,7 @@ fun TimetableDetailSheet(
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = addLessonSheetState
         )
     }
@@ -3001,7 +3006,7 @@ fun TimetableDetailSheet(
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = addCourseSheetState
         )
     }
@@ -3016,7 +3021,7 @@ fun TimetableDetailSheet(
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = editLessonSheetState
         )
     }
@@ -3031,7 +3036,7 @@ fun TimetableDetailSheet(
                     }
                 }
             },
-            dao = dao,
+            repository = repository,
             sheetState = editCourseSheetState
         )
     }
