@@ -99,6 +99,7 @@ import com.star.schedule.R
 import com.star.schedule.core.common.isNewerVersion
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.DatabaseProvider.dao
+import com.star.schedule.feature.update.data.GitHubLatestReleaseSource
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.ui.layouts.DateRange
@@ -110,11 +111,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
@@ -169,9 +165,10 @@ class MainActivity : ComponentActivity() {
 fun Layout(context: Activity) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val latestReleaseSource = remember { GitHubLatestReleaseSource() }
 
-    LaunchedEffect(Unit) {
-        val latestTag = fetchLatestReleaseTag()
+    LaunchedEffect(latestReleaseSource) {
+        val latestTag = latestReleaseSource.fetchLatestReleaseTag()
         if (latestTag == null) {
             Log.d("StarSchedule", "Failed to fetch latest release tag")
             return@LaunchedEffect
@@ -588,61 +585,6 @@ fun getAppVersionName(context: Context): String {
         pInfo.versionName ?: ""
     } catch (_: Exception) {
         ""
-    }
-}
-
-suspend fun fetchLatestReleaseTag(): String? {
-    return withContext(Dispatchers.IO) {
-        try {
-            // 创建带有超时和重试机制的OkHttpClient
-            val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .writeTimeout(15, TimeUnit.SECONDS)
-                .retryOnConnectionFailure(true)
-                .build()
-
-            val url = "https://api.github.com/repos/lightStarrr/starSchedule/releases/latest"
-            val request = Request.Builder()
-                .url(url)
-                .header("Accept", "application/vnd.github+json")
-                .build()
-
-            val resp = client.newCall(request).execute()
-            if (!resp.isSuccessful) {
-                Log.w("StarSchedule", "GitHub API request failed with code: ${resp.code}, message: ${resp.message}")
-                return@withContext null
-            }
-
-            val body = resp.body?.string() ?: run {
-                Log.w("StarSchedule", "Empty response body from GitHub API")
-                return@withContext null
-            }
-            if (body.isBlank()) {
-                Log.w("StarSchedule", "Empty response from GitHub API")
-                return@withContext null
-            }
-
-            val json = JSONObject(body)
-            val tag = json.optString("tag_name", "v1.0.0")
-            Log.d("StarSchedule", "Successfully fetched latest release tag: $tag")
-            tag
-        } catch (e: javax.net.ssl.SSLHandshakeException) {
-            Log.w("StarSchedule", "SSL handshake failed, network may be unstable", e)
-            null
-        } catch (e: java.net.SocketTimeoutException) {
-            Log.w("StarSchedule", "Request timeout, network may be slow", e)
-            null
-        } catch (e: java.net.UnknownHostException) {
-            Log.w("StarSchedule", "Cannot resolve host, network unavailable", e)
-            null
-        } catch (e: java.net.ConnectException) {
-            Log.w("StarSchedule", "Connection failed, network may be unavailable", e)
-            null
-        } catch (e: Exception) {
-            Log.w("StarSchedule", "Failed to fetch latest release tag", e)
-            null
-        }
     }
 }
 
