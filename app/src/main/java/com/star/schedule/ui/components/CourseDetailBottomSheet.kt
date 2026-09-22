@@ -13,8 +13,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
-import com.star.schedule.db.CourseEntity
-import com.star.schedule.db.LessonTimeEntity
+import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.LessonTimeEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

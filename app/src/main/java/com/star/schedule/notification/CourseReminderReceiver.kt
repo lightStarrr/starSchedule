@@ -4,8 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.star.schedule.Constants
-import com.star.schedule.db.DatabaseProvider
+import com.star.schedule.core.common.Constants
+import com.star.schedule.core.database.DatabaseProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first

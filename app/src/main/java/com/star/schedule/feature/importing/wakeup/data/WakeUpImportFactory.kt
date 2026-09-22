@@ -1,6 +1,6 @@
 package com.star.schedule.feature.importing.wakeup.data
 
-import com.star.schedule.db.ScheduleDao
+import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.feature.importing.wakeup.domain.ImportWakeUpScheduleUseCase
 
 fun createWakeUpImportUseCase(

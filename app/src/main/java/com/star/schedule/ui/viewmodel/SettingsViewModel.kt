@@ -3,8 +3,8 @@ package com.star.schedule.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.star.schedule.Constants
-import com.star.schedule.db.ScheduleDao
+import com.star.schedule.core.common.Constants
+import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.notification.FlymeLiveTemplate
 import com.star.schedule.notification.UnifiedNotificationManager
 import kotlinx.coroutines.flow.MutableStateFlow

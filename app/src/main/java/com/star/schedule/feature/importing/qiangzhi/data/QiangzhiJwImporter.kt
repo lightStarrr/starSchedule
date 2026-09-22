@@ -5,10 +5,10 @@ import android.util.Log
 import com.star.schedule.R
 import com.star.schedule.autoupdate.QiangzhiJwAutoUpdateConfig
 import com.star.schedule.autoupdate.TimetableAutoUpdateJson
-import com.star.schedule.db.CourseEntity
-import com.star.schedule.db.LessonTimeEntity
-import com.star.schedule.db.ScheduleDao
-import com.star.schedule.db.TimetableEntity
+import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.core.database.TimetableEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext

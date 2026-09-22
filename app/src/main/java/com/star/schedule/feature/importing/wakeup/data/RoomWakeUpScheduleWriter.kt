@@ -1,9 +1,9 @@
 package com.star.schedule.feature.importing.wakeup.data
 
-import com.star.schedule.db.CourseEntity
-import com.star.schedule.db.LessonTimeEntity
-import com.star.schedule.db.ScheduleDao
-import com.star.schedule.db.TimetableEntity
+import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportPlan
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpScheduleWriter
 import java.time.LocalDate

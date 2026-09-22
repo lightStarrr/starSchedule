@@ -4,10 +4,10 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.star.schedule.R
-import com.star.schedule.db.CourseEntity
-import com.star.schedule.db.LessonTimeEntity
-import com.star.schedule.db.ScheduleDao
-import com.star.schedule.db.TimetableEntity
+import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.importing.parser.ParseResult
 import com.star.schedule.feature.importing.parser.TimetableParserManager
 import com.star.schedule.feature.importing.parser.algorithms.XuexitongParser

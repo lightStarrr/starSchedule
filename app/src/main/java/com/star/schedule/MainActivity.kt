@@ -97,8 +97,8 @@ import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import com.star.schedule.R
 import com.star.schedule.core.common.isNewerVersion
-import com.star.schedule.db.DatabaseProvider
-import com.star.schedule.db.DatabaseProvider.dao
+import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.core.database.DatabaseProvider.dao
 import com.star.schedule.feature.update.data.GitHubLatestReleaseSource
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.components.OptimizedBottomSheet

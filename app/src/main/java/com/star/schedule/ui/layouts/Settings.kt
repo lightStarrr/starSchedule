@@ -110,7 +110,7 @@ import androidx.core.net.toUri
 import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.star.schedule.R
-import com.star.schedule.db.ScheduleDao
+import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.notification.FlymeLiveTemplate
 import com.star.schedule.ui.components.OptimizedBottomSheet

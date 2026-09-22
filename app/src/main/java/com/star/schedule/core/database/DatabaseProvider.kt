@@ -1,4 +1,4 @@
-package com.star.schedule.db
+package com.star.schedule.core.database
 
 import android.content.Context
 import androidx.room.Room
