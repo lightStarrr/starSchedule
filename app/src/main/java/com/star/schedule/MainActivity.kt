@@ -101,6 +101,7 @@ import com.star.schedule.core.common.isNewerVersion
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.DatabaseProvider.dao
 import com.star.schedule.feature.settings.data.RoomSettingsRepository
+import com.star.schedule.feature.schedule.data.RoomScheduleRepository
 import com.star.schedule.feature.timetable.data.RoomTimetableRepository
 import com.star.schedule.feature.update.data.GitHubLatestReleaseSource
 import com.star.schedule.notification.UnifiedNotificationManager
@@ -212,6 +213,9 @@ fun Layout(context: Activity) {
     }
     val timetableRepository = remember(dao) {
         RoomTimetableRepository(dao)
+    }
+    val scheduleRepository = remember(dao) {
+        RoomScheduleRepository(dao)
     }
 
     // 注入 notificationManager 到 dao 中
@@ -420,7 +424,7 @@ fun Layout(context: Activity) {
             when (page) {
                 0 -> DateRange(
                     context = context,
-                    dao = dao,
+                    repository = scheduleRepository,
                     currentWeekNumber = currentWeekNumber,
                     floatingToolbarHeight = floatingToolbarHeight,
                     onCurrentWeekNumberChange = { newWeekNumber ->
