@@ -56,13 +56,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.star.schedule.core.common.Constants
 import com.star.schedule.R
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.ui.components.CourseDetailBottomSheet
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import kotlinx.coroutines.Dispatchers
@@ -98,7 +97,7 @@ data class CourseBlock(
 @Composable
 fun DateRange(
     context: Activity,
-    dao: ScheduleDao,
+    repository: ScheduleRepository,
     currentWeekNumber: Int,
     floatingToolbarHeight: Dp,
     onCurrentWeekNumberChange: (Int) -> Unit,
@@ -106,30 +105,30 @@ fun DateRange(
     upDateRealCurrentWeek: (Int) -> Unit
 ) {
     // 当前课表ID
-    val currentTimetableIdPref by dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
+    val currentTimetableId by repository.observeCurrentTimetableId()
         .collectAsState(initial = null)
-    val timetableId = currentTimetableIdPref?.toLongOrNull()
+    val timetableId = currentTimetableId
 
     // 获取当前课表实体以读取 showWeekend 和 startDate
     val timetable by if (timetableId != null) {
-        dao.getTimetableFlow(timetableId).collectAsState(initial = null)
+        repository.observeTimetable(timetableId).collectAsState(initial = null)
     } else remember { mutableStateOf(null as TimetableEntity?) }
 
     // 当前周的课程或全部课程（根据开关）
     val today = LocalDate.now()
     val courses by if (timetableId != null) {
         // 总是加载所有课程，后续根据showNonCurrent设置来决定显示哪些课程
-        dao.getCoursesFlow(timetableId).collectAsState(initial = emptyList())
+        repository.observeCourses(timetableId).collectAsState(initial = emptyList())
     } else remember { mutableStateOf(emptyList()) }
 
     // 当前课表的作息时间
     val lessonTimes by if (timetableId != null) {
-        dao.getLessonTimesFlow(timetableId).collectAsState(initial = emptyList())
+        repository.observeLessonTimes(timetableId).collectAsState(initial = emptyList())
     } else remember { mutableStateOf(emptyList()) }
 
     // 当天便签
     val dayNotes by if (timetableId != null) {
-        dao.getDayNotesFlow(timetableId).collectAsState(initial = emptyList())
+        repository.observeDayNotes(timetableId).collectAsState(initial = emptyList())
     } else remember { mutableStateOf(emptyList<DayNoteEntity>()) }
 
     val noteSheetState = rememberModalBottomSheetState()
@@ -303,7 +302,7 @@ fun DateRange(
                     if (notesByDate.containsKey(targetDate.toString())) {
                         TextButton(onClick = {
                             noteScope.launch(Dispatchers.IO) {
-                                dao.deleteDayNote(timetableId, targetDate.toString())
+                                repository.deleteDayNote(timetableId, targetDate.toString())
                             }
                             noteScope.launch {
                                 noteSheetState.hide()
@@ -319,9 +318,9 @@ fun DateRange(
                         val content = noteDraft.trim()
                         noteScope.launch(Dispatchers.IO) {
                             if (content.isBlank()) {
-                                dao.deleteDayNote(timetableId, targetDate.toString())
+                                repository.deleteDayNote(timetableId, targetDate.toString())
                             } else {
-                                dao.upsertDayNote(
+                                repository.upsertDayNote(
                                     DayNoteEntity(
                                         timetableId = timetableId,
                                         date = targetDate.toString(),
