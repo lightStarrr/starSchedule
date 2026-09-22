@@ -95,6 +95,8 @@ import com.star.schedule.db.LessonTimeTemplateEntity
 import com.star.schedule.db.LessonTimeTemplateItemEntity
 import com.star.schedule.db.ScheduleDao
 import com.star.schedule.db.TimetableEntity
+import com.star.schedule.feature.importing.wakeup.domain.extractKeyFromShareText
+import com.star.schedule.feature.importing.wakeup.domain.parseWakeUpDate
 import com.star.schedule.service.WidgetRefreshManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.utils.ImportManager.importTimetable
@@ -118,7 +120,6 @@ import okhttp3.Request
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 private enum class LessonTimeTemplateImportConflictStrategy {
     OVERWRITE,
@@ -3557,14 +3558,6 @@ fun QiangzhiImportSheet(
     }
 }
 
-// 从分享文本中提取口令
-fun extractKeyFromShareText(text: String): String {
-    val pattern = "分享口令为「([a-f0-9]+)」".toRegex()
-    val match = pattern.find(text)
-    val key = match?.groupValues?.get(1) ?: ""
-    return key
-}
-
 // WakeUp导入函数
 suspend fun importFromWakeUp(key: String, dao: ScheduleDao, context: Context): Boolean = withContext(Dispatchers.IO) {
     try {
@@ -3624,7 +3617,7 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao, context: Context): B
                     ?: context.getString(R.string.wakeup_default_timetable_name),
                 showWeekend = configInfo["showSun"]?.jsonPrimitive?.boolean ?: true,
                 startDate = configInfo["startDate"]?.jsonPrimitive?.content?.let {
-                    parseDateAutoFix(
+                    parseWakeUpDate(
                         it
                     )
                 }
@@ -3710,16 +3703,6 @@ suspend fun importFromWakeUp(key: String, dao: ScheduleDao, context: Context): B
         Log.e("WakeUpImport", "导入失败", e)
         false
     }
-}
-
-fun parseDateAutoFix(dateStr: String): String {
-    val parts = dateStr.split("-")
-    if (parts.size != 3) throw IllegalArgumentException("Invalid date format: $dateStr")
-    val year = parts[0].padStart(4, '0')
-    val month = parts[1].padStart(2, '0')
-    val day = parts[2].padStart(2, '0')
-    val fixedDateStr = "$year-$month-$day"
-    return LocalDate.parse(fixedDateStr, DateTimeFormatter.ISO_LOCAL_DATE).toString()
 }
 
 // ---------- 超星导入弹窗 ----------
