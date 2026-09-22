@@ -1,4 +1,4 @@
-package com.star.schedule.db
+package com.star.schedule.core.database
 
 import androidx.room.Dao
 import androidx.room.Delete
@@ -8,7 +8,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.TypeConverter
 import androidx.room.Update
-import com.star.schedule.Constants
+import com.star.schedule.core.common.Constants
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

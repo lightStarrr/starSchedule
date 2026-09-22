@@ -1,5 +1,5 @@
 // AppDatabase.kt
-package com.star.schedule.db
+package com.star.schedule.core.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase

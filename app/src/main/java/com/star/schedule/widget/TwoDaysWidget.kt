@@ -36,8 +36,8 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.star.schedule.R
-import com.star.schedule.Constants
-import com.star.schedule.db.DatabaseProvider
+import com.star.schedule.core.common.Constants
+import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import com.star.schedule.service.WidgetUpdateJobService
 import kotlinx.coroutines.CoroutineScope

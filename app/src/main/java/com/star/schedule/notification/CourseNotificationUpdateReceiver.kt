@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.star.schedule.db.DatabaseProvider
+import com.star.schedule.core.database.DatabaseProvider
 
 class CourseNotificationUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

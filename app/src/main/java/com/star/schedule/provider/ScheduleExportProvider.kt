@@ -10,11 +10,11 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.net.toUri
 import androidx.room.InvalidationTracker
-import com.star.schedule.Constants
-import com.star.schedule.db.CourseEntity
-import com.star.schedule.db.DatabaseProvider
-import com.star.schedule.db.LessonTimeEntity
-import com.star.schedule.db.TimetableEntity
+import com.star.schedule.core.common.Constants
+import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.TimetableEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

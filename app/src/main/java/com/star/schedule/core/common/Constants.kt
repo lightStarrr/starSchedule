@@ -1,4 +1,4 @@
-package com.star.schedule
+package com.star.schedule.core.common
 
 object Constants {
     const val PREF_CURRENT_TIMETABLE = "current_timetable"

@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.star.schedule.db.DatabaseProvider
+import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.ui.theme.StarScheduleTheme
 import android.annotation.SuppressLint
 import android.webkit.WebChromeClient
