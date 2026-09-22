@@ -96,6 +96,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import com.star.schedule.R
+import com.star.schedule.core.common.Constants
 import com.star.schedule.core.common.isNewerVersion
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.DatabaseProvider.dao
