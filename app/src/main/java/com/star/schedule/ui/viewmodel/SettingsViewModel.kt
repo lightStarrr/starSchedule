@@ -4,9 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.star.schedule.core.common.Constants
-import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.notification.FlymeLiveTemplate
-import com.star.schedule.notification.UnifiedNotificationManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,18 +16,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
-    private val dao: ScheduleDao,
-    private val notificationManager: UnifiedNotificationManager
+    private val repository: SettingsRepository
 ) : ViewModel() {
 
-    val timetables = dao.getAllTimetables()
+    val timetables = repository.observeTimetables()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList()
         )
 
-    val currentTimetableId = dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
+    val currentTimetableId = repository.observePreference(Constants.PREF_CURRENT_TIMETABLE)
         .map { it?.toLongOrNull() }
         .stateIn(
             scope = viewModelScope,
@@ -36,8 +34,8 @@ class SettingsViewModel(
             initialValue = null
         )
 
-    val notifyOnlyForFirstContinuousClass = dao
-        .getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS)
+    val notifyOnlyForFirstContinuousClass = repository
+        .observePreference(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS)
         .map { it == "true" }
         .stateIn(
             scope = viewModelScope,
@@ -45,8 +43,8 @@ class SettingsViewModel(
             initialValue = false
         )
 
-    val wakeUpSimulationEnabled = dao
-        .getPreferenceFlow(Constants.PREF_WAKEUP_SIMULATION_ENABLED)
+    val wakeUpSimulationEnabled = repository
+        .observePreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED)
         .map { it == "true" }
         .stateIn(
             scope = viewModelScope,
@@ -54,8 +52,8 @@ class SettingsViewModel(
             initialValue = false
         )
 
-    val hideFromRecents = dao
-        .getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS)
+    val hideFromRecents = repository
+        .observePreference(Constants.PREF_HIDE_FROM_RECENTS)
         .map { it == "true" }
         .stateIn(
             scope = viewModelScope,
@@ -63,7 +61,7 @@ class SettingsViewModel(
             initialValue = false
         )
 
-    val startupHintClosed = dao.getPreferenceFlow("startup_hint_closed")
+    val startupHintClosed = repository.observePreference("startup_hint_closed")
         .map { it == "true" }
         .stateIn(
             scope = viewModelScope,
@@ -71,14 +69,14 @@ class SettingsViewModel(
             initialValue = false
         )
 
-    val liveCapsuleBgColor = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR)
+    val liveCapsuleBgColor = repository.observePreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null
         )
 
-    val liveCapsuleIconPath = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH)
+    val liveCapsuleIconPath = repository.observePreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH)
         .map { it?.takeIf { path -> path.isNotBlank() } }
         .stateIn(
             scope = viewModelScope,
@@ -86,7 +84,7 @@ class SettingsViewModel(
             initialValue = null
         )
 
-    val liveNotificationTemplate = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE)
+    val liveNotificationTemplate = repository.observePreference(Constants.PREF_FLYME_LIVE_TEMPLATE)
         .map { FlymeLiveTemplate.fromPref(it) }
         .stateIn(
             scope = viewModelScope,
@@ -95,7 +93,7 @@ class SettingsViewModel(
         )
 
     val isLiveCapsuleCustomizationAvailable =
-        notificationManager.isLiveCapsuleCustomizationAvailable()
+        repository.isLiveCapsuleCustomizationAvailable()
 
     private val _reminderEnabled = MutableStateFlow(false)
     val reminderEnabled: StateFlow<Boolean> = _reminderEnabled.asStateFlow()
@@ -104,7 +102,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             currentTimetableId.collectLatest { timetableId ->
                 _reminderEnabled.value = timetableId?.let {
-                    notificationManager.isReminderEnabledForTimetableSync(it)
+                    repository.isReminderEnabledForTimetable(it)
                 } ?: false
             }
         }
@@ -112,109 +110,108 @@ class SettingsViewModel(
 
     fun selectTimetable(timetableId: Long) {
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_CURRENT_TIMETABLE, timetableId.toString())
+            repository.setPreference(Constants.PREF_CURRENT_TIMETABLE, timetableId.toString())
         }
     }
 
     fun closeStartupHint() {
         viewModelScope.launch {
-            dao.setPreference("startup_hint_closed", "true")
+            repository.setPreference("startup_hint_closed", "true")
         }
     }
 
     fun setNotifyOnlyForFirstContinuousClass(enabled: Boolean) {
         viewModelScope.launch {
-            dao.setPreference(
+            repository.setPreference(
                 Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS,
                 enabled.toString()
             )
             currentTimetableId.value?.let { timetableId ->
-                notificationManager.enableRemindersForTimetable(timetableId)
+                repository.enableRemindersForTimetable(timetableId)
             }
         }
     }
 
     fun setHideFromRecents(enabled: Boolean) {
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_HIDE_FROM_RECENTS, enabled.toString())
+            repository.setPreference(Constants.PREF_HIDE_FROM_RECENTS, enabled.toString())
         }
     }
 
     fun enableRemindersForCurrentTimetable() {
         val timetableId = currentTimetableId.value ?: return
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "false")
-            notificationManager.enableRemindersForTimetable(timetableId)
+            repository.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "false")
+            repository.enableRemindersForTimetable(timetableId)
             _reminderEnabled.value = true
         }
     }
 
     fun disableReminders() {
         viewModelScope.launch {
-            notificationManager.disableReminders()
+            repository.disableReminders()
             _reminderEnabled.value = false
         }
     }
 
     fun enableWakeUpSimulation() {
         viewModelScope.launch {
-            notificationManager.disableReminders()
-            dao.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "true")
+            repository.disableReminders()
+            repository.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "true")
             _reminderEnabled.value = false
         }
     }
 
     fun disableWakeUpSimulation() {
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "false")
+            repository.setPreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED, "false")
         }
     }
 
     fun sendTestNotification() {
         viewModelScope.launch {
-            notificationManager.sendTestNotification()
+            repository.sendTestNotification()
         }
     }
 
     fun scheduleTestReminder() {
         viewModelScope.launch {
-            notificationManager.scheduleTestReminder()
+            repository.scheduleTestReminder()
         }
     }
 
     fun updateLiveCapsuleBgColor(colorHex: String) {
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR, colorHex)
+            repository.setPreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR, colorHex)
         }
     }
 
     fun updateLiveCapsuleIconPath(path: String) {
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH, path)
+            repository.setPreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH, path)
         }
     }
 
     fun clearLiveCapsuleIcon() {
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH, "")
+            repository.setPreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH, "")
         }
     }
 
     fun updateFlymeLiveTemplate(template: FlymeLiveTemplate) {
         viewModelScope.launch {
-            dao.setPreference(Constants.PREF_FLYME_LIVE_TEMPLATE, template.prefValue)
+            repository.setPreference(Constants.PREF_FLYME_LIVE_TEMPLATE, template.prefValue)
         }
     }
 }
 
 class SettingsViewModelFactory(
-    private val dao: ScheduleDao,
-    private val notificationManager: UnifiedNotificationManager
+    private val repository: SettingsRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(dao, notificationManager) as T
+            return SettingsViewModel(repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

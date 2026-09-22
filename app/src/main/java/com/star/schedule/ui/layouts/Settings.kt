@@ -110,8 +110,7 @@ import androidx.core.net.toUri
 import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.star.schedule.R
-import com.star.schedule.core.database.ScheduleDao
-import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.notification.FlymeLiveTemplate
 import com.star.schedule.ui.components.OptimizedBottomSheet
 import com.star.schedule.ui.viewmodel.SettingsViewModel
@@ -138,10 +137,10 @@ import androidx.core.graphics.scale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
-fun Settings(floatingToolbarHeight: Dp,context: Activity, dao: ScheduleDao, notificationManager: UnifiedNotificationManager) {
+fun Settings(floatingToolbarHeight: Dp, context: Activity, repository: SettingsRepository) {
     val viewModel: SettingsViewModel = viewModel(
-        factory = remember(dao, notificationManager) {
-            SettingsViewModelFactory(dao, notificationManager)
+        factory = remember(repository) {
+            SettingsViewModelFactory(repository)
         }
     )
     val haptic = LocalHapticFeedback.current
