@@ -9,7 +9,7 @@ import androidx.room.Transaction
 import androidx.room.TypeConverter
 import androidx.room.Update
 import com.star.schedule.Constants
-import com.star.schedule.db.DayNoteEntity
+import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -468,10 +468,4 @@ class Converters {
     @TypeConverter
     fun toIntList(data: String): List<Int> =
         if (data.isBlank()) emptyList() else data.split(",").map { it.toInt() }
-}
-
-// ---------- Helper 扩展 ----------
-fun LocalDate.getWeekOfSemester(startDate: LocalDate): Int {
-    val days = java.time.temporal.ChronoUnit.DAYS.between(startDate, this)
-    return (days / 7 + 1).toInt()
 }

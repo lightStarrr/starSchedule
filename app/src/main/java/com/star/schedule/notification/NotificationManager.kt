@@ -40,6 +40,7 @@ import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.LessonTimeEntity
 import com.star.schedule.db.NotificationManagerProvider
 import com.star.schedule.db.ReminderEntity
+import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -492,7 +493,7 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
         var date = currentDate
         while (!date.isAfter(endDate)) {
-            val weekNumber = getWeekOfSemester(date, startDate)
+            val weekNumber = date.getWeekOfSemester(startDate)
             val dayOfWeek = date.dayOfWeek.value
             val todayCourses =
                 courses.filter { it.dayOfWeek == dayOfWeek && it.weeks.contains(weekNumber) }
@@ -606,11 +607,6 @@ class UnifiedNotificationManager(private val context: Context) : NotificationMan
 
     private fun generateRequestCode(courseId: Long, date: LocalDate, period: Int): Int =
         ("$courseId${date.toEpochDay()}$period").hashCode().and(0x7FFFFFFF)
-
-    private fun getWeekOfSemester(date: LocalDate, startDate: LocalDate): Int {
-        val days = java.time.temporal.ChronoUnit.DAYS.between(startDate, date)
-        return (days / 7 + 1).toInt()
-    }
 
     fun sendTestNotification() {
         val startTime = LocalTime.now().plusMinutes(1)

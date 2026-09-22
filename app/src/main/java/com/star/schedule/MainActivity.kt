@@ -96,6 +96,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import com.star.schedule.R
+import com.star.schedule.core.common.isNewerVersion
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.db.DatabaseProvider.dao
 import com.star.schedule.notification.UnifiedNotificationManager
@@ -643,23 +644,6 @@ suspend fun fetchLatestReleaseTag(): String? {
             null
         }
     }
-}
-
-/** 简单比较版本号（假设格式是 vX.Y.Z） */
-fun isNewerVersion(latestTag: String, currentVersion: String): Boolean {
-    // 去掉前缀 v （如果有）
-    val lt = latestTag.trimStart('v', 'V')
-    val cv = currentVersion.trimStart('v', 'V')
-    val ltParts = lt.split(".")
-    val cvParts = cv.split(".")
-    val len = maxOf(ltParts.size, cvParts.size)
-    for (i in 0 until len) {
-        val lNum = ltParts.getOrNull(i)?.toIntOrNull() ?: 0
-        val cNum = cvParts.getOrNull(i)?.toIntOrNull() ?: 0
-        if (lNum > cNum) return true
-        if (lNum < cNum) return false
-    }
-    return false
 }
 
 @Composable
