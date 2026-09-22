@@ -241,7 +241,7 @@ fun Settings(floatingToolbarHeight: Dp,context: Activity, dao: ScheduleDao, noti
                 }
 
                 // ✅ Step 2: 检查是否支持实况通知（Android 16+）
-                if (Build.VERSION.SDK_INT >= 36 && !Build.MANUFACTURER.equals("meizu")) {
+                if (Build.VERSION.SDK_INT >= 36 && !Build.MANUFACTURER.equals("meizu",ignoreCase = true)) {
                     val nm = context.getSystemService(android.app.NotificationManager::class.java)
                     if (!nm.canPostPromotedNotifications()) {
                         CoroutineScope(Dispatchers.Main).launch {

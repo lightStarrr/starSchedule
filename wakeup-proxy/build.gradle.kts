@@ -11,8 +11,8 @@ android {
         applicationId = "com.suda.yzune.wakeupschedule"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 999999
+        versionName = "99.99.99"
     }
 
     compileOptions {
