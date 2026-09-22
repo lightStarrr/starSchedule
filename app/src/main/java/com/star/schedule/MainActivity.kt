@@ -100,6 +100,7 @@ import com.star.schedule.core.common.Constants
 import com.star.schedule.core.common.isNewerVersion
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.DatabaseProvider.dao
+import com.star.schedule.feature.settings.data.RoomSettingsRepository
 import com.star.schedule.feature.update.data.GitHubLatestReleaseSource
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.ui.components.OptimizedBottomSheet
@@ -205,6 +206,9 @@ fun Layout(context: Activity) {
     val haptic = LocalHapticFeedback.current
     val dao = DatabaseProvider.dao()
     val notificationManager = UnifiedNotificationManager(context)
+    val settingsRepository = remember(dao, notificationManager) {
+        RoomSettingsRepository(dao, notificationManager)
+    }
 
     // 注入 notificationManager 到 dao 中
     dao.notificationManager = notificationManager
@@ -434,8 +438,7 @@ fun Layout(context: Activity) {
                 2 -> Settings(
                     floatingToolbarHeight = floatingToolbarHeight,
                     context = context,
-                    dao = dao,
-                    notificationManager = notificationManager
+                    repository = settingsRepository
                 )
             }
         }
