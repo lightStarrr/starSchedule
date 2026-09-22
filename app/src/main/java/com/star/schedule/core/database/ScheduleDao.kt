@@ -17,17 +17,9 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 
-// NotificationManager 接口
-interface NotificationManagerProvider {
-    suspend fun enableRemindersForTimetable(timetableId: Long)
-}
-
 // ---------- DAO ----------
 @Dao
 abstract class ScheduleDao {
-    // 将 notificationManager 设为可空变量，通过 setter 注入
-    var notificationManager: NotificationManagerProvider? = null
-
     // ------------------ 偏好设置 ------------------
     @Query("SELECT value FROM preference WHERE prefKey = :prefKey LIMIT 1")
     abstract fun getPreferenceFlow(prefKey: String): Flow<String?>
@@ -124,7 +116,6 @@ abstract class ScheduleDao {
     open suspend fun replaceLessonTimesForTimetable(timetableId: Long, lessonTimes: List<LessonTimeEntity>) {
         deleteLessonTimesByTimetableId(timetableId)
         lessonTimes.forEach { insertLessonTime(it) }
-        checkAndEnableReminders(timetableId)
     }
 
     // ------------------ 课程时间模板 ------------------
@@ -285,7 +276,6 @@ abstract class ScheduleDao {
     open suspend fun replaceCoursesForTimetable(timetableId: Long, courses: List<CourseEntity>) {
         deleteCoursesByTimetableId(timetableId)
         courses.forEach { insertCourse(it) }
-        checkAndEnableReminders(timetableId)
     }
 
     // ---------- 提醒 ----------
@@ -300,42 +290,6 @@ abstract class ScheduleDao {
 
     @Query("DELETE FROM reminder")
     abstract suspend fun deleteAllReminders()
-
-    // ------------------ 自动排序和提醒 ------------------
-    private suspend fun checkAndEnableReminders(timetableId: Long) {
-        val currentId = getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE).firstOrNull()?.toLongOrNull()
-        android.util.Log.d(
-            "ScheduleDao",
-            "checkAndEnableReminders: timetableId=$timetableId, currentId=$currentId, notificationManager=$notificationManager"
-        )
-
-        if (currentId == timetableId) {
-            // 检查用户是否已经启用了课前提醒
-            val enabledTimetableId = getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).firstOrNull()
-            val isReminderEnabled = enabledTimetableId?.toLongOrNull() == currentId
-
-            if (isReminderEnabled) {
-                try {
-                    android.util.Log.d(
-                        "ScheduleDao",
-                        "用户已启用课前提醒，正在为课表ID $timetableId 启用提醒"
-                    )
-                    notificationManager?.enableRemindersForTimetable(currentId)
-                    android.util.Log.d("ScheduleDao", "提醒启用操作完成")
-                } catch (e: Exception) {
-                    android.util.Log.e("ScheduleDao", "启用提醒时出错", e)
-                    // 不抛出异常，因为提醒功能不应该影响主要的数据操作
-                }
-            } else {
-                android.util.Log.d("ScheduleDao", "用户未启用课前提醒，跳过自动启用提醒")
-            }
-        } else {
-            android.util.Log.d(
-                "ScheduleDao",
-                "当前课表ID($currentId)与操作课表ID($timetableId)不匹配，跳过提醒启用"
-            )
-        }
-    }
 
     // ---------- 课时操作 ----------
     @Transaction
@@ -372,7 +326,6 @@ abstract class ScheduleDao {
                 }
             }
 
-            checkAndEnableReminders(lessonTime.timetableId)
             android.util.Log.d("ScheduleDao", "课程时间操作完成")
         } catch (e: Exception) {
             android.util.Log.e("ScheduleDao", "课程时间排序过程中出错", e)
@@ -390,7 +343,6 @@ abstract class ScheduleDao {
             val newPeriod = index + 1
             if (lesson.period != newPeriod) updateLessonTime(lesson.copy(period = newPeriod))
         }
-        checkAndEnableReminders(lessonTime.timetableId)
     }
 
     // ---------- 课程操作 ----------
@@ -399,7 +351,6 @@ abstract class ScheduleDao {
         android.util.Log.d("ScheduleDao", "开始插入课程: $course")
         val id = insertCourse(course)
         android.util.Log.d("ScheduleDao", "插入课程成功，ID: $id")
-        checkAndEnableReminders(course.timetableId)
         return id
     }
 
@@ -409,7 +360,6 @@ abstract class ScheduleDao {
         try {
             updateCourse(course)
             android.util.Log.d("ScheduleDao", "更新课程成功，ID: ${course.id}")
-            checkAndEnableReminders(course.timetableId)
             android.util.Log.d("ScheduleDao", "课程更新操作完成")
         } catch (e: Exception) {
             android.util.Log.e("ScheduleDao", "更新课程失败", e)
@@ -420,7 +370,6 @@ abstract class ScheduleDao {
     @Transaction
     open suspend fun deleteCourseWithReminders(course: CourseEntity) {
         deleteCourse(course)
-        checkAndEnableReminders(course.timetableId)
     }
 
     // ---------- 便签 ----------
@@ -437,7 +386,6 @@ abstract class ScheduleDao {
     @Transaction
     open suspend fun insertTimetableWithReminders(timetable: TimetableEntity): Long {
         val id = insertTimetable(timetable)
-        checkAndEnableReminders(id)
         // 若当前未选定课表，则在新增后回落到第一条课表
         ensureValidCurrentTimetable()
         return id
@@ -446,7 +394,6 @@ abstract class ScheduleDao {
     @Transaction
     open suspend fun updateTimetableWithReminders(timetable: TimetableEntity) {
         updateTimetable(timetable)
-        checkAndEnableReminders(timetable.id)
         // 更新后也校验一次，防止异常状态
         ensureValidCurrentTimetable()
     }
@@ -454,7 +401,6 @@ abstract class ScheduleDao {
     @Transaction
     open suspend fun deleteTimetableWithReminders(timetable: TimetableEntity) {
         deleteTimetable(timetable)
-        checkAndEnableReminders(timetable.id)
         // 若删除了当前课表，则回退到第一条课表或清空
         ensureValidCurrentTimetable()
     }

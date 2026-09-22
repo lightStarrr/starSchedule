@@ -212,14 +212,11 @@ fun Layout(context: Activity) {
         RoomSettingsRepository(dao, notificationManager)
     }
     val timetableRepository = remember(dao) {
-        RoomTimetableRepository(dao)
+        RoomTimetableRepository(dao, notificationManager)
     }
     val scheduleRepository = remember(dao) {
         RoomScheduleRepository(dao)
     }
-
-    // 注入 notificationManager 到 dao 中
-    dao.notificationManager = notificationManager
 
     // 在应用启动时初始化提醒系统
     LaunchedEffect(Unit) {
