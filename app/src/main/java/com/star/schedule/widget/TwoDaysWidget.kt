@@ -40,9 +40,8 @@ import com.star.schedule.Constants
 import com.star.schedule.db.DatabaseProvider
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import com.star.schedule.service.WidgetUpdateJobService
-import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -551,11 +550,15 @@ class TwoDaysWidget : GlanceAppWidget() {
 class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = TwoDaysWidget()
 
-    @OptIn(DelicateCoroutinesApi::class)
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        GlobalScope.launch(Dispatchers.IO) {
-            TwoDaysWidget.updateWidgetContent(context)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                TwoDaysWidget.updateWidgetContent(context)
+            } finally {
+                pendingResult.finish()
+            }
         }
 
         try {
@@ -576,7 +579,6 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
         }
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -597,7 +599,8 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
 
             if (validAppWidgetIds.isEmpty()) return
 
-            GlobalScope.launch(Dispatchers.IO) {
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
                 try {
                     if (!DatabaseProvider.isInitialized()) {
                         DatabaseProvider.init(context)
@@ -605,6 +608,8 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
                     TwoDaysWidget.updateWidgetContent(context)
                 } catch (e: Exception) {
                     Log.e("TwoDaysWidgetReceiver", "更新失败", e)
+                } finally {
+                    pendingResult.finish()
                 }
             }
 
