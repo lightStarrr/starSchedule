@@ -57,12 +57,10 @@ dependencies {
     implementation(libs.androidx.room.runtime) {
         exclude(group = "com.intellij", module = "annotations")
     }
-    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.okhttp)
     implementation(platform(libs.okhttp.bom))
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
     kapt(libs.androidx.room.compiler) {
         exclude(group = "com.intellij", module = "annotations")
     }
@@ -71,8 +69,6 @@ dependencies {
     }
     implementation(libs.poi)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.wheelpickercompose)
-    implementation(libs.color.picker)
     implementation(libs.androidx.work.runtime)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

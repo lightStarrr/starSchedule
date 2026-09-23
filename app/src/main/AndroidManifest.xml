@@ -37,16 +37,12 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.StarSchedule"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            android:theme="@style/Theme.StarSchedule">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".WebActivity"
-            android:exported="true" />
-
         <!-- 课程提醒广播接收器 -->
         <receiver android:name=".notification.CourseReminderReceiver"/>
         <receiver android:name=".notification.CourseNotificationUpdateReceiver" />
