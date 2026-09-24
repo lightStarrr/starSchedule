@@ -23,12 +23,14 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -164,7 +166,7 @@ private fun HeaderSplitButtons(
             Icon(
                 imageVector = Icons.Rounded.Edit,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
             )
             Spacer(modifier = Modifier.size(8.dp))
             Text(stringResource(R.string.home_action_edit))
@@ -177,7 +179,7 @@ private fun HeaderSplitButtons(
             Icon(
                 imageVector = Icons.Rounded.CalendarMonth,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
             )
         }
         ConnectedActionButton(
@@ -188,7 +190,7 @@ private fun HeaderSplitButtons(
             Icon(
                 imageVector = Icons.Rounded.Settings,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
             )
         }
     }
@@ -216,7 +218,7 @@ private fun WeekNavigationSplitButtons(
             Icon(
                 imageVector = Icons.Rounded.ChevronLeft,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
             )
         }
         ConnectedActionButton(
@@ -227,7 +229,7 @@ private fun WeekNavigationSplitButtons(
             Icon(
                 imageVector = Icons.Rounded.Apps,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
             )
         }
         ConnectedActionButton(
@@ -238,7 +240,7 @@ private fun WeekNavigationSplitButtons(
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
             )
         }
     }
@@ -262,6 +264,7 @@ private fun ConnectedActionButton(
     ToggleButton(
         checked = false,
         onCheckedChange = { onClick() },
+        buttonSize = ToggleButtonSize.Medium,
         shapes = when (position) {
             ConnectedButtonPosition.LEADING -> ButtonGroupDefaults.connectedLeadingButtonShapes()
             ConnectedButtonPosition.MIDDLE -> ButtonGroupDefaults.connectedMiddleButtonShapes()
