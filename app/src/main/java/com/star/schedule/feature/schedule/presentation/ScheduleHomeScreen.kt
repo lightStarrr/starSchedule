@@ -1,6 +1,7 @@
 package com.star.schedule.feature.schedule.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,17 +11,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SplitButtonDefaults
+import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -75,7 +88,7 @@ fun ScheduleHomeScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        WeekNavigationButtonGroup(
+        WeekNavigationSplitButtons(
             currentWeek = currentWeek,
             onPreviousWeekClick = onPreviousWeekClick,
             onNextWeekClick = onNextWeekClick,
@@ -120,7 +133,7 @@ private fun ScheduleHomeHeader(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        HomeActionButtonGroup(
+        HeaderSplitButtons(
             onEditClick = onEditClick,
             onSwitchTimetableClick = onSwitchTimetableClick,
             onSettingsClick = onSettingsClick,
@@ -130,67 +143,141 @@ private fun ScheduleHomeHeader(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun HomeActionButtonGroup(
+private fun HeaderSplitButtons(
     onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val editLabel = stringResource(R.string.home_action_edit)
-    val switchTimetableLabel = stringResource(R.string.home_action_switch_timetable)
-    val settingsLabel = stringResource(R.string.home_action_settings)
+    val settingsDescription = stringResource(R.string.home_action_settings)
+    val switchTimetableDescription = stringResource(R.string.home_action_switch_timetable)
 
-    ButtonGroup(
-        overflowIndicator = { menuState ->
-            ButtonGroupDefaults.OverflowIndicator(menuState)
-        },
+    Row(
         modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        clickableItem(
-            onClick = onEditClick,
-            label = editLabel,
+        SplitButtonLayout(
+            leadingButton = {
+                SplitButtonDefaults.LeadingButton(onClick = onEditClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                    )
+                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.home_action_edit))
+                }
+            },
+            trailingButton = {
+                SplitButtonDefaults.TrailingButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = settingsDescription
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                    )
+                }
+            },
         )
-        clickableItem(
-            onClick = onSwitchTimetableClick,
-            label = switchTimetableLabel,
-        )
-        clickableItem(
-            onClick = onSettingsClick,
-            label = settingsLabel,
+
+        SplitButtonLayout(
+            leadingButton = {
+                SplitButtonDefaults.LeadingButton(onClick = onSwitchTimetableClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.CalendarMonth,
+                        contentDescription = null,
+                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                    )
+                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.home_action_timetable_short))
+                }
+            },
+            trailingButton = {
+                SplitButtonDefaults.TrailingButton(
+                    onClick = onSwitchTimetableClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = switchTimetableDescription
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                    )
+                }
+            },
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun WeekNavigationButtonGroup(
+private fun WeekNavigationSplitButtons(
     currentWeek: Int,
     onPreviousWeekClick: () -> Unit,
     onNextWeekClick: () -> Unit,
     onSelectWeekClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val previousWeekLabel = stringResource(R.string.home_action_previous_week)
-    val selectWeekLabel = stringResource(R.string.week_label_template, currentWeek)
-    val nextWeekLabel = stringResource(R.string.home_action_next_week)
+    val nextWeekDescription = stringResource(R.string.home_action_next_week)
+    val selectWeekDescription = stringResource(R.string.select_week_number_title)
 
-    ButtonGroup(
-        overflowIndicator = { menuState ->
-            ButtonGroupDefaults.OverflowIndicator(menuState)
-        },
+    Row(
         modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        clickableItem(
-            onClick = onPreviousWeekClick,
-            label = previousWeekLabel,
+        SplitButtonLayout(
+            leadingButton = {
+                SplitButtonDefaults.LeadingButton(onClick = onPreviousWeekClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronLeft,
+                        contentDescription = null,
+                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                    )
+                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.home_action_previous_week))
+                }
+            },
+            trailingButton = {
+                SplitButtonDefaults.TrailingButton(
+                    onClick = onNextWeekClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = nextWeekDescription
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                    )
+                }
+            },
         )
-        clickableItem(
-            onClick = onSelectWeekClick,
-            label = selectWeekLabel,
-        )
-        clickableItem(
-            onClick = onNextWeekClick,
-            label = nextWeekLabel,
+
+        SplitButtonLayout(
+            leadingButton = {
+                SplitButtonDefaults.LeadingButton(onClick = onSelectWeekClick) {
+                    Text(stringResource(R.string.week_label_template, currentWeek))
+                }
+            },
+            trailingButton = {
+                SplitButtonDefaults.TrailingButton(
+                    onClick = onSelectWeekClick,
+                    modifier = Modifier.semantics {
+                        contentDescription = selectWeekDescription
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                    )
+                }
+            },
         )
     }
 }

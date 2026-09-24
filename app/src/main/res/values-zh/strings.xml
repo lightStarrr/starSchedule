@@ -228,6 +228,7 @@
     <string name="home_date_range_template">%1$d月%2$d日–%3$d月%4$d日</string>
     <string name="home_action_edit">编辑</string>
     <string name="home_action_switch_timetable">切换课表</string>
+    <string name="home_action_timetable_short">课表</string>
     <string name="home_action_settings">设置</string>
     <string name="home_action_previous_week">上一周</string>
     <string name="home_action_next_week">下一周</string>
