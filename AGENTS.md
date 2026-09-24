@@ -129,7 +129,7 @@ fun TimetableSettingsRoute(viewModel: TimetableSettingsViewModel) {
 - 状态栏背景由 Compose 内容绘制。统一背景直接延伸到系统栏区域；Material 3 `TopAppBar` 优先使用默认 `windowInsets`，自定义顶部栏使用 `statusBarsPadding()` 或 `windowInsetsPadding(WindowInsets.statusBars)`，同一层级只能处理一次。
 - 不使用固定的 24dp/状态栏高度，也不同时叠加 `Scaffold`、TopAppBar 和自定义 `statusBarsPadding()`，避免重复留白。
 - 当图片、课程卡片或渐变背景导致状态栏图标对比度不足时，在 Compose 中使用覆盖状态栏区域的颜色或渐变保护层；不得退回直接设置系统状态栏颜色。
-- 自动适配状态栏图标时，只采样应用窗口在状态栏下方的内容；默认每 1500ms 更新一次，并使用带滞回的亮度阈值，禁止每帧截图或在亮度临界值附近反复切换图标。
+- 自动适配状态栏图标时，只采样应用窗口在状态栏下方的内容；默认每 100ms 更新一次，并使用带滞回的亮度阈值，禁止每帧截图或在亮度临界值附近反复切换图标。
 - 导航栏同样遵循 Edge-to-edge 和 Insets 规则；验证时至少检查手势导航与三键导航的内容遮挡、背景保护和图标对比度。
 
 ## 六、数据与业务层规范
