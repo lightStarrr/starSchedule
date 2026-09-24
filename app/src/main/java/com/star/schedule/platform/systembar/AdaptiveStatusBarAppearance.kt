@@ -21,4 +21,4 @@ internal fun ComponentActivity.installAdaptiveStatusBarAppearance(
     }
 }
 
-internal const val DEFAULT_SAMPLE_INTERVAL_MILLIS = 1_500L
+internal const val DEFAULT_SAMPLE_INTERVAL_MILLIS = 100L
