@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,19 +16,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SplitButtonDefaults
-import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,7 +90,6 @@ fun ScheduleHomeScreen(
         )
 
         WeekNavigationSplitButtons(
-            currentWeek = currentWeek,
             onPreviousWeekClick = onPreviousWeekClick,
             onNextWeekClick = onNextWeekClick,
             onSelectWeekClick = onSelectWeekClick,
@@ -154,132 +154,130 @@ private fun HeaderSplitButtons(
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
-        SplitButtonLayout(
-            leadingButton = {
-                SplitButtonDefaults.LeadingButton(onClick = onEditClick) {
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
-                    )
-                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.home_action_edit))
-                }
-            },
-            trailingButton = {
-                SplitButtonDefaults.TrailingButton(
-                    onClick = onSettingsClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = settingsDescription
-                    },
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                    )
-                }
-            },
-        )
-
-        SplitButtonLayout(
-            leadingButton = {
-                SplitButtonDefaults.LeadingButton(onClick = onSwitchTimetableClick) {
-                    Icon(
-                        imageVector = Icons.Rounded.CalendarMonth,
-                        contentDescription = null,
-                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
-                    )
-                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.home_action_timetable_short))
-                }
-            },
-            trailingButton = {
-                SplitButtonDefaults.TrailingButton(
-                    onClick = onSwitchTimetableClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = switchTimetableDescription
-                    },
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                    )
-                }
-            },
-        )
+        ConnectedActionButton(
+            position = ConnectedButtonPosition.LEADING,
+            onClick = onEditClick,
+            contentDescription = stringResource(R.string.home_action_edit),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Edit,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(stringResource(R.string.home_action_edit))
+        }
+        ConnectedActionButton(
+            position = ConnectedButtonPosition.MIDDLE,
+            onClick = onSwitchTimetableClick,
+            contentDescription = switchTimetableDescription,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CalendarMonth,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        ConnectedActionButton(
+            position = ConnectedButtonPosition.TRAILING,
+            onClick = onSettingsClick,
+            contentDescription = settingsDescription,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Settings,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun WeekNavigationSplitButtons(
-    currentWeek: Int,
     onPreviousWeekClick: () -> Unit,
     onNextWeekClick: () -> Unit,
     onSelectWeekClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val nextWeekDescription = stringResource(R.string.home_action_next_week)
     val selectWeekDescription = stringResource(R.string.select_week_number_title)
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
-        SplitButtonLayout(
-            leadingButton = {
-                SplitButtonDefaults.LeadingButton(onClick = onPreviousWeekClick) {
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronLeft,
-                        contentDescription = null,
-                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
-                    )
-                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.home_action_previous_week))
-                }
-            },
-            trailingButton = {
-                SplitButtonDefaults.TrailingButton(
-                    onClick = onNextWeekClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = nextWeekDescription
-                    },
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronRight,
-                        contentDescription = null,
-                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                    )
-                }
-            },
-        )
-
-        SplitButtonLayout(
-            leadingButton = {
-                SplitButtonDefaults.LeadingButton(onClick = onSelectWeekClick) {
-                    Text(stringResource(R.string.week_label_template, currentWeek))
-                }
-            },
-            trailingButton = {
-                SplitButtonDefaults.TrailingButton(
-                    onClick = onSelectWeekClick,
-                    modifier = Modifier.semantics {
-                        contentDescription = selectWeekDescription
-                    },
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                    )
-                }
-            },
-        )
+        ConnectedActionButton(
+            position = ConnectedButtonPosition.LEADING,
+            onClick = onPreviousWeekClick,
+            contentDescription = stringResource(R.string.home_action_previous_week),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.ChevronLeft,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        ConnectedActionButton(
+            position = ConnectedButtonPosition.MIDDLE,
+            onClick = onSelectWeekClick,
+            contentDescription = selectWeekDescription,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Apps,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        ConnectedActionButton(
+            position = ConnectedButtonPosition.TRAILING,
+            onClick = onNextWeekClick,
+            contentDescription = stringResource(R.string.home_action_next_week),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        }
     }
+}
+
+private enum class ConnectedButtonPosition {
+    LEADING,
+    MIDDLE,
+    TRAILING,
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ConnectedActionButton(
+    position: ConnectedButtonPosition,
+    onClick: () -> Unit,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    ToggleButton(
+        checked = false,
+        onCheckedChange = { onClick() },
+        shapes = when (position) {
+            ConnectedButtonPosition.LEADING -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+            ConnectedButtonPosition.MIDDLE -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            ConnectedButtonPosition.TRAILING -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+        },
+        modifier = modifier.semantics {
+            this.contentDescription = contentDescription
+        },
+        colors = ToggleButtonDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            checkedContainerColor = MaterialTheme.colorScheme.primary,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+        content = content,
+    )
 }
 
 @Preview(
