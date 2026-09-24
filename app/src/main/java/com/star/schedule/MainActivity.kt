@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.star.schedule.app.StarScheduleApp
 import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
 
 class MainActivity : ComponentActivity() {
@@ -12,7 +13,8 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         installAdaptiveStatusBarAppearance()
-        setContent {}
-
+        setContent {
+            StarScheduleApp()
+        }
     }
 }
