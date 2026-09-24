@@ -12,8 +12,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(
-                lightScrim = Color.TRANSPARENT,
+            // The temporary empty root uses the light XML window background.
+            // Keep its status-bar icons visible until the Compose theme is wired in.
+            statusBarStyle = SystemBarStyle.light(
+                scrim = Color.TRANSPARENT,
                 darkScrim = Color.TRANSPARENT,
             ),
         )
