@@ -121,6 +121,16 @@ fun TimetableSettingsRoute(viewModel: TimetableSettingsViewModel) {
 - 每完成一个新页面并确认功能等价后，应删除对应旧 UI，避免长期维护两套实现。
 - UI 重写期间保持 Room 数据、偏好键、通知行为、Widget 数据和 Provider 协议兼容，除非当前任务明确要求迁移或破坏性调整。
 
+### Edge-to-edge 与系统栏
+
+- 项目 `targetSdk` 达到 35 及以上时，必须按 Android 15+ Edge-to-edge 规则实现；状态栏默认透明，内容会绘制到状态栏后方。
+- 每个 Compose Activity 在 `onCreate` 中调用 `enableEdgeToEdge()`，以兼容低于 Android 15 的设备；状态栏样式使用 `SystemBarStyle.auto` 或与页面主题一致的明确样式。
+- 不新增 `window.statusBarColor`、`Window.setStatusBarColor` 或固定 XML `statusBarColor` 作为主要方案；这些 API 在 Android 15 上已废弃且不再影响状态栏颜色。
+- 状态栏背景由 Compose 内容绘制。统一背景直接延伸到系统栏区域；Material 3 `TopAppBar` 优先使用默认 `windowInsets`，自定义顶部栏使用 `statusBarsPadding()` 或 `windowInsetsPadding(WindowInsets.statusBars)`，同一层级只能处理一次。
+- 不使用固定的 24dp/状态栏高度，也不同时叠加 `Scaffold`、TopAppBar 和自定义 `statusBarsPadding()`，避免重复留白。
+- 当图片、课程卡片或渐变背景导致状态栏图标对比度不足时，在 Compose 中使用覆盖状态栏区域的颜色或渐变保护层；不得退回直接设置系统状态栏颜色。
+- 导航栏同样遵循 Edge-to-edge 和 Insets 规则；验证时至少检查手势导航与三键导航的内容遮挡、背景保护和图标对比度。
+
 ## 六、数据与业务层规范
 
 - 按领域拆分 DAO，例如 `TimetableDao`、`CourseDao`、`LessonTimeDao`、`PreferenceDao`、`ReminderDao` 和 `DayNoteDao`。
