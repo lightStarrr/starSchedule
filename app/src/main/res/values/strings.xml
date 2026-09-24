@@ -225,6 +225,12 @@
     <string name="tab_schedule">Schedule</string>
     <string name="tab_timetable_settings">Timetable settings</string>
     <string name="week_label_template">Week %1$d</string>
+    <string name="home_date_range_template">%1$d/%2$d–%3$d/%4$d</string>
+    <string name="home_action_edit">Edit</string>
+    <string name="home_action_switch_timetable">Timetable</string>
+    <string name="home_action_settings">Settings</string>
+    <string name="home_action_previous_week">Previous</string>
+    <string name="home_action_next_week">Next</string>
     <string name="select_week_number_title">Select week</string>
     <string name="week_badge_current">This week</string>
     <string name="update_available_title">Update available</string>
