@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -154,45 +155,66 @@ private fun HeaderSplitButtons(
     val settingsDescription = stringResource(R.string.home_action_settings)
     val switchTimetableDescription = stringResource(R.string.home_action_switch_timetable)
 
-    Row(
+    ButtonGroup(
+        overflowIndicator = {},
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
-        ConnectedActionButton(
-            position = ConnectedButtonPosition.LEADING,
-            onClick = onEditClick,
-            contentDescription = stringResource(R.string.home_action_edit),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Edit,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
-            )
-            Spacer(modifier = Modifier.size(8.dp))
-            Text(stringResource(R.string.home_action_edit))
-        }
-        ConnectedActionButton(
-            position = ConnectedButtonPosition.MIDDLE,
-            onClick = onSwitchTimetableClick,
-            contentDescription = switchTimetableDescription,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.CalendarMonth,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
-            )
-        }
-        ConnectedActionButton(
-            position = ConnectedButtonPosition.TRAILING,
-            onClick = onSettingsClick,
-            contentDescription = settingsDescription,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Settings,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
-            )
-        }
+        customItem(
+            buttonGroupContent = {
+                ConnectedActionButton(
+                    position = ConnectedButtonPosition.LEADING,
+                    onClick = onEditClick,
+                    contentDescription = stringResource(R.string.home_action_edit),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(
+                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                        ),
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text(stringResource(R.string.home_action_edit))
+                }
+            },
+            menuContent = {},
+        )
+        customItem(
+            buttonGroupContent = {
+                ConnectedActionButton(
+                    position = ConnectedButtonPosition.MIDDLE,
+                    onClick = onSwitchTimetableClick,
+                    contentDescription = switchTimetableDescription,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CalendarMonth,
+                        contentDescription = null,
+                        modifier = Modifier.size(
+                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                        ),
+                    )
+                }
+            },
+            menuContent = {},
+        )
+        customItem(
+            buttonGroupContent = {
+                ConnectedActionButton(
+                    position = ConnectedButtonPosition.TRAILING,
+                    onClick = onSettingsClick,
+                    contentDescription = settingsDescription,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(
+                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                        ),
+                    )
+                }
+            },
+            menuContent = {},
+        )
     }
 }
 
@@ -206,43 +228,64 @@ private fun WeekNavigationSplitButtons(
 ) {
     val selectWeekDescription = stringResource(R.string.select_week_number_title)
 
-    Row(
+    ButtonGroup(
+        overflowIndicator = {},
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
-        ConnectedActionButton(
-            position = ConnectedButtonPosition.LEADING,
-            onClick = onPreviousWeekClick,
-            contentDescription = stringResource(R.string.home_action_previous_week),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.ChevronLeft,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
-            )
-        }
-        ConnectedActionButton(
-            position = ConnectedButtonPosition.MIDDLE,
-            onClick = onSelectWeekClick,
-            contentDescription = selectWeekDescription,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Apps,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
-            )
-        }
-        ConnectedActionButton(
-            position = ConnectedButtonPosition.TRAILING,
-            onClick = onNextWeekClick,
-            contentDescription = stringResource(R.string.home_action_next_week),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height)),
-            )
-        }
+        customItem(
+            buttonGroupContent = {
+                ConnectedActionButton(
+                    position = ConnectedButtonPosition.LEADING,
+                    onClick = onPreviousWeekClick,
+                    contentDescription = stringResource(R.string.home_action_previous_week),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronLeft,
+                        contentDescription = null,
+                        modifier = Modifier.size(
+                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                        ),
+                    )
+                }
+            },
+            menuContent = {},
+        )
+        customItem(
+            buttonGroupContent = {
+                ConnectedActionButton(
+                    position = ConnectedButtonPosition.MIDDLE,
+                    onClick = onSelectWeekClick,
+                    contentDescription = selectWeekDescription,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Apps,
+                        contentDescription = null,
+                        modifier = Modifier.size(
+                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                        ),
+                    )
+                }
+            },
+            menuContent = {},
+        )
+        customItem(
+            buttonGroupContent = {
+                ConnectedActionButton(
+                    position = ConnectedButtonPosition.TRAILING,
+                    onClick = onNextWeekClick,
+                    contentDescription = stringResource(R.string.home_action_next_week),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(
+                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                        ),
+                    )
+                }
+            },
+            menuContent = {},
+        )
     }
 }
 
