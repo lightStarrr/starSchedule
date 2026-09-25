@@ -309,7 +309,7 @@ private fun ConnectedActionButton(
     ToggleButton(
         checked = false,
         onCheckedChange = { onClick() },
-        buttonSize = ToggleButtonSize.Medium,
+        buttonSize = ToggleButtonSize.Small,
         shapes = when (position) {
             ConnectedButtonPosition.LEADING -> ButtonGroupDefaults.connectedLeadingButtonShapes()
             ConnectedButtonPosition.MIDDLE -> ButtonGroupDefaults.connectedMiddleButtonShapes()
