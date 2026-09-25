@@ -165,11 +165,11 @@ private fun ScheduleHomeHeaderInfo(
     currentWeek: Int,
     dateRange: String,
 ) {
-    Column(modifier = Modifier.padding(top = 4.dp)) {
+    Column {
         Text(
             text = stringResource(R.string.week_label_template, currentWeek),
             color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.headlineLarge,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
         )
