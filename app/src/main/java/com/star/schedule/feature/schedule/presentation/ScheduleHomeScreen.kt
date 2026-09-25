@@ -1,6 +1,7 @@
 package com.star.schedule.feature.schedule.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -157,6 +158,7 @@ private fun HeaderSplitButtons(
     ButtonGroup(
         overflowIndicator = {},
         modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         customItem(
             buttonGroupContent = {
@@ -230,6 +232,7 @@ private fun WeekNavigationSplitButtons(
     ButtonGroup(
         overflowIndicator = {},
         modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         customItem(
             buttonGroupContent = {
