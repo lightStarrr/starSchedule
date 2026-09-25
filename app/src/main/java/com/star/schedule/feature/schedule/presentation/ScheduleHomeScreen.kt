@@ -31,6 +31,13 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleButtonSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -39,26 +46,65 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
+import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.feature.schedule.domain.ScheduleRepository
+import kotlinx.coroutines.flow.flowOf
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 @Composable
-fun ScheduleHomeRoute() {
+fun ScheduleHomeRoute(repository: ScheduleRepository) {
+    val timetableId by repository.observeCurrentTimetableId().collectAsState(initial = null)
+    val timetable by remember(timetableId) {
+        timetableId?.let(repository::observeTimetable) ?: flowOf(null)
+    }.collectAsState(initial = null)
+    val courses by remember(timetableId) {
+        timetableId?.let(repository::observeCourses) ?: flowOf<List<CourseEntity>>(emptyList())
+    }.collectAsState(initial = emptyList())
+    val lessonTimes by remember(timetableId) {
+        timetableId?.let(repository::observeLessonTimes)
+            ?: flowOf<List<LessonTimeEntity>>(emptyList())
+    }.collectAsState(initial = emptyList())
+    val semesterStart = remember(timetable?.startDate) {
+        runCatching { timetable?.startDate?.let(LocalDate::parse) }
+            .getOrNull()
+            ?: LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+    }
+    val realCurrentWeek = remember(semesterStart) {
+        ChronoUnit.DAYS.between(semesterStart, LocalDate.now()).toInt() / 7 + 1
+    }.coerceAtLeast(1)
+    var currentWeek by rememberSaveable { mutableIntStateOf(realCurrentWeek) }
+
+    LaunchedEffect(realCurrentWeek) {
+        currentWeek = realCurrentWeek
+    }
+
+    val weekStartDate = semesterStart.plusWeeks((currentWeek - 1).toLong())
     ScheduleHomeScreen(
-        currentWeek = 1,
+        currentWeek = currentWeek,
         dateRange = stringResource(
             R.string.home_date_range_template,
-            9,
-            21,
-            9,
-            27,
+            weekStartDate.monthValue,
+            weekStartDate.dayOfMonth,
+            weekStartDate.plusDays(6).monthValue,
+            weekStartDate.plusDays(6).dayOfMonth,
         ),
+        lessonTimes = lessonTimes,
+        courses = courses,
+        hasTimetable = timetable != null,
+        weekStartDate = weekStartDate,
+        showWeekend = timetable?.showWeekend ?: true,
+        rowHeight = (timetable?.rowHeight ?: 60).dp,
         onEditClick = {},
         onSwitchTimetableClick = {},
         onSettingsClick = {},
-        onPreviousWeekClick = {},
-        onNextWeekClick = {},
+        onPreviousWeekClick = { currentWeek = (currentWeek - 1).coerceAtLeast(1) },
+        onNextWeekClick = { currentWeek += 1 },
         onSelectWeekClick = {},
     )
 }
@@ -74,21 +120,40 @@ fun ScheduleHomeScreen(
     onNextWeekClick: () -> Unit,
     onSelectWeekClick: () -> Unit,
     modifier: Modifier = Modifier,
+    lessonTimes: List<LessonTimeEntity> = emptyList(),
+    courses: List<CourseEntity> = emptyList(),
+    hasTimetable: Boolean = true,
+    weekStartDate: LocalDate = LocalDate.now().with(java.time.DayOfWeek.MONDAY),
+    showWeekend: Boolean = true,
+    rowHeight: Dp = 60.dp,
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
+        TimetableGrid(
+                lessonTimes = lessonTimes,
+                courses = courses,
+                hasTimetable = hasTimetable,
+                currentWeek = currentWeek,
+            weekStartDate = weekStartDate,
+            showWeekend = showWeekend,
+            rowHeight = rowHeight,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         ScheduleHomeHeader(
             currentWeek = currentWeek,
             dateRange = dateRange,
             onEditClick = onEditClick,
             onSwitchTimetableClick = onSwitchTimetableClick,
             onSettingsClick = onSettingsClick,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
         )
 
         WeekNavigationSplitButtons(
@@ -97,7 +162,7 @@ fun ScheduleHomeScreen(
             onSelectWeekClick = onSelectWeekClick,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 8.dp),
+                .padding(end = 20.dp, bottom = 8.dp),
         )
     }
 }

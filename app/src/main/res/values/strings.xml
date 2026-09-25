@@ -32,7 +32,7 @@
     <string name="action_login_and_import">Sign in and import</string>
     <string name="timetable_management_title">Timetable management</string>
     <string name="timetable_new_name">New timetable</string>
-    <string name="timetable_empty_title">No timetables yet</string>
+    <string name="timetable_empty_title">Please set up a timetable first</string>
     <string name="timetable_empty_description">Tap "Create" or use import to build your schedule in one step.</string>
     <string name="auto_update_config_invalid">Auto–update config invalid; please import again</string>
     <string name="auto_update_in_progress">Updating courses…</string>
@@ -112,8 +112,8 @@
     <string name="title_course_time_management">Class time management</string>
     <string name="title_courses_management">Course management</string>
     <string name="label_template">Template</string>
-    <string name="label_no_lesson_time">No class times yet</string>
-    <string name="label_no_course">No courses yet</string>
+    <string name="label_no_lesson_time">Please set up class times first</string>
+    <string name="label_no_course">No courses this week</string>
     <string name="content_desc_edit_lesson_time">Edit class time</string>
     <string name="content_desc_delete_lesson_time">Delete class time</string>
     <string name="content_desc_edit_course">Edit course</string>

@@ -32,7 +32,7 @@
     <string name="action_login_and_import">登录并导入</string>
     <string name="timetable_management_title">课表管理</string>
     <string name="timetable_new_name">新建课表</string>
-    <string name="timetable_empty_title">暂无课表</string>
+    <string name="timetable_empty_title">请先设置课表</string>
     <string name="timetable_empty_description">点击“新建”或使用导入功能，一键构建属于你的课程安排。</string>
     <string name="auto_update_config_invalid">自动更新配置无效，请重新导入</string>
     <string name="auto_update_in_progress">正在更新课程…</string>
@@ -112,8 +112,8 @@
     <string name="title_course_time_management">课程时间管理</string>
     <string name="title_courses_management">课程管理</string>
     <string name="label_template">模板</string>
-    <string name="label_no_lesson_time">暂无课程时间</string>
-    <string name="label_no_course">暂无课程</string>
+    <string name="label_no_lesson_time">请先设置课程时间</string>
+    <string name="label_no_course">本周没有课程</string>
     <string name="content_desc_edit_lesson_time">编辑课程时间</string>
     <string name="content_desc_delete_lesson_time">删除课程时间</string>
     <string name="content_desc_edit_course">编辑课程</string>
