@@ -35,6 +35,7 @@ import androidx.compose.material3.ToggleButtonSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -112,41 +113,96 @@ private fun ScheduleHomeHeader(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(top = 4.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.week_label_template, currentWeek),
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+    SubcomposeLayout(modifier = modifier) { constraints ->
+        val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val horizontalSpacing = 12.dp.roundToPx()
+        val headerInfo = subcompose(ScheduleHomeHeaderSlot.INFO) {
+            ScheduleHomeHeaderInfo(
+                currentWeek = currentWeek,
+                dateRange = dateRange,
             )
-            Text(
-                text = dateRange,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+        }.single().measure(childConstraints)
+
+        val labelModes = listOf(
+            HeaderActionLabelMode.ALL,
+            HeaderActionLabelMode.EDIT_ONLY,
+            HeaderActionLabelMode.NONE,
+        )
+        val actionPlaceables = labelModes.map { labelMode ->
+            subcompose(labelMode.slot) {
+                HeaderSplitButtons(
+                    labelMode = labelMode,
+                    onEditClick = onEditClick,
+                    onSwitchTimetableClick = onSwitchTimetableClick,
+                    onSettingsClick = onSettingsClick,
+                )
+            }.single().measure(childConstraints)
+        }
+        val availableWidth = constraints.maxWidth
+        val selectedActionIndex = actionPlaceables.indexOfFirst { actions ->
+            headerInfo.width + horizontalSpacing + actions.width <= availableWidth
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        if (selectedActionIndex >= 0) {
+            val actions = actionPlaceables[selectedActionIndex]
+            val layoutHeight = maxOf(headerInfo.height, actions.height)
+            layout(availableWidth, layoutHeight) {
+                headerInfo.placeRelative(0, 0)
+                actions.placeRelative(availableWidth - actions.width, 0)
+            }
+        } else {
+            val compactActions = actionPlaceables.last()
+            val layoutWidth = maxOf(constraints.minWidth, headerInfo.width, compactActions.width)
+            val layoutHeight = headerInfo.height + horizontalSpacing + compactActions.height
+            layout(layoutWidth, layoutHeight) {
+                headerInfo.placeRelative(0, 0)
+                compactActions.placeRelative(layoutWidth - compactActions.width, headerInfo.height + horizontalSpacing)
+            }
+        }
+    }
+}
 
-        HeaderSplitButtons(
-            onEditClick = onEditClick,
-            onSwitchTimetableClick = onSwitchTimetableClick,
-            onSettingsClick = onSettingsClick,
+@Composable
+private fun ScheduleHomeHeaderInfo(
+    currentWeek: Int,
+    dateRange: String,
+) {
+    Column(modifier = Modifier.padding(top = 4.dp)) {
+        Text(
+            text = stringResource(R.string.week_label_template, currentWeek),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+        Text(
+            text = dateRange,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
         )
     }
+}
+
+private enum class ScheduleHomeHeaderSlot {
+    INFO,
+    ACTIONS_ALL,
+    ACTIONS_EDIT_ONLY,
+    ACTIONS_NONE,
+}
+
+private enum class HeaderActionLabelMode(
+    val slot: ScheduleHomeHeaderSlot,
+) {
+    ALL(ScheduleHomeHeaderSlot.ACTIONS_ALL),
+    EDIT_ONLY(ScheduleHomeHeaderSlot.ACTIONS_EDIT_ONLY),
+    NONE(ScheduleHomeHeaderSlot.ACTIONS_NONE),
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HeaderSplitButtons(
+    labelMode: HeaderActionLabelMode,
     onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -154,6 +210,9 @@ private fun HeaderSplitButtons(
 ) {
     val settingsDescription = stringResource(R.string.home_action_settings)
     val switchTimetableDescription = stringResource(R.string.home_action_switch_timetable)
+    val editLabel = stringResource(R.string.home_action_edit)
+    val switchTimetableLabel = stringResource(R.string.home_action_switch_timetable)
+    val settingsLabel = stringResource(R.string.home_action_settings)
 
     ButtonGroup(
         overflowIndicator = {},
@@ -165,7 +224,7 @@ private fun HeaderSplitButtons(
                 ConnectedActionButton(
                     position = ConnectedButtonPosition.LEADING,
                     onClick = onEditClick,
-                    contentDescription = stringResource(R.string.home_action_edit),
+                    contentDescription = editLabel,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Edit,
@@ -174,8 +233,10 @@ private fun HeaderSplitButtons(
                             ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
                         ),
                     )
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(R.string.home_action_edit))
+                    if (labelMode != HeaderActionLabelMode.NONE) {
+                        Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
+                        Text(editLabel)
+                    }
                 }
             },
             menuContent = {},
@@ -194,6 +255,10 @@ private fun HeaderSplitButtons(
                             ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
                         ),
                     )
+                    if (labelMode == HeaderActionLabelMode.ALL) {
+                        Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
+                        Text(switchTimetableLabel)
+                    }
                 }
             },
             menuContent = {},
@@ -212,6 +277,10 @@ private fun HeaderSplitButtons(
                             ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
                         ),
                     )
+                    if (labelMode == HeaderActionLabelMode.ALL) {
+                        Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
+                        Text(settingsLabel)
+                    }
                 }
             },
             menuContent = {},
