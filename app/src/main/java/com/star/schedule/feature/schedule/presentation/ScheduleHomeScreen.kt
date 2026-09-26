@@ -6,13 +6,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -130,31 +129,34 @@ fun ScheduleHomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .windowInsetsPadding(WindowInsets.safeDrawing),
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
     ) {
-        TimetableGrid(
+        Column(modifier = Modifier.fillMaxSize()) {
+            ScheduleHomeHeader(
+                currentWeek = currentWeek,
+                dateRange = dateRange,
+                onEditClick = onEditClick,
+                onSwitchTimetableClick = onSwitchTimetableClick,
+                onSettingsClick = onSettingsClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 8.dp),
+            )
+
+            TimetableGrid(
                 lessonTimes = lessonTimes,
                 courses = courses,
                 hasTimetable = hasTimetable,
                 currentWeek = currentWeek,
-            weekStartDate = weekStartDate,
-            showWeekend = showWeekend,
-            rowHeight = rowHeight,
-            modifier = Modifier.fillMaxSize(),
-        )
-
-        ScheduleHomeHeader(
-            currentWeek = currentWeek,
-            dateRange = dateRange,
-            onEditClick = onEditClick,
-            onSwitchTimetableClick = onSwitchTimetableClick,
-            onSettingsClick = onSettingsClick,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-        )
+                weekStartDate = weekStartDate,
+                showWeekend = showWeekend,
+                rowHeight = rowHeight,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
 
         WeekNavigationSplitButtons(
             onPreviousWeekClick = onPreviousWeekClick,
@@ -162,6 +164,7 @@ fun ScheduleHomeScreen(
             onSelectWeekClick = onSelectWeekClick,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
                 .padding(end = 20.dp, bottom = 8.dp),
         )
     }

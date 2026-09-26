@@ -1,7 +1,6 @@
 package com.star.schedule.feature.schedule.presentation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -66,7 +67,6 @@ fun TimetableGrid(
         stringResource(R.string.weekday_short_saturday),
         stringResource(R.string.weekday_short_sunday),
     )
-    val horizontalScrollState = rememberScrollState()
     val verticalScrollState = rememberScrollState()
     val sortedLessonTimes = remember(lessonTimes) { lessonTimes.sortedBy { it.period } }
     val visibleCourses = remember(courses, currentWeek) {
@@ -79,7 +79,6 @@ fun TimetableGrid(
             }
             .toMap()
     }
-    val columnWidth = 112.dp
     val timeColumnWidth = 58.dp
 
     Box(
@@ -100,13 +99,13 @@ fun TimetableGrid(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .horizontalScroll(horizontalScrollState)
-                    .verticalScroll(verticalScrollState)
-                    .padding(8.dp),
+                    .verticalScroll(verticalScrollState),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Row(
-                    modifier = Modifier.height(64.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     GridTimeHeader(modifier = Modifier.width(timeColumnWidth))
@@ -115,14 +114,17 @@ fun TimetableGrid(
                         GridDayHeader(
                             dayLabel = dayLabels[day - 1],
                             date = date,
-                            modifier = Modifier.width(columnWidth),
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
 
                 sortedLessonTimes.forEach { lessonTime ->
                     Row(
-                        modifier = Modifier.height(rowHeight),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = rowHeight)
+                            .height(IntrinsicSize.Min),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         GridTimeCell(
@@ -135,7 +137,7 @@ fun TimetableGrid(
                             GridCourseCell(
                                 course = coursesByCell[day to lessonTime.period],
                                 modifier = Modifier
-                                    .width(columnWidth)
+                                    .weight(1f)
                                     .fillMaxHeight(),
                             )
                         }
@@ -209,9 +211,7 @@ private fun EmptyTimetableState(
 private fun GridTimeHeader(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            .fillMaxHeight(),
         contentAlignment = Alignment.Center,
     ) {}
 }
@@ -225,15 +225,14 @@ private fun GridDayHeader(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Top,
     ) {
         Text(
             text = stringResource(R.string.weekday_column_label, dayLabel),
             style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )
@@ -253,8 +252,6 @@ private fun GridTimeCell(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -262,6 +259,7 @@ private fun GridTimeCell(
         Text(
             text = lessonTime.period.toString(),
             style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
