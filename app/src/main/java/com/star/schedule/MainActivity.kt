@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
 
         DatabaseProvider.init(this)
         enableEdgeToEdge()
-//        installAdaptiveStatusBarAppearance()
+        installAdaptiveStatusBarAppearance()
         val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
         setContent {
             StarScheduleApp(scheduleRepository)

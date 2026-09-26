@@ -1,7 +1,10 @@
 package com.star.schedule.platform.systembar
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
+import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
+import android.view.PixelCopy
 import android.view.Window
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -9,6 +12,8 @@ import androidx.core.view.WindowInsetsCompat
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlin.math.pow
 
 internal class StatusBarAppearanceMonitor(
@@ -17,6 +22,7 @@ internal class StatusBarAppearanceMonitor(
     private val contrastSelector: StatusBarContrastSelector = StatusBarContrastSelector(),
 ) {
     private var currentMode: StatusBarIconMode? = null
+    private val pixelCopyHandler = Handler(Looper.getMainLooper())
 
     init {
         require(sampleIntervalMillis > 0)
@@ -29,7 +35,7 @@ internal class StatusBarAppearanceMonitor(
         }
     }
 
-    private fun updateAppearance() {
+    private suspend fun updateAppearance() {
         val decorView = window.decorView
         if (!decorView.isLaidOut || decorView.width <= 0) return
 
@@ -48,7 +54,7 @@ internal class StatusBarAppearanceMonitor(
         currentMode = nextMode
     }
 
-    private fun sampleLuminance(statusBarHeight: Int): Double? {
+    private suspend fun sampleLuminance(statusBarHeight: Int): Double? {
         val decorView = window.decorView
         val bitmap = Bitmap.createBitmap(
             SAMPLE_COLUMN_COUNT,
@@ -56,27 +62,50 @@ internal class StatusBarAppearanceMonitor(
             Bitmap.Config.ARGB_8888,
         )
 
-        return try {
-            val canvas = Canvas(bitmap)
-            canvas.scale(
-                SAMPLE_COLUMN_COUNT.toFloat() / decorView.width,
-                SAMPLE_ROW_COUNT.toFloat() / statusBarHeight,
-            )
-            decorView.draw(canvas)
+        return suspendCancellableCoroutine { continuation ->
+            var completed = false
 
-            val pixels = IntArray(SAMPLE_COLUMN_COUNT * SAMPLE_ROW_COUNT)
-            bitmap.getPixels(
-                pixels,
-                0,
-                SAMPLE_COLUMN_COUNT,
-                0,
-                0,
-                SAMPLE_COLUMN_COUNT,
-                SAMPLE_ROW_COUNT,
-            )
-            averageLuminance(pixels)
-        } finally {
-            bitmap.recycle()
+            fun finish(result: Int) {
+                if (completed) return
+                completed = true
+
+                val luminance = if (
+                    result == PixelCopy.SUCCESS && !bitmap.isRecycled
+                ) {
+                    val pixels = IntArray(SAMPLE_COLUMN_COUNT * SAMPLE_ROW_COUNT)
+                    bitmap.getPixels(
+                        pixels,
+                        0,
+                        SAMPLE_COLUMN_COUNT,
+                        0,
+                        0,
+                        SAMPLE_COLUMN_COUNT,
+                        SAMPLE_ROW_COUNT,
+                    )
+                    averageLuminance(pixels)
+                } else {
+                    null
+                }
+                if (!bitmap.isRecycled) bitmap.recycle()
+                if (continuation.isActive) continuation.resume(luminance)
+            }
+
+            continuation.invokeOnCancellation {
+                completed = true
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+
+            runCatching {
+                PixelCopy.request(
+                    window,
+                    Rect(0, 0, decorView.width, statusBarHeight),
+                    bitmap,
+                    ::finish,
+                    pixelCopyHandler,
+                )
+            }.onFailure {
+                finish(PixelCopy.ERROR_UNKNOWN)
+            }
         }
     }
 
