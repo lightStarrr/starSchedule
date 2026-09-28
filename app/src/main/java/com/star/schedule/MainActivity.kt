@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import com.star.schedule.app.StarScheduleApp
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.feature.schedule.data.RoomScheduleRepository
+import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
 import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
 
 class MainActivity : ComponentActivity() {
@@ -17,8 +18,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         installAdaptiveStatusBarAppearance()
         val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
+        val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.dao())
         setContent {
-            StarScheduleApp(scheduleRepository)
+            StarScheduleApp(scheduleRepository, wallpaperRepository)
         }
     }
 }

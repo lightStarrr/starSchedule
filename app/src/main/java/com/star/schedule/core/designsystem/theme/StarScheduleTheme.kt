@@ -1,8 +1,5 @@
 package com.star.schedule.core.designsystem.theme
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -12,14 +9,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import com.star.schedule.R
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.min
 
@@ -45,46 +37,6 @@ fun StarScheduleTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
         content = content,
-    )
-}
-
-@Composable
-fun rememberImageSeedColor(@DrawableRes imageResId: Int?): Color? {
-    val context = LocalContext.current
-    val color by produceState<Color?>(initialValue = null, imageResId) {
-        value = imageResId?.let { resourceId ->
-            withContext(Dispatchers.Default) { extractSeedColor(context, resourceId) }
-        }
-    }
-    return color
-}
-
-private fun extractSeedColor(context: android.content.Context, @DrawableRes resourceId: Int): Color? {
-    val source = BitmapFactory.decodeResource(context.resources, resourceId) ?: return null
-    val sample = Bitmap.createScaledBitmap(source, 32, 32, true)
-    if (sample !== source) source.recycle()
-
-    var red = 0L
-    var green = 0L
-    var blue = 0L
-    var count = 0L
-    for (y in 0 until sample.height) {
-        for (x in 0 until sample.width) {
-            val pixel = sample.getPixel(x, y)
-            val alpha = pixel ushr 24 and 0xff
-            if (alpha < 180) continue
-            red += pixel ushr 16 and 0xff
-            green += pixel ushr 8 and 0xff
-            blue += pixel and 0xff
-            count++
-        }
-    }
-    sample.recycle()
-    if (count == 0L) return null
-    return Color(
-        red = (red / count).toInt(),
-        green = (green / count).toInt(),
-        blue = (blue / count).toInt(),
     )
 }
 
