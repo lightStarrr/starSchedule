@@ -1,6 +1,7 @@
 package com.star.schedule.feature.schedule.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -47,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.core.database.CourseEntity
@@ -56,8 +59,21 @@ import kotlinx.coroutines.flow.flowOf
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
+enum class ScheduleBackgroundMode(
+    val imageResId: Int?,
+) {
+    SYSTEM(null),
+    FOREST(R.drawable.schedule_background_forest),
+    MOUNTAIN(R.drawable.schedule_background_mountain),
+    FIELD(R.drawable.schedule_background_field),
+}
+
 @Composable
-fun ScheduleHomeRoute(repository: ScheduleRepository) {
+fun ScheduleHomeRoute(
+    repository: ScheduleRepository,
+    backgroundMode: ScheduleBackgroundMode = ScheduleBackgroundMode.SYSTEM,
+    onEditClick: () -> Unit = {},
+) {
     val timetableId by repository.observeCurrentTimetableId().collectAsState(initial = null)
     val timetable by remember(timetableId) {
         timetableId?.let(repository::observeTimetable) ?: flowOf(null)
@@ -99,7 +115,8 @@ fun ScheduleHomeRoute(repository: ScheduleRepository) {
         weekStartDate = weekStartDate,
         showWeekend = timetable?.showWeekend ?: true,
         rowHeight = (timetable?.rowHeight ?: 60).dp,
-        onEditClick = {},
+        backgroundMode = backgroundMode,
+        onEditClick = onEditClick,
         onSwitchTimetableClick = {},
         onSettingsClick = {},
         onPreviousWeekClick = { currentWeek = (currentWeek - 1).coerceAtLeast(1) },
@@ -125,12 +142,26 @@ fun ScheduleHomeScreen(
     weekStartDate: LocalDate = LocalDate.now().with(java.time.DayOfWeek.MONDAY),
     showWeekend: Boolean = true,
     rowHeight: Dp = 60.dp,
+    backgroundMode: ScheduleBackgroundMode = ScheduleBackgroundMode.SYSTEM,
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surfaceContainerLowest),
     ) {
+        backgroundMode.imageResId?.let { imageResId ->
+            Image(
+                painter = painterResource(imageResId),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f)),
+            )
+        }
         Column(modifier = Modifier.fillMaxSize()) {
             ScheduleHomeHeader(
                 currentWeek = currentWeek,
