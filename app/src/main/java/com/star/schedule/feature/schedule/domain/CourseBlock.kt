@@ -29,3 +29,17 @@ fun buildCourseBlocks(courses: List<CourseEntity>): List<CourseBlock> =
             }
         }
     }
+
+/**
+ * Builds the blocks once and indexes them by teaching week so changing weeks
+ * does not sort and split every course again on the main thread.
+ */
+fun buildCourseBlocksByWeek(courses: List<CourseEntity>): Map<Int, List<CourseBlock>> {
+    val blocksByWeek = linkedMapOf<Int, MutableList<CourseBlock>>()
+    buildCourseBlocks(courses).forEach { block ->
+        block.course.weeks.distinct().forEach { week ->
+            blocksByWeek.getOrPut(week) { mutableListOf() }.add(block)
+        }
+    }
+    return blocksByWeek.mapValues { (_, blocks) -> blocks.toList() }
+}
