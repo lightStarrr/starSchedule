@@ -152,6 +152,7 @@ class RoomWallpaperRepository(
                     oldPreference?.takeIf { it.fileName != fileName }?.let {
                         cacheStore.delete(timetableId, it.fileName)
                     }
+                    Unit
                 } catch (error: Throwable) {
                     temporaryFile.delete()
                     createdTarget?.delete()
