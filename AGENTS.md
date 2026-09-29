@@ -215,3 +215,27 @@ fun TimetableSettingsRoute(viewModel: TimetableSettingsViewModel) {
 重写课程表主页界面
 补充课程周数计算测试
 ```
+
+## 十二、Android Studio 与命令行构建环境
+
+- Android Studio 的 Gradle JVM 使用项目配置的 `#GRADLE_LOCAL_JAVA_HOME`，当前实际指向 Android Studio 自带的 `C:\Program Files\Android\Android Studio\jbr`（JDK 21）。
+- 命令行不能默认使用系统 PATH 中的其它 JDK。当前机器的 JDK 26 会在 Android Gradle Plugin 的 `JdkImageTransform` 阶段导致 `jlink` 失败，即使 Kotlin 编译阶段可以通过。
+- 命令行 Gradle 缓存必须放在仓库内可写的 `.gradle` 目录，避免默认路径落到不可写的 `C:\.gradle`。
+- `local.properties` 中的 Android SDK 路径仍以本机实际安装位置为准，不提交该文件；`.gradle/config.properties` 和 `.android` 只作为本机环境配置，不纳入提交。
+
+PowerShell 验证命令：
+
+```powershell
+$projectRoot = (Get-Location).Path
+$studioJdk = "C:\Program Files\Android\Android Studio\jbr"
+$env:JAVA_HOME = $studioJdk
+$env:Path = "$studioJdk\bin;$env:Path"
+$env:GRADLE_USER_HOME = Join-Path $projectRoot ".gradle"
+$env:ANDROID_USER_HOME = Join-Path $projectRoot ".android"
+
+java -version
+.\gradlew :app:compileDebugKotlin --offline
+.\gradlew :app:testDebugUnitTest --offline
+```
+
+若命令行构建与 Android Studio 结果不一致，先对比 `java -version`、Gradle JVM、`JAVA_HOME`、`GRADLE_USER_HOME` 和 `local.properties`，再判断是否为代码问题。
