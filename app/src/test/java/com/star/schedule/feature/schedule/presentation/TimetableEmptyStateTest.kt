@@ -15,6 +15,19 @@ class TimetableEmptyStateTest {
     )
 
     @Test
+    fun `loading does not show missing timetable`() {
+        assertNull(
+            determineTimetableEmptyState(
+                isLoading = true,
+                hasTimetable = false,
+                lessonTimes = emptyList(),
+                courses = emptyList(),
+                currentWeek = 1,
+            ),
+        )
+    }
+
+    @Test
     fun `missing timetable shows timetable empty state`() {
         assertEquals(
             TimetableEmptyState.NO_TIMETABLE,
