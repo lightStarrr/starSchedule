@@ -1,5 +1,7 @@
 package com.star.schedule.feature.schedule.presentation
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,10 +22,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,7 +39,10 @@ import com.star.schedule.R
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.feature.schedule.domain.CourseBlock
-import com.star.schedule.feature.schedule.domain.buildCourseBlocks
+import com.star.schedule.feature.schedule.domain.buildCourseBlocksByWeek
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
@@ -60,10 +69,11 @@ fun TimetableGrid(
     )
     val verticalScrollState = rememberScrollState()
     val sortedLessonTimes = remember(lessonTimes) { lessonTimes.sortedBy { it.period } }
-    val visibleCourses = remember(courses, currentWeek) {
-        courses.filter { currentWeek in it.weeks }
+    val courseBlocksByWeek = remember(courses) { buildCourseBlocksByWeek(courses) }
+    val courseBlocks = courseBlocksByWeek[currentWeek].orEmpty()
+    val courseBlocksByDay = remember(courseBlocks) {
+        courseBlocks.groupBy { it.dayOfWeek }
     }
-    val courseBlocks = remember(visibleCourses) { buildCourseBlocks(visibleCourses) }
     val timeColumnWidth = 58.dp
 
     Box(
@@ -111,9 +121,9 @@ fun TimetableGrid(
                 }
                 visibleDays.forEach { day ->
                     CourseDayColumn(
-                        day = day,
                         lessonTimes = sortedLessonTimes,
-                        courseBlocks = courseBlocks,
+                        courseBlocks = courseBlocksByDay[day].orEmpty(),
+                        currentWeek = currentWeek,
                         rowHeight = rowHeight,
                         modifier = Modifier.weight(1f),
                     )
@@ -126,9 +136,9 @@ fun TimetableGrid(
 
 @Composable
 private fun CourseDayColumn(
-    day: Int,
     lessonTimes: List<LessonTimeEntity>,
     courseBlocks: List<CourseBlock>,
+    currentWeek: Int,
     rowHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -144,16 +154,15 @@ private fun CourseDayColumn(
                 Box(modifier = Modifier.fillMaxWidth().height(rowHeight))
             }
         }
-        courseBlocks
-            .asSequence()
-            .filter { it.dayOfWeek == day }
-            .forEach { block ->
-                val startIndex = periodIndexes[block.startPeriod]
-                val endIndex = periodIndexes[block.endPeriod]
-                if (startIndex != null && endIndex != null && endIndex >= startIndex) {
-                    val span = endIndex - startIndex + 1
+        courseBlocks.forEachIndexed { index, block ->
+            val startIndex = periodIndexes[block.startPeriod]
+            val endIndex = periodIndexes[block.endPeriod]
+            if (startIndex != null && endIndex != null && endIndex >= startIndex) {
+                val span = endIndex - startIndex + 1
+                key(currentWeek, block.course.id, block.startPeriod, block.endPeriod) {
                     GridCourseCell(
                         course = block.course,
+                        animationDelayMillis = (index * 35L).coerceAtMost(210L),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(rowHeight * span + rowGap * (span - 1))
@@ -161,6 +170,7 @@ private fun CourseDayColumn(
                     )
                 }
             }
+        }
     }
 }
 
@@ -237,15 +247,37 @@ private fun GridTimeCell(
 @Composable
 private fun GridCourseCell(
     course: CourseEntity?,
+    animationDelayMillis: Long,
     modifier: Modifier = Modifier,
 ) {
+    val density = LocalDensity.current
+    val alpha = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(20f) }
+
+    LaunchedEffect(Unit) {
+        delay(animationDelayMillis)
+        coroutineScope {
+            launch {
+                alpha.animateTo(1f, animationSpec = tween(durationMillis = 320))
+            }
+            launch {
+                offsetY.animateTo(0f, animationSpec = tween(durationMillis = 320))
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .padding(2.dp),
     ) {
         if (course != null) {
             Card(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        this.alpha = alpha.value
+                        translationY = with(density) { offsetY.value.dp.toPx() }
+                    },
                 shape = RoundedCornerShape(10.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,

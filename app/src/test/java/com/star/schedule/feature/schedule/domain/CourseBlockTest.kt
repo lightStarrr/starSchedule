@@ -29,6 +29,16 @@ class CourseBlockTest {
         )
     }
 
+    @Test
+    fun `blocks are indexed for every teaching week`() {
+        val course = course(periods = listOf(1, 2)).copy(weeks = listOf(1, 2, 2))
+
+        assertEquals(
+            listOf(CourseBlock(course, 1, 1, 2)),
+            buildCourseBlocksByWeek(listOf(course))[2],
+        )
+    }
+
     private fun course(periods: List<Int>) = CourseEntity(
         timetableId = 1,
         name = "数学",
