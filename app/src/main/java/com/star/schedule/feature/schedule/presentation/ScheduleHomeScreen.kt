@@ -50,30 +50,48 @@ import com.star.schedule.R
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.presentation.WallpaperBackground
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
+private data class HomeTimetableData(
+    val timetable: TimetableEntity?,
+    val courses: List<CourseEntity>,
+    val lessonTimes: List<LessonTimeEntity>,
+)
+
 @Composable
 fun ScheduleHomeRoute(
     repository: ScheduleRepository,
+    timetableId: Long?,
+    isSelectionLoading: Boolean,
     wallpaperState: WallpaperState = WallpaperState.None,
     onEditClick: () -> Unit = {},
 ) {
-    val timetableId by repository.observeCurrentTimetableId().collectAsState(initial = null)
-    val timetable by remember(timetableId) {
-        timetableId?.let(repository::observeTimetable) ?: flowOf(null)
-    }.collectAsState(initial = null)
-    val courses by remember(timetableId) {
-        timetableId?.let(repository::observeCourses) ?: flowOf<List<CourseEntity>>(emptyList())
-    }.collectAsState(initial = emptyList())
-    val lessonTimes by remember(timetableId) {
-        timetableId?.let(repository::observeLessonTimes)
-            ?: flowOf<List<LessonTimeEntity>>(emptyList())
-    }.collectAsState(initial = emptyList())
+    val homeDataFlow: Flow<HomeTimetableData?> = remember(repository, timetableId) {
+        if (timetableId == null) {
+            flowOf(null)
+        } else {
+            combine(
+                repository.observeTimetable(timetableId),
+                repository.observeCourses(timetableId),
+                repository.observeLessonTimes(timetableId),
+            ) { timetable, courses, lessonTimes ->
+                HomeTimetableData(timetable, courses, lessonTimes)
+            }
+        }
+    }
+    val homeData by homeDataFlow.collectAsState(initial = null)
+    val timetable = homeData?.timetable
+    val courses = homeData?.courses.orEmpty()
+    val lessonTimes = homeData?.lessonTimes.orEmpty()
+    val isLoading = isSelectionLoading || (timetableId != null && homeData == null)
     val semesterStart = remember(timetable?.startDate) {
         runCatching { timetable?.startDate?.let(LocalDate::parse) }
             .getOrNull()
@@ -99,6 +117,7 @@ fun ScheduleHomeRoute(
         lessonTimes = lessonTimes,
         courses = courses,
         hasTimetable = timetable != null,
+        isLoading = isLoading,
         weekStartDate = weekStartDate,
         showWeekend = timetable?.showWeekend ?: true,
         rowHeight = (timetable?.rowHeight ?: 60).dp,
@@ -126,6 +145,7 @@ fun ScheduleHomeScreen(
     lessonTimes: List<LessonTimeEntity> = emptyList(),
     courses: List<CourseEntity> = emptyList(),
     hasTimetable: Boolean = true,
+    isLoading: Boolean = false,
     weekStartDate: LocalDate = LocalDate.now().with(java.time.DayOfWeek.MONDAY),
     showWeekend: Boolean = true,
     rowHeight: Dp = 60.dp,
@@ -148,6 +168,7 @@ fun ScheduleHomeScreen(
             )
         }
         val emptyState = determineTimetableEmptyState(
+            isLoading = isLoading,
             hasTimetable = hasTimetable,
             lessonTimes = lessonTimes,
             courses = courses,
@@ -166,7 +187,7 @@ fun ScheduleHomeScreen(
                     .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 8.dp),
             )
 
-            if (emptyState == null) {
+            if (!isLoading && emptyState == null) {
                 TimetableGrid(
                     lessonTimes = lessonTimes,
                     courses = courses,

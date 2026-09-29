@@ -12,14 +12,20 @@ import com.star.schedule.feature.schedule.presentation.ScheduleHomeRoute
 import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+
+private data class SelectedTimetable(val id: Long?)
 
 @Composable
 fun StarScheduleApp(
     scheduleRepository: ScheduleRepository,
     wallpaperRepository: WallpaperRepository,
 ) {
-    val timetableId by scheduleRepository.observeCurrentTimetableId().collectAsState(initial = null)
-    key(timetableId) {
+    val selection by remember(scheduleRepository) {
+        scheduleRepository.observeCurrentTimetableId().map(::SelectedTimetable)
+    }.collectAsState(initial = null)
+    val timetableId = selection?.id
+    key(selection) {
         val wallpaperState by remember(timetableId) {
             timetableId?.let(wallpaperRepository::observe) ?: flowOf(WallpaperState.None)
         }.collectAsState(initial = WallpaperState.None)
@@ -33,6 +39,8 @@ fun StarScheduleApp(
         ) {
             ScheduleHomeRoute(
                 repository = scheduleRepository,
+                timetableId = timetableId,
+                isSelectionLoading = selection == null,
                 wallpaperState = wallpaperState,
             )
         }

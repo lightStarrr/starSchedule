@@ -36,11 +36,13 @@ internal enum class TimetableEmptyState {
 }
 
 internal fun determineTimetableEmptyState(
+    isLoading: Boolean = false,
     hasTimetable: Boolean,
     lessonTimes: List<LessonTimeEntity>,
     courses: List<CourseEntity>,
     currentWeek: Int,
 ): TimetableEmptyState? = when {
+    isLoading -> null
     !hasTimetable -> TimetableEmptyState.NO_TIMETABLE
     lessonTimes.isEmpty() -> TimetableEmptyState.NO_LESSON_TIMES
     courses.none { currentWeek in it.weeks } -> TimetableEmptyState.NO_COURSES
