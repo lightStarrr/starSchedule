@@ -147,6 +147,12 @@ fun ScheduleHomeScreen(
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f)),
             )
         }
+        val emptyState = determineTimetableEmptyState(
+            hasTimetable = hasTimetable,
+            lessonTimes = lessonTimes,
+            courses = courses,
+            currentWeek = currentWeek,
+        )
         Column(modifier = Modifier.fillMaxSize()) {
             ScheduleHomeHeader(
                 currentWeek = currentWeek,
@@ -160,17 +166,25 @@ fun ScheduleHomeScreen(
                     .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 8.dp),
             )
 
-            TimetableGrid(
-                lessonTimes = lessonTimes,
-                courses = courses,
-                hasTimetable = hasTimetable,
-                currentWeek = currentWeek,
-                weekStartDate = weekStartDate,
-                showWeekend = showWeekend,
-                rowHeight = rowHeight,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+            if (emptyState == null) {
+                TimetableGrid(
+                    lessonTimes = lessonTimes,
+                    courses = courses,
+                    currentWeek = currentWeek,
+                    weekStartDate = weekStartDate,
+                    showWeekend = showWeekend,
+                    rowHeight = rowHeight,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+        }
+
+        if (emptyState != null) {
+            EmptyTimetableState(
+                state = emptyState,
+                modifier = Modifier.fillMaxSize(),
             )
         }
 
