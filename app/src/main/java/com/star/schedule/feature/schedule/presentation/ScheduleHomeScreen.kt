@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
@@ -61,6 +62,7 @@ import java.time.temporal.ChronoUnit
 fun ScheduleHomeRoute(
     repository: ScheduleRepository,
     wallpaperState: WallpaperState = WallpaperState.None,
+    onEditClick: () -> Unit = {},
 ) {
     val timetableId by repository.observeCurrentTimetableId().collectAsState(initial = null)
     val timetable by remember(timetableId) {
@@ -104,6 +106,7 @@ fun ScheduleHomeRoute(
         showWeekend = timetable?.showWeekend ?: true,
         rowHeight = (timetable?.rowHeight ?: 60).dp,
         wallpaperState = wallpaperState,
+        onEditClick = onEditClick,
         onSwitchTimetableClick = {},
         onSettingsClick = {},
         onPreviousWeekClick = { currentWeek = (currentWeek - 1).coerceAtLeast(1) },
@@ -116,6 +119,7 @@ fun ScheduleHomeRoute(
 fun ScheduleHomeScreen(
     currentWeek: Int,
     dateRange: String,
+    onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onPreviousWeekClick: () -> Unit,
@@ -150,6 +154,7 @@ fun ScheduleHomeScreen(
             ScheduleHomeHeader(
                 currentWeek = currentWeek,
                 dateRange = dateRange,
+                onEditClick = onEditClick,
                 onSwitchTimetableClick = onSwitchTimetableClick,
                 onSettingsClick = onSettingsClick,
                 modifier = Modifier
@@ -188,6 +193,7 @@ fun ScheduleHomeScreen(
 private fun ScheduleHomeHeader(
     currentWeek: Int,
     dateRange: String,
+    onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -202,11 +208,16 @@ private fun ScheduleHomeHeader(
             )
         }.single().measure(childConstraints)
 
-        val labelModes = listOf(HeaderActionLabelMode.ALL, HeaderActionLabelMode.NONE)
+        val labelModes = listOf(
+            HeaderActionLabelMode.ALL,
+            HeaderActionLabelMode.EDIT_ONLY,
+            HeaderActionLabelMode.NONE,
+        )
         val actionPlaceables = labelModes.map { labelMode ->
             subcompose(labelMode.slot) {
                 HeaderSplitButtons(
                     labelMode = labelMode,
+                    onEditClick = onEditClick,
                     onSwitchTimetableClick = onSwitchTimetableClick,
                     onSettingsClick = onSettingsClick,
                 )
@@ -261,6 +272,7 @@ private fun ScheduleHomeHeaderInfo(
 private enum class ScheduleHomeHeaderSlot {
     INFO,
     ACTIONS_ALL,
+    ACTIONS_EDIT_ONLY,
     ACTIONS_NONE,
 }
 
@@ -268,6 +280,7 @@ private enum class HeaderActionLabelMode(
     val slot: ScheduleHomeHeaderSlot,
 ) {
     ALL(ScheduleHomeHeaderSlot.ACTIONS_ALL),
+    EDIT_ONLY(ScheduleHomeHeaderSlot.ACTIONS_EDIT_ONLY),
     NONE(ScheduleHomeHeaderSlot.ACTIONS_NONE),
 }
 
@@ -275,12 +288,14 @@ private enum class HeaderActionLabelMode(
 @Composable
 private fun HeaderSplitButtons(
     labelMode: HeaderActionLabelMode,
+    onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val settingsDescription = stringResource(R.string.home_action_settings)
     val switchTimetableDescription = stringResource(R.string.home_action_switch_timetable)
+    val editLabel = stringResource(R.string.home_action_edit)
     val switchTimetableLabel = stringResource(R.string.home_action_switch_timetable)
     val settingsLabel = stringResource(R.string.home_action_settings)
 
@@ -293,6 +308,28 @@ private fun HeaderSplitButtons(
             buttonGroupContent = {
                 ConnectedActionButton(
                     position = ConnectedButtonPosition.LEADING,
+                    onClick = onEditClick,
+                    contentDescription = editLabel,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(
+                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                        ),
+                    )
+                    if (labelMode != HeaderActionLabelMode.NONE) {
+                        Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
+                        Text(editLabel)
+                    }
+                }
+            },
+            menuContent = {},
+        )
+        customItem(
+            buttonGroupContent = {
+                ConnectedActionButton(
+                    position = ConnectedButtonPosition.MIDDLE,
                     onClick = onSwitchTimetableClick,
                     contentDescription = switchTimetableDescription,
                 ) {
@@ -457,6 +494,7 @@ private fun ScheduleHomeScreenPreview() {
         ScheduleHomeScreen(
             currentWeek = 1,
             dateRange = "9/21–9/27",
+            onEditClick = {},
             onSwitchTimetableClick = {},
             onSettingsClick = {},
             onPreviousWeekClick = {},

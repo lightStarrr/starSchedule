@@ -226,6 +226,7 @@
     <string name="tab_timetable_settings">Timetable settings</string>
     <string name="week_label_template">Week %1$d</string>
     <string name="home_date_range_template">%1$d/%2$d–%3$d/%4$d</string>
+    <string name="home_action_edit">Edit</string>
     <string name="home_action_switch_timetable">Timetable</string>
     <string name="home_action_timetable_short">Schedule</string>
     <string name="home_action_settings">Settings</string>
