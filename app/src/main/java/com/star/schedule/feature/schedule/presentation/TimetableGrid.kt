@@ -10,8 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -42,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.feature.schedule.domain.CourseBlock
+import com.star.schedule.feature.schedule.domain.buildCourseBlocks
 import java.time.LocalDate
 
 @Composable
@@ -72,13 +73,7 @@ fun TimetableGrid(
     val visibleCourses = remember(courses, currentWeek) {
         courses.filter { currentWeek in it.weeks }
     }
-    val coursesByCell = remember(visibleCourses) {
-        visibleCourses
-            .flatMap { course ->
-                course.periods.map { period -> (course.dayOfWeek to period) to course }
-            }
-            .toMap()
-    }
+    val courseBlocks = remember(visibleCourses) { buildCourseBlocks(visibleCourses) }
     val timeColumnWidth = 58.dp
 
     Box(
@@ -119,33 +114,76 @@ fun TimetableGrid(
                     }
                 }
 
-                sortedLessonTimes.forEach { lessonTime ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = rowHeight)
-                            .height(IntrinsicSize.Min),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.width(timeColumnWidth),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        GridTimeCell(
-                            lessonTime = lessonTime,
-                            modifier = Modifier
-                                .width(timeColumnWidth)
-                                .fillMaxHeight(),
-                        )
-                        visibleDays.forEach { day ->
-                            GridCourseCell(
-                                course = coursesByCell[day to lessonTime.period],
+                        sortedLessonTimes.forEach { lessonTime ->
+                            GridTimeCell(
+                                lessonTime = lessonTime,
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
+                                    .fillMaxWidth()
+                                    .height(rowHeight),
                             )
                         }
+                    }
+                    visibleDays.forEach { day ->
+                        CourseDayColumn(
+                            day = day,
+                            lessonTimes = sortedLessonTimes,
+                            courseBlocks = courseBlocks,
+                            rowHeight = rowHeight,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun CourseDayColumn(
+    day: Int,
+    lessonTimes: List<LessonTimeEntity>,
+    courseBlocks: List<CourseBlock>,
+    rowHeight: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val rowGap = 2.dp
+    val totalHeight = rowHeight * lessonTimes.size + rowGap * (lessonTimes.size - 1).coerceAtLeast(0)
+    val periodIndexes = remember(lessonTimes) {
+        lessonTimes.mapIndexed { index, lessonTime -> lessonTime.period to index }.toMap()
+    }
+
+    Box(modifier = modifier.height(totalHeight)) {
+        Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
+            lessonTimes.forEach {
+                Box(modifier = Modifier.fillMaxWidth().height(rowHeight))
+            }
+        }
+        courseBlocks
+            .asSequence()
+            .filter { it.dayOfWeek == day }
+            .forEach { block ->
+                val startIndex = periodIndexes[block.startPeriod]
+                val endIndex = periodIndexes[block.endPeriod]
+                if (startIndex != null && endIndex != null && endIndex >= startIndex) {
+                    val span = endIndex - startIndex + 1
+                    GridCourseCell(
+                        course = block.course,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(rowHeight * span + rowGap * (span - 1))
+                            .offset(y = (rowHeight + rowGap) * startIndex),
+                    )
+                }
+            }
     }
 }
 

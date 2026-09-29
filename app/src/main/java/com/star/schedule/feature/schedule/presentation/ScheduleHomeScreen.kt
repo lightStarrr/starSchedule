@@ -30,7 +30,6 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleButtonSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -83,10 +82,8 @@ fun ScheduleHomeRoute(
     val realCurrentWeek = remember(semesterStart) {
         ChronoUnit.DAYS.between(semesterStart, LocalDate.now()).toInt() / 7 + 1
     }.coerceAtLeast(1)
-    var currentWeek by rememberSaveable { mutableIntStateOf(realCurrentWeek) }
-
-    LaunchedEffect(realCurrentWeek) {
-        currentWeek = realCurrentWeek
+    var currentWeek by rememberSaveable(timetableId, timetable?.startDate) {
+        mutableIntStateOf(realCurrentWeek)
     }
 
     val weekStartDate = semesterStart.plusWeeks((currentWeek - 1).toLong())
