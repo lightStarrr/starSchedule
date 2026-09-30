@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,38 +13,48 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.ToggleButtonSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
@@ -230,6 +241,8 @@ private fun ScheduleHomeHeader(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var expandedOverflowCount by remember { mutableIntStateOf(0) }
+
     SubcomposeLayout(modifier = modifier) { constraints ->
         val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
         val horizontalSpacing = 12.dp.roundToPx()
@@ -240,20 +253,27 @@ private fun ScheduleHomeHeader(
             )
         }.single().measure(childConstraints)
 
-        val labelModes = listOf(
-            HeaderActionLabelMode.ALL,
-            HeaderActionLabelMode.EDIT_ONLY,
-            HeaderActionLabelMode.NONE,
+        val variants = listOf(
+            HeaderActionVariant(HeaderActionLabelMode.ALL, overflowCount = 0),
+            HeaderActionVariant(HeaderActionLabelMode.EDIT_ONLY, overflowCount = 0),
+            HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 0),
+            HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 1),
+            HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 2),
+            HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 3),
         )
-        val actionPlaceables = labelModes.map { labelMode ->
-            subcompose(labelMode.slot) {
+        val actionConstraints = Constraints(maxHeight = constraints.maxHeight)
+        val actionPlaceables = variants.map { variant ->
+            subcompose(variant.labelMode.slot to variant.overflowCount) {
                 HeaderSplitButtons(
-                    labelMode = labelMode,
+                    labelMode = variant.labelMode,
+                    overflowCount = variant.overflowCount,
+                    expandedOverflowCount = expandedOverflowCount,
+                    onExpandedOverflowCountChange = { expandedOverflowCount = it },
                     onEditClick = onEditClick,
                     onSwitchTimetableClick = onSwitchTimetableClick,
                     onSettingsClick = onSettingsClick,
                 )
-            }.single().measure(childConstraints)
+            }.single().measure(actionConstraints)
         }
         val availableWidth = constraints.maxWidth
         val selectedActionIndex = actionPlaceables.indexOfFirst { actions ->
@@ -268,7 +288,11 @@ private fun ScheduleHomeHeader(
                 actions.placeRelative(availableWidth - actions.width, 0)
             }
         } else {
-            val compactActions = actionPlaceables.last()
+            val compactActionIndex = variants.indices.firstOrNull { index ->
+                variants[index].labelMode == HeaderActionLabelMode.NONE &&
+                    actionPlaceables[index].width <= availableWidth
+            } ?: variants.lastIndex
+            val compactActions = actionPlaceables[compactActionIndex]
             val layoutWidth = maxOf(constraints.minWidth, headerInfo.width, compactActions.width)
             val layoutHeight = headerInfo.height + horizontalSpacing + compactActions.height
             layout(layoutWidth, layoutHeight) {
@@ -316,92 +340,158 @@ private enum class HeaderActionLabelMode(
     NONE(ScheduleHomeHeaderSlot.ACTIONS_NONE),
 }
 
+private data class HeaderActionVariant(
+    val labelMode: HeaderActionLabelMode,
+    val overflowCount: Int,
+)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HeaderSplitButtons(
     labelMode: HeaderActionLabelMode,
+    overflowCount: Int,
+    expandedOverflowCount: Int,
+    onExpandedOverflowCountChange: (Int) -> Unit,
     onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val settingsDescription = stringResource(R.string.home_action_settings)
-    val switchTimetableDescription = stringResource(R.string.home_action_switch_timetable)
     val editLabel = stringResource(R.string.home_action_edit)
     val switchTimetableLabel = stringResource(R.string.home_action_switch_timetable)
     val settingsLabel = stringResource(R.string.home_action_settings)
 
-    ButtonGroup(
-        overflowIndicator = {},
+    val actions = listOf(
+        HeaderAction(editLabel, Icons.Rounded.Edit, onEditClick),
+        HeaderAction(switchTimetableLabel, Icons.Rounded.CalendarMonth, onSwitchTimetableClick),
+        HeaderAction(settingsLabel, Icons.Rounded.Settings, onSettingsClick),
+    )
+    val visibleActions = actions.drop(overflowCount)
+    val visibleItemCount = visibleActions.size + if (overflowCount > 0) 1 else 0
+
+    Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
-        customItem(
-            buttonGroupContent = {
-                ConnectedActionButton(
-                    position = ConnectedButtonPosition.LEADING,
-                    onClick = onEditClick,
-                    contentDescription = editLabel,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(
-                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
-                        ),
-                    )
-                    if (labelMode != HeaderActionLabelMode.NONE) {
-                        Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
-                        Text(editLabel)
-                    }
+        visibleActions.forEachIndexed { index, action ->
+            val position = connectedPosition(index, visibleItemCount)
+            val showLabel = labelMode == HeaderActionLabelMode.ALL ||
+                (labelMode == HeaderActionLabelMode.EDIT_ONLY && index == 0 && overflowCount == 0)
+            ConnectedActionButton(
+                position = position,
+                onClick = action.onClick,
+                contentDescription = action.label,
+            ) {
+                Icon(
+                    imageVector = action.icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(
+                        ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                    ),
+                )
+                if (showLabel) {
+                    Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
+                    Text(action.label)
                 }
-            },
-            menuContent = {},
+            }
+        }
+        if (overflowCount > 0) {
+            OverflowMenuButton(
+                actions = actions.take(overflowCount),
+                connectedPosition = connectedPosition(visibleActions.size, visibleItemCount),
+                isExpanded = expandedOverflowCount == overflowCount,
+                onExpandedChange = { expanded ->
+                    onExpandedOverflowCountChange(if (expanded) overflowCount else 0)
+                },
+                modifier = Modifier,
+            )
+        }
+    }
+}
+
+private data class HeaderAction(
+    val label: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
+
+private fun connectedPosition(index: Int, itemCount: Int): ConnectedButtonPosition = when {
+    itemCount <= 1 -> ConnectedButtonPosition.STANDALONE
+    index == 0 -> ConnectedButtonPosition.LEADING
+    index == itemCount - 1 -> ConnectedButtonPosition.TRAILING
+    else -> ConnectedButtonPosition.MIDDLE
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun OverflowMenuButton(
+    actions: List<HeaderAction>,
+    connectedPosition: ConnectedButtonPosition,
+    isExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val overflowDescription = stringResource(R.string.home_action_more)
+    val connectedShapes = ButtonGroupDefaults.connectedTrailingButtonShapes()
+    val buttonShapes = when {
+        isExpanded -> ToggleButtonShapes(
+            shape = connectedShapes.shape,
+            pressedShape = connectedShapes.pressedShape,
+            checkedShape = CircleShape,
         )
-        customItem(
-            buttonGroupContent = {
-                ConnectedActionButton(
-                    position = ConnectedButtonPosition.MIDDLE,
-                    onClick = onSwitchTimetableClick,
-                    contentDescription = switchTimetableDescription,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.CalendarMonth,
-                        contentDescription = null,
-                        modifier = Modifier.size(
-                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
-                        ),
+        connectedPosition == ConnectedButtonPosition.STANDALONE -> ToggleButtonShapes(
+            shape = CircleShape,
+            pressedShape = CircleShape,
+            checkedShape = CircleShape,
+        )
+        else -> connectedShapes
+    }
+
+    Box(modifier = modifier) {
+        ToggleButton(
+            checked = isExpanded,
+            onCheckedChange = onExpandedChange,
+            buttonSize = ToggleButtonSize.Small,
+            shapes = buttonShapes,
+            modifier = Modifier.semantics {
+                contentDescription = overflowDescription
+            },
+            colors = ToggleButtonDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                checkedContainerColor = MaterialTheme.colorScheme.primary,
+                checkedContentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        ) {
+            Icon(
+                imageVector = if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                modifier = Modifier.size(
+                    ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
+                ),
+            )
+        }
+
+        DropdownMenuPopup(
+            expanded = isExpanded,
+            onDismissRequest = { onExpandedChange(false) },
+        ) {
+            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+                actions.forEachIndexed { index, action ->
+                    DropdownMenuItem(
+                        onClick = {
+                            action.onClick()
+                            onExpandedChange(false)
+                        },
+                        text = { Text(action.label) },
+                        shape = MenuDefaults.itemShape(index, actions.size).shape,
+                        leadingIcon = {
+                            Icon(imageVector = action.icon, contentDescription = null)
+                        },
                     )
-                    if (labelMode == HeaderActionLabelMode.ALL) {
-                        Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
-                        Text(switchTimetableLabel)
-                    }
                 }
-            },
-            menuContent = {},
-        )
-        customItem(
-            buttonGroupContent = {
-                ConnectedActionButton(
-                    position = ConnectedButtonPosition.TRAILING,
-                    onClick = onSettingsClick,
-                    contentDescription = settingsDescription,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(
-                            ButtonDefaults.iconSizeFor(ToggleButtonSize.Medium.height),
-                        ),
-                    )
-                    if (labelMode == HeaderActionLabelMode.ALL) {
-                        Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
-                        Text(settingsLabel)
-                    }
-                }
-            },
-            menuContent = {},
-        )
+            }
+        }
     }
 }
 
@@ -481,6 +571,7 @@ private enum class ConnectedButtonPosition {
     LEADING,
     MIDDLE,
     TRAILING,
+    STANDALONE,
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -500,6 +591,8 @@ private fun ConnectedActionButton(
             ConnectedButtonPosition.LEADING -> ButtonGroupDefaults.connectedLeadingButtonShapes()
             ConnectedButtonPosition.MIDDLE -> ButtonGroupDefaults.connectedMiddleButtonShapes()
             ConnectedButtonPosition.TRAILING -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+            ConnectedButtonPosition.STANDALONE ->
+                ToggleButtonDefaults.shapesFor(ToggleButtonSize.Small.height)
         },
         modifier = modifier.semantics {
             this.contentDescription = contentDescription
