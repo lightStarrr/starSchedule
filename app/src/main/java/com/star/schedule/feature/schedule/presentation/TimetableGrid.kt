@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.star.schedule.R
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
@@ -74,6 +75,12 @@ fun TimetableGrid(
     val courseBlocksByDay = remember(courseBlocks) {
         courseBlocks.groupBy { it.dayOfWeek }
     }
+    val minimumTimeCellHeight = with(LocalDensity.current) {
+        // Three text lines plus the cell's vertical padding must fit even when
+        // the user selects a row height smaller than the time column needs.
+        (20.sp.toPx() + 16.sp.toPx() * 2 + 16.dp.toPx()).toDp()
+    }.coerceAtLeast(72.dp)
+    val effectiveRowHeight = maxOf(rowHeight, minimumTimeCellHeight)
     val timeColumnWidth = 58.dp
 
     Box(
@@ -115,7 +122,7 @@ fun TimetableGrid(
                             lessonTime = lessonTime,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(rowHeight),
+                                .height(effectiveRowHeight),
                         )
                     }
                 }
@@ -124,7 +131,7 @@ fun TimetableGrid(
                         lessonTimes = sortedLessonTimes,
                         courseBlocks = courseBlocksByDay[day].orEmpty(),
                         currentWeek = currentWeek,
-                        rowHeight = rowHeight,
+                        rowHeight = effectiveRowHeight,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -285,8 +292,10 @@ private fun GridCourseCell(
                 ),
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                 ) {
                     Text(
                         text = course.name,
