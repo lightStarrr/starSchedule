@@ -1,39 +1,36 @@
 package com.star.schedule.feature.settings.presentation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.NotificationsOff
-import androidx.compose.material.icons.rounded.PhoneAndroid
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.TableView
-import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,12 +39,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
-import androidx.compose.ui.platform.LocalContext
 import com.star.schedule.feature.settings.domain.TimetableSummary
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -89,21 +86,33 @@ private fun SettingsScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
                         )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                ),
             )
         },
     ) { innerPadding ->
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -116,27 +125,29 @@ private fun SettingsScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier
+                        .fillMaxWidth()
                         .widthIn(max = 720.dp)
                         .align(Alignment.TopCenter),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
                     item { SettingsSectionTitle(R.string.settings_section_timetable) }
                     item {
-                        SettingsListItem(
-                            title = stringResource(R.string.settings_current_timetable_title),
-                            supporting = currentTimetable?.name
-                                ?: stringResource(R.string.timetable_not_selected),
-                            icon = Icons.Rounded.TableView,
-                            onClick = { showTimetablePicker = true },
-                            shapeIndex = 0,
-                            shapeCount = 1,
-                            trailing = {
-                                Icon(
-                                    imageVector = Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                )
-                            },
-                        )
+                        SettingsGroup {
+                            SettingsListItem(
+                                title = stringResource(R.string.settings_current_timetable_title),
+                                supporting = currentTimetable?.name
+                                    ?: stringResource(R.string.timetable_not_selected),
+                                onClick = { showTimetablePicker = true },
+                                shapeIndex = 0,
+                                shapeCount = 1,
+                                trailing = {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ChevronRight,
+                                        contentDescription = null,
+                                    )
+                                },
+                            )
+                        }
                     }
                     if (state.timetables.isEmpty()) {
                         item {
@@ -144,107 +155,91 @@ private fun SettingsScreen(
                                 text = stringResource(R.string.settings_empty_timetable),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 72.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                             )
                         }
                     }
 
                     item { SettingsSectionTitle(R.string.settings_section_notifications) }
                     item {
-                        SettingsSwitchItem(
-                            title = stringResource(R.string.reminder_toggle_title),
-                            supporting = currentTimetable?.let {
-                                stringResource(
-                                    R.string.reminder_toggle_support,
-                                    it.name,
-                                    it.reminderTime,
-                                )
-                            } ?: stringResource(R.string.settings_reminder_requires_timetable),
-                            icon = if (state.reminderEnabled) {
-                                Icons.Rounded.NotificationsActive
-                            } else {
-                                Icons.Rounded.NotificationsOff
-                            },
-                            checked = state.reminderEnabled,
-                            enabled = currentTimetable != null,
-                            onCheckedChange = onReminderEnabledChange,
-                            shapeIndex = 0,
-                            shapeCount = 5,
-                        )
-                    }
-                    item {
-                        SettingsSwitchItem(
-                            title = stringResource(R.string.only_first_continuous_title),
-                            supporting = stringResource(R.string.only_first_continuous_support),
-                            icon = Icons.Rounded.Schedule,
-                            checked = state.notifyOnlyForFirstContinuousClass,
-                            enabled = currentTimetable != null,
-                            onCheckedChange = onNotifyOnlyFirstChange,
-                            shapeIndex = 1,
-                            shapeCount = 5,
-                        )
-                    }
-                    item {
-                        SettingsListItem(
-                            title = stringResource(R.string.notification_test_title),
-                            supporting = stringResource(R.string.notification_test_support_instant),
-                            icon = Icons.Rounded.Notifications,
-                            onClick = onSendTestNotification,
-                            shapeIndex = 2,
-                            shapeCount = 5,
-                        )
-                    }
-                    item {
-                        SettingsListItem(
-                            title = stringResource(R.string.notification_test_title),
-                            supporting = stringResource(R.string.notification_test_support_delayed),
-                            icon = Icons.Rounded.Schedule,
-                            onClick = onScheduleTestReminder,
-                            shapeIndex = 3,
-                            shapeCount = 5,
-                        )
-                    }
-                    item {
-                        SettingsListItem(
-                            title = stringResource(R.string.live_capsule_settings_title),
-                            supporting = stringResource(
-                                if (state.liveCapsuleCustomizationAvailable) {
-                                    R.string.live_capsule_settings_available
-                                } else {
-                                    R.string.live_capsule_settings_unavailable
-                                },
-                            ),
-                            icon = Icons.Rounded.PhoneAndroid,
-                            shapeIndex = 4,
-                            shapeCount = 5,
-                        )
+                        SettingsGroup {
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.reminder_toggle_title),
+                                supporting = currentTimetable?.let {
+                                    stringResource(
+                                        R.string.reminder_toggle_support,
+                                        it.name,
+                                        it.reminderTime,
+                                    )
+                                } ?: stringResource(R.string.settings_reminder_requires_timetable),
+                                checked = state.reminderEnabled,
+                                enabled = currentTimetable != null,
+                                onCheckedChange = onReminderEnabledChange,
+                                shapeIndex = 0,
+                                shapeCount = 5,
+                            )
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.only_first_continuous_title),
+                                supporting = stringResource(R.string.only_first_continuous_support),
+                                checked = state.notifyOnlyForFirstContinuousClass,
+                                enabled = currentTimetable != null,
+                                onCheckedChange = onNotifyOnlyFirstChange,
+                                shapeIndex = 1,
+                                shapeCount = 5,
+                            )
+                            SettingsListItem(
+                                title = stringResource(R.string.notification_test_title),
+                                supporting = stringResource(R.string.notification_test_support_instant),
+                                onClick = onSendTestNotification,
+                                shapeIndex = 2,
+                                shapeCount = 5,
+                            )
+                            SettingsListItem(
+                                title = stringResource(R.string.notification_test_title),
+                                supporting = stringResource(R.string.notification_test_support_delayed),
+                                onClick = onScheduleTestReminder,
+                                shapeIndex = 3,
+                                shapeCount = 5,
+                            )
+                            SettingsListItem(
+                                title = stringResource(R.string.live_capsule_settings_title),
+                                supporting = stringResource(
+                                    if (state.liveCapsuleCustomizationAvailable) {
+                                        R.string.live_capsule_settings_available
+                                    } else {
+                                        R.string.live_capsule_settings_unavailable
+                                    },
+                                ),
+                                shapeIndex = 4,
+                                shapeCount = 5,
+                            )
+                        }
                     }
 
                     item { SettingsSectionTitle(R.string.settings_section_behavior) }
                     item {
-                        SettingsSwitchItem(
-                            title = stringResource(R.string.hide_from_recents_title),
-                            supporting = stringResource(R.string.hide_from_recents_support),
-                            icon = Icons.Rounded.VisibilityOff,
-                            checked = state.hideFromRecents,
-                            onCheckedChange = onHideFromRecentsChange,
-                            shapeIndex = 0,
-                            shapeCount = 1,
-                        )
+                        SettingsGroup {
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.hide_from_recents_title),
+                                supporting = stringResource(R.string.hide_from_recents_support),
+                                checked = state.hideFromRecents,
+                                onCheckedChange = onHideFromRecentsChange,
+                                shapeIndex = 0,
+                                shapeCount = 1,
+                            )
+                        }
                     }
 
                     item { SettingsSectionTitle(R.string.settings_section_about) }
                     item {
-                        SettingsListItem(
-                            title = stringResource(R.string.about_app_title),
-                            supporting = stringResource(
-                                R.string.version_label,
-                                versionName,
-                            ),
-                            icon = Icons.Rounded.Info,
-                            shapeIndex = 0,
-                            shapeCount = 1,
-                        )
+                        SettingsGroup {
+                            SettingsListItem(
+                                title = stringResource(R.string.about_app_title),
+                                supporting = stringResource(R.string.version_label, versionName),
+                                shapeIndex = 0,
+                                shapeCount = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -271,7 +266,18 @@ private fun SettingsSectionTitle(stringRes: Int) {
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 72.dp, top = 24.dp, end = 24.dp, bottom = 8.dp),
+        modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        content = content,
     )
 }
 
@@ -280,7 +286,6 @@ private fun SettingsSectionTitle(stringRes: Int) {
 private fun SettingsListItem(
     title: String,
     supporting: String,
-    icon: ImageVector,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     shapeIndex: Int,
@@ -293,7 +298,6 @@ private fun SettingsListItem(
         colors = ListItemDefaults.segmentedColors(),
         content = { Text(title) },
         supportingContent = { Text(supporting) },
-        leadingContent = { Icon(imageVector = icon, contentDescription = null) },
         trailingContent = trailing,
     )
 }
@@ -303,7 +307,6 @@ private fun SettingsListItem(
 private fun SettingsSwitchItem(
     title: String,
     supporting: String,
-    icon: ImageVector,
     checked: Boolean,
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
@@ -317,7 +320,6 @@ private fun SettingsSwitchItem(
         colors = ListItemDefaults.segmentedColors(),
         content = { Text(title) },
         supportingContent = { Text(supporting) },
-        leadingContent = { Icon(imageVector = icon, contentDescription = null) },
         trailingContent = {
             Switch(
                 checked = checked,
@@ -341,19 +343,19 @@ private fun TimetablePickerDialog(
         title = { Text(stringResource(R.string.select_timetable_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                timetables.forEach { timetable ->
+                timetables.forEachIndexed { index, timetable ->
                     SegmentedListItem(
                         onClick = { onSelect(timetable.id) },
-                        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                        shapes = ListItemDefaults.segmentedShapes(
+                            index = index,
+                            count = timetables.size,
+                        ),
                         colors = ListItemDefaults.segmentedColors(),
                         content = { Text(timetable.name) },
                         supportingContent = {
                             if (timetable.id == selectedId) {
                                 Text(stringResource(R.string.settings_selected_timetable))
                             }
-                        },
-                        leadingContent = {
-                            Icon(Icons.Rounded.TableView, contentDescription = null)
                         },
                     )
                 }
