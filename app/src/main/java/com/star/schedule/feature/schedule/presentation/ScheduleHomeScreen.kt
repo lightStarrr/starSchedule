@@ -84,6 +84,7 @@ fun ScheduleHomeRoute(
     isSelectionLoading: Boolean,
     wallpaperState: WallpaperState = WallpaperState.None,
     onEditClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
 ) {
     val homeDataFlow: Flow<HomeTimetableData?> = remember(repository, timetableId) {
         if (timetableId == null) {
@@ -135,7 +136,7 @@ fun ScheduleHomeRoute(
         wallpaperState = wallpaperState,
         onEditClick = onEditClick,
         onSwitchTimetableClick = {},
-        onSettingsClick = {},
+        onSettingsClick = onSettingsClick,
         onPreviousWeekClick = { currentWeek = (currentWeek - 1).coerceAtLeast(1) },
         onNextWeekClick = { currentWeek += 1 },
         onSelectWeekClick = {},

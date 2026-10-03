@@ -1,5 +1,6 @@
 package com.star.schedule
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,7 +21,13 @@ class MainActivity : ComponentActivity() {
         val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
         val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.dao())
         setContent {
-            StarScheduleApp(scheduleRepository, wallpaperRepository)
+            StarScheduleApp(
+                scheduleRepository = scheduleRepository,
+                wallpaperRepository = wallpaperRepository,
+                onSettingsClick = {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                },
+            )
         }
     }
 }
