@@ -181,6 +181,17 @@
     <string name="reminder_minutes_value">%1$d minutes</string>
     <string name="import_xls_instruction">Export your timetable as an xls file from the academic system, then select it here to import.</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_section_timetable">Timetable</string>
+    <string name="settings_section_notifications">Notifications</string>
+    <string name="settings_section_behavior">Behavior</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_current_timetable_title">Current timetable</string>
+    <string name="settings_empty_timetable">No timetables yet. Import or create one from the timetable editor.</string>
+    <string name="settings_reminder_requires_timetable">Select a timetable before enabling reminders</string>
+    <string name="settings_selected_timetable">Selected</string>
+    <string name="live_capsule_settings_title">Live notification capsule</string>
+    <string name="live_capsule_settings_available">Customization is available on this device</string>
+    <string name="live_capsule_settings_unavailable">Not available on this device</string>
     <string name="timetable_not_selected">Not selected</string>
     <string name="current_timetable_label">Current timetable: %1$s</string>
     <string name="select_timetable_title">Select timetable</string>

@@ -20,6 +20,7 @@ private data class SelectedTimetable(val id: Long?)
 fun StarScheduleApp(
     scheduleRepository: ScheduleRepository,
     wallpaperRepository: WallpaperRepository,
+    onSettingsClick: () -> Unit,
 ) {
     val selection by remember(scheduleRepository) {
         scheduleRepository.observeCurrentTimetableId().map(::SelectedTimetable)
@@ -42,6 +43,7 @@ fun StarScheduleApp(
                 timetableId = timetableId,
                 isSelectionLoading = selection == null,
                 wallpaperState = wallpaperState,
+                onSettingsClick = onSettingsClick,
             )
         }
     }
