@@ -128,6 +128,8 @@ private fun SettingsScreen(
                                 ?: stringResource(R.string.timetable_not_selected),
                             icon = Icons.Rounded.TableView,
                             onClick = { showTimetablePicker = true },
+                            shapeIndex = 0,
+                            shapeCount = 1,
                             trailing = {
                                 Icon(
                                     imageVector = Icons.Rounded.ChevronRight,
@@ -166,6 +168,8 @@ private fun SettingsScreen(
                             checked = state.reminderEnabled,
                             enabled = currentTimetable != null,
                             onCheckedChange = onReminderEnabledChange,
+                            shapeIndex = 0,
+                            shapeCount = 5,
                         )
                     }
                     item {
@@ -176,6 +180,8 @@ private fun SettingsScreen(
                             checked = state.notifyOnlyForFirstContinuousClass,
                             enabled = currentTimetable != null,
                             onCheckedChange = onNotifyOnlyFirstChange,
+                            shapeIndex = 1,
+                            shapeCount = 5,
                         )
                     }
                     item {
@@ -184,6 +190,8 @@ private fun SettingsScreen(
                             supporting = stringResource(R.string.notification_test_support_instant),
                             icon = Icons.Rounded.Notifications,
                             onClick = onSendTestNotification,
+                            shapeIndex = 2,
+                            shapeCount = 5,
                         )
                     }
                     item {
@@ -192,6 +200,8 @@ private fun SettingsScreen(
                             supporting = stringResource(R.string.notification_test_support_delayed),
                             icon = Icons.Rounded.Schedule,
                             onClick = onScheduleTestReminder,
+                            shapeIndex = 3,
+                            shapeCount = 5,
                         )
                     }
                     item {
@@ -205,6 +215,8 @@ private fun SettingsScreen(
                                 },
                             ),
                             icon = Icons.Rounded.PhoneAndroid,
+                            shapeIndex = 4,
+                            shapeCount = 5,
                         )
                     }
 
@@ -216,6 +228,8 @@ private fun SettingsScreen(
                             icon = Icons.Rounded.VisibilityOff,
                             checked = state.hideFromRecents,
                             onCheckedChange = onHideFromRecentsChange,
+                            shapeIndex = 0,
+                            shapeCount = 1,
                         )
                     }
 
@@ -228,6 +242,8 @@ private fun SettingsScreen(
                                 versionName,
                             ),
                             icon = Icons.Rounded.Info,
+                            shapeIndex = 0,
+                            shapeCount = 1,
                         )
                     }
                 }
@@ -267,11 +283,13 @@ private fun SettingsListItem(
     icon: ImageVector,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    shapeIndex: Int,
+    shapeCount: Int,
 ) {
     SegmentedListItem(
         onClick = onClick ?: {},
-        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
-        enabled = onClick != null,
+        shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
+        enabled = true,
         colors = ListItemDefaults.segmentedColors(),
         content = { Text(title) },
         supportingContent = { Text(supporting) },
@@ -289,10 +307,12 @@ private fun SettingsSwitchItem(
     checked: Boolean,
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
+    shapeIndex: Int,
+    shapeCount: Int,
 ) {
     SegmentedListItem(
         onClick = { if (enabled) onCheckedChange(!checked) },
-        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+        shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
         enabled = enabled,
         colors = ListItemDefaults.segmentedColors(),
         content = { Text(title) },
