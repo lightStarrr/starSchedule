@@ -9,6 +9,8 @@ interface SettingsRepository {
 
     suspend fun setPreference(key: String, value: String)
 
+    suspend fun selectTimetable(timetableId: Long)
+
     fun isLiveCapsuleCustomizationAvailable(): Boolean
 
     fun isReminderEnabledForTimetable(timetableId: Long): Boolean

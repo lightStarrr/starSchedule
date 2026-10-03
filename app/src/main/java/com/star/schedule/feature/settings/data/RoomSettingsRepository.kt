@@ -1,5 +1,6 @@
 package com.star.schedule.feature.settings.data
 
+import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.feature.settings.domain.TimetableSummary
@@ -9,7 +10,7 @@ import kotlinx.coroutines.flow.map
 
 class RoomSettingsRepository(
     private val dao: ScheduleDao,
-    private val notificationManager: UnifiedNotificationManager
+    private val notificationManager: UnifiedNotificationManager,
 ) : SettingsRepository {
     override fun observeTimetables(): Flow<List<TimetableSummary>> =
         dao.getAllTimetables().map { timetables ->
@@ -17,7 +18,7 @@ class RoomSettingsRepository(
                 TimetableSummary(
                     id = timetable.id,
                     name = timetable.name,
-                    reminderTime = timetable.reminderTime
+                    reminderTime = timetable.reminderTime,
                 )
             }
         }
@@ -27,6 +28,13 @@ class RoomSettingsRepository(
 
     override suspend fun setPreference(key: String, value: String) {
         dao.setPreference(key, value)
+    }
+
+    override suspend fun selectTimetable(timetableId: Long) {
+        // Switching the active timetable must not leave reminders scheduled for
+        // a timetable that is no longer being viewed.
+        disableReminders()
+        dao.setPreference(Constants.PREF_CURRENT_TIMETABLE, timetableId.toString())
     }
 
     override fun isLiveCapsuleCustomizationAvailable(): Boolean =
