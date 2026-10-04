@@ -10,16 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -30,9 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.feature.settings.domain.TimetableSummary
 
@@ -51,7 +50,7 @@ fun SettingsRoute(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreen(
         state = state,
         onBack = onBack,
@@ -76,7 +75,7 @@ private fun SettingsScreen(
     onSendTestNotification: () -> Unit,
     onScheduleTestReminder: () -> Unit,
 ) {
-    var showTimetablePicker by remember { mutableStateOf(false) }
+    var showTimetablePicker by rememberSaveable { mutableStateOf(false) }
     val currentTimetable = state.timetables.firstOrNull { it.id == state.currentTimetableId }
     val context = LocalContext.current
     val versionName = remember(context) {
@@ -86,20 +85,15 @@ private fun SettingsScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    FilledTonalIconButton(
+                    IconButton(
                         onClick = onBack,
                         modifier = Modifier
                             .padding(start = 4.dp),
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -108,8 +102,8 @@ private fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,
             )
@@ -139,6 +133,7 @@ private fun SettingsScreen(
                                 title = stringResource(R.string.settings_current_timetable_title),
                                 supporting = currentTimetable?.name
                                     ?: stringResource(R.string.timetable_not_selected),
+                                enabled = state.timetables.isNotEmpty(),
                                 onClick = { showTimetablePicker = true },
                                 shapeIndex = 0,
                                 shapeCount = 1,
@@ -189,21 +184,21 @@ private fun SettingsScreen(
                                 shapeIndex = 1,
                                 shapeCount = 5,
                             )
-                            SettingsListItem(
+                            SettingsActionItem(
                                 title = stringResource(R.string.notification_test_title),
                                 supporting = stringResource(R.string.notification_test_support_instant),
                                 onClick = onSendTestNotification,
                                 shapeIndex = 2,
                                 shapeCount = 5,
                             )
-                            SettingsListItem(
+                            SettingsActionItem(
                                 title = stringResource(R.string.notification_test_title),
                                 supporting = stringResource(R.string.notification_test_support_delayed),
                                 onClick = onScheduleTestReminder,
                                 shapeIndex = 3,
                                 shapeCount = 5,
                             )
-                            SettingsListItem(
+                            SettingsInfoItem(
                                 title = stringResource(R.string.live_capsule_settings_title),
                                 supporting = stringResource(
                                     if (state.liveCapsuleCustomizationAvailable) {
@@ -235,7 +230,7 @@ private fun SettingsScreen(
                     item { SettingsSectionTitle(R.string.settings_section_about) }
                     item {
                         SettingsGroup {
-                            SettingsListItem(
+                            SettingsInfoItem(
                                 title = stringResource(R.string.about_app_title),
                                 supporting = stringResource(R.string.version_label, versionName),
                                 shapeIndex = 0,
@@ -288,6 +283,7 @@ private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
 private fun SettingsListItem(
     title: String,
     supporting: String,
+    enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     shapeIndex: Int,
@@ -296,11 +292,45 @@ private fun SettingsListItem(
     SegmentedListItem(
         onClick = onClick ?: {},
         shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
-        enabled = true,
+        enabled = enabled,
         colors = ListItemDefaults.segmentedColors(),
         content = { Text(title) },
         supportingContent = { Text(supporting) },
         trailingContent = trailing,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SettingsActionItem(
+    title: String,
+    supporting: String,
+    onClick: () -> Unit,
+    shapeIndex: Int,
+    shapeCount: Int,
+) {
+    SettingsListItem(
+        title = title,
+        supporting = supporting,
+        onClick = onClick,
+        shapeIndex = shapeIndex,
+        shapeCount = shapeCount,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SettingsInfoItem(
+    title: String,
+    supporting: String,
+    shapeIndex: Int,
+    shapeCount: Int,
+) {
+    SegmentedListItem(
+        shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
+        colors = ListItemDefaults.segmentedColors(),
+        content = { Text(title) },
+        supportingContent = { Text(supporting) },
     )
 }
 
