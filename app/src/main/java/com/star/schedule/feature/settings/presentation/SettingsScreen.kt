@@ -85,7 +85,8 @@ private fun SettingsScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
@@ -102,7 +103,7 @@ private fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,
@@ -293,7 +294,9 @@ private fun SettingsListItem(
         onClick = onClick ?: {},
         shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
         enabled = enabled,
-        colors = ListItemDefaults.segmentedColors(),
+        colors = ListItemDefaults.segmentedColors(
+            containerColor =  MaterialTheme.colorScheme.surfaceContainer
+        ),
         content = { Text(title) },
         supportingContent = { Text(supporting) },
         trailingContent = trailing,
@@ -328,7 +331,9 @@ private fun SettingsInfoItem(
 ) {
     SegmentedListItem(
         shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
-        colors = ListItemDefaults.segmentedColors(),
+        colors = ListItemDefaults.segmentedColors(
+            containerColor =  MaterialTheme.colorScheme.surfaceContainer
+        ),
         content = { Text(title) },
         supportingContent = { Text(supporting) },
     )
@@ -349,7 +354,9 @@ private fun SettingsSwitchItem(
         onClick = { if (enabled) onCheckedChange(!checked) },
         shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
         enabled = enabled,
-        colors = ListItemDefaults.segmentedColors(),
+        colors = ListItemDefaults.segmentedColors(
+            containerColor =  MaterialTheme.colorScheme.surfaceContainer
+        ),
         content = { Text(title) },
         supportingContent = { Text(supporting) },
         trailingContent = {
