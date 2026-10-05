@@ -354,6 +354,7 @@ private fun SettingsSwitchItem(
         onClick = { if (enabled) onCheckedChange(!checked) },
         shapes = ListItemDefaults.segmentedShapes(index = shapeIndex, count = shapeCount),
         enabled = enabled,
+        verticalAlignment = Alignment.CenterVertically,
         colors = ListItemDefaults.segmentedColors(
             containerColor =  MaterialTheme.colorScheme.surfaceContainer
         ),
