@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -303,11 +304,16 @@ private fun SettingsScreen(
 
                     item { SettingsSectionTitle(R.string.settings_section_notifications) }
                     item {
+                        val reminderVisibility = remember {
+                            MutableTransitionState(state.reminderEnabled)
+                        }
+                        reminderVisibility.targetState = state.reminderEnabled
                         val rows = notificationRows(
-                            reminderEnabled = false,
+                            reminderEnabled = reminderVisibility.currentState ||
+                                reminderVisibility.targetState,
                             wakeUpAvailable = state.wakeUpSimulationAvailable,
-                            liveCapsuleAvailable = false,
-                        ).take(if (state.wakeUpSimulationAvailable) 2 else 1)
+                            liveCapsuleAvailable = state.liveCapsuleCustomizationAvailable,
+                        )
                         val positions = rows.positions().associateBy { it.row }
                         SettingsGroup {
                             if (state.wakeUpSimulationAvailable) {
@@ -354,131 +360,122 @@ private fun SettingsScreen(
                                     else R.string.settings_collapsed,
                                 ),
                             )
-                        }
-                    }
-
-                    item {
-                        AnimatedVisibility(
-                            visible = state.reminderEnabled,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut(),
-                        ) {
-                            val rows = notificationRows(
-                                reminderEnabled = true,
-                                wakeUpAvailable = false,
-                                liveCapsuleAvailable = state.liveCapsuleCustomizationAvailable,
-                            ).filter { it in setOf(SettingsRow.OnlyFirst, SettingsRow.Icon, SettingsRow.CapsuleColor, SettingsRow.Template) }
-                            val positions = rows.positions().associateBy { it.row }
-                            SettingsGroup {
-                                val firstPosition = positions.getValue(SettingsRow.OnlyFirst)
-                                SettingsSwitchItem(
-                                    title = stringResource(R.string.only_first_continuous_title),
-                                    supporting = stringResource(R.string.only_first_continuous_support),
-                                    checked = state.notifyOnlyForFirstContinuousClass,
-                                    onCheckedChange = onNotifyOnlyFirstChange,
-                                    shapeIndex = firstPosition.index,
-                                    shapeCount = firstPosition.count,
-                                )
-                                val iconPosition = positions.getValue(SettingsRow.Icon)
-                                SettingsListItem(
-                                    title = stringResource(R.string.notification_icon_title),
-                                    supporting = stringResource(
-                                        if (state.liveCapsuleIconPath == null) {
-                                            R.string.notification_icon_subtitle_empty
-                                        } else {
-                                            R.string.notification_icon_subtitle_set
-                                        },
-                                    ),
-                                    onClick = { liveIconPicker.launch(arrayOf("image/*")) },
-                                    shapeIndex = iconPosition.index,
-                                    shapeCount = iconPosition.count,
-                                    trailing = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (liveIconBitmap != null) {
-                                                Image(
-                                                    bitmap = liveIconBitmap!!.asImageBitmap(),
-                                                    contentDescription = null,
-                                                    modifier = Modifier
-                                                        .size(36.dp)
-                                                        .clip(MaterialTheme.shapes.small),
-                                                    contentScale = ContentScale.Crop,
-                                                )
+                            AnimatedVisibility(
+                                visibleState = reminderVisibility,
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut(),
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+                                ) {
+                                    val firstPosition = positions.getValue(SettingsRow.OnlyFirst)
+                                    SettingsSwitchItem(
+                                        title = stringResource(R.string.only_first_continuous_title),
+                                        supporting = stringResource(R.string.only_first_continuous_support),
+                                        checked = state.notifyOnlyForFirstContinuousClass,
+                                        onCheckedChange = onNotifyOnlyFirstChange,
+                                        shapeIndex = firstPosition.index,
+                                        shapeCount = firstPosition.count,
+                                    )
+                                    val iconPosition = positions.getValue(SettingsRow.Icon)
+                                    SettingsListItem(
+                                        title = stringResource(R.string.notification_icon_title),
+                                        supporting = stringResource(
+                                            if (state.liveCapsuleIconPath == null) {
+                                                R.string.notification_icon_subtitle_empty
                                             } else {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.ic_notification),
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                            if (state.liveCapsuleIconPath != null) {
-                                                IconButton(onClick = onClearLiveIcon) {
+                                                R.string.notification_icon_subtitle_set
+                                            },
+                                        ),
+                                        onClick = { liveIconPicker.launch(arrayOf("image/*")) },
+                                        shapeIndex = iconPosition.index,
+                                        shapeCount = iconPosition.count,
+                                        trailing = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                if (liveIconBitmap != null) {
+                                                    Image(
+                                                        bitmap = liveIconBitmap!!.asImageBitmap(),
+                                                        contentDescription = null,
+                                                        modifier = Modifier
+                                                            .size(36.dp)
+                                                            .clip(MaterialTheme.shapes.small),
+                                                        contentScale = ContentScale.Crop,
+                                                    )
+                                                } else {
                                                     Icon(
-                                                        Icons.Rounded.Close,
-                                                        contentDescription = stringResource(
-                                                            R.string.action_reset_default,
-                                                        ),
+                                                        painter = painterResource(R.drawable.ic_notification),
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
                                                     )
                                                 }
+                                                if (state.liveCapsuleIconPath != null) {
+                                                    IconButton(onClick = onClearLiveIcon) {
+                                                        Icon(
+                                                            Icons.Rounded.Close,
+                                                            contentDescription = stringResource(
+                                                                R.string.action_reset_default,
+                                                            ),
+                                                        )
+                                                    }
+                                                }
                                             }
-                                        }
-                                    },
-                                )
-                                if (state.liveCapsuleCustomizationAvailable) {
-                                    val colorPosition = positions.getValue(SettingsRow.CapsuleColor)
-                                    SettingsListItem(
-                                        title = stringResource(R.string.live_capsule_bg_title),
-                                        supporting = stringResource(R.string.live_capsule_bg_support),
-                                        onClick = {
-                                            selectedColor = savedColor
-                                            colorPickerController.wheelColor = savedColor
-                                            showColorPicker = true
-                                        },
-                                        shapeIndex = colorPosition.index,
-                                        shapeCount = colorPosition.count,
-                                        trailing = {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(width = 48.dp, height = 24.dp)
-                                                    .background(savedColor, MaterialTheme.shapes.small)
-                                                    .border(1.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
-                                            )
                                         },
                                     )
-                                    val templatePosition = positions.getValue(SettingsRow.Template)
-                                    SettingsListItem(
-                                        title = stringResource(R.string.live_notification_template_title),
-                                        supporting = stringResource(liveTemplate.descriptionRes),
-                                        onClick = { showTemplatePicker = true },
-                                        shapeIndex = templatePosition.index,
-                                        shapeCount = templatePosition.count,
-                                        trailing = {
-                                            Text(
-                                                text = stringResource(liveTemplate.titleRes),
-                                                color = MaterialTheme.colorScheme.primary,
-                                            )
-                                        },
-                                    )
+                                    if (state.liveCapsuleCustomizationAvailable) {
+                                        val colorPosition = positions.getValue(SettingsRow.CapsuleColor)
+                                        SettingsListItem(
+                                            title = stringResource(R.string.live_capsule_bg_title),
+                                            supporting = stringResource(R.string.live_capsule_bg_support),
+                                            onClick = {
+                                                selectedColor = savedColor
+                                                colorPickerController.wheelColor = savedColor
+                                                showColorPicker = true
+                                            },
+                                            shapeIndex = colorPosition.index,
+                                            shapeCount = colorPosition.count,
+                                            trailing = {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(width = 48.dp, height = 24.dp)
+                                                        .background(savedColor, MaterialTheme.shapes.small)
+                                                        .border(1.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
+                                                )
+                                            },
+                                        )
+                                        val templatePosition = positions.getValue(SettingsRow.Template)
+                                        SettingsListItem(
+                                            title = stringResource(R.string.live_notification_template_title),
+                                            supporting = stringResource(liveTemplate.descriptionRes),
+                                            onClick = { showTemplatePicker = true },
+                                            shapeIndex = templatePosition.index,
+                                            shapeCount = templatePosition.count,
+                                            trailing = {
+                                                Text(
+                                                    text = stringResource(liveTemplate.titleRes),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                )
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    }
-
-                    item {
-                        SettingsGroup {
+                            val instantPosition = positions.getValue(SettingsRow.InstantTest)
                             SettingsActionItem(
                                 title = stringResource(R.string.notification_test_title),
                                 supporting = stringResource(R.string.notification_test_support_instant),
                                 onClick = onSendTestNotification,
-                                shapeIndex = 0,
-                                shapeCount = 2,
+                                shapeIndex = instantPosition.index,
+                                shapeCount = instantPosition.count,
                                 leading = { Icon(Icons.Rounded.Science, contentDescription = null) },
                             )
+                            val delayedPosition = positions.getValue(SettingsRow.DelayedTest)
                             SettingsActionItem(
                                 title = stringResource(R.string.notification_test_title),
                                 supporting = stringResource(R.string.notification_test_support_delayed),
                                 onClick = onScheduleTestReminder,
-                                shapeIndex = 1,
-                                shapeCount = 2,
+                                shapeIndex = delayedPosition.index,
+                                shapeCount = delayedPosition.count,
                                 leading = { Icon(Icons.Rounded.Science, contentDescription = null) },
                             )
                         }
@@ -705,6 +702,7 @@ private fun SettingsListItem(
             enabled = enabled,
             colors = colors,
             leadingContent = leading,
+            verticalAlignment = Alignment.CenterVertically,
             content = { Text(title) },
             supportingContent = { Text(supporting) },
             trailingContent = trailing,
@@ -716,6 +714,7 @@ private fun SettingsListItem(
             enabled = enabled,
             colors = colors,
             leadingContent = leading,
+            verticalAlignment = Alignment.CenterVertically,
             content = { Text(title) },
             supportingContent = { Text(supporting) },
             trailingContent = trailing,
