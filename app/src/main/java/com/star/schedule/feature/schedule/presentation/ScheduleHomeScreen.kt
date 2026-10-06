@@ -166,7 +166,7 @@ fun ScheduleHomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+            .background(MaterialTheme.colorScheme.surface),
     ) {
         WallpaperBackground(
             state = wallpaperState,
