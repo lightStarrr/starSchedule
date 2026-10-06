@@ -13,6 +13,14 @@ interface SettingsRepository {
 
     fun isLiveCapsuleCustomizationAvailable(): Boolean
 
+    fun isWakeUpSimulationAvailable(): Boolean
+
+    fun isWakeUpProxyInstalled(): Boolean
+
+    suspend fun importLiveCapsuleIcon(uriString: String): Result<Unit>
+
+    suspend fun clearLiveCapsuleIcon()
+
     fun isReminderEnabledForTimetable(timetableId: Long): Boolean
 
     suspend fun enableRemindersForTimetable(timetableId: Long)
