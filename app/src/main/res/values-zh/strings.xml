@@ -214,6 +214,11 @@
     <string name="about_app_title">关于应用</string>
     <string name="version_label">版本 %1$s</string>
     <string name="qq_group_title">QQ群聊</string>
+    <string name="github_title">GitHub</string>
+    <string name="github_url">https://github.com/lightStarrr/starSchedule</string>
+    <string name="qq_group_url">https://qun.qq.com/universal-share/share?ac=1&amp;authKey=vkf2HO4ASBIuSUo58JkyisXvAH3O2ahAWe8WCZhNtWb7naUMzjEaLdmFzqMq%2B1c9&amp;busi_data=eyJncm91cENvZGUiOiI5NDc1NzQ5NTMiLCJ0b2tlbiI6ImZlZ2k0bjV0RXRmMVphaEZDNDFPZkVHSmFZSzMxMUErRExWVXp0M2k4cHR2RmthaTdaR3JwR2dVL3Q1RWFIZ2oiLCJ1aW4iOiIyNzMzOTc3OTMyIn0%3D&amp;data=NkI03UL5UEBOZSjmEjCZ1XOX_FMW7sODMR0NVcuFpi5n-wd8cRrJzpDlKmpZ63I8SJ8U2_9S81TBshw62OIXcQ&amp;svctype=4&amp;tempid=h5_group_info</string>
+    <string name="settings_expanded">已展开</string>
+    <string name="settings_collapsed">已收起</string>
     <string name="notification_icon_updated">已更新实况通知图标</string>
     <string name="notification_icon_update_failed">更新图标失败: %1$s</string>
     <string name="live_notification_not_enabled">未启用实况通知，请在设置中开启，否则将使用普通通知</string>
