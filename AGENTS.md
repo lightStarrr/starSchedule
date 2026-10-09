@@ -218,9 +218,9 @@ fun TimetableSettingsRoute(viewModel: TimetableSettingsViewModel) {
 
 ## 十二、Android Studio 与命令行构建环境
 
-- Android Studio 的 Gradle JVM 使用项目配置的 `#GRADLE_LOCAL_JAVA_HOME`，当前实际指向 Android Studio 自带的 `C:\Program Files\Android\Android Studio\jbr`（JDK 21）。
-- 命令行不能默认使用系统 PATH 中的其它 JDK。当前机器的 JDK 26 会在 Android Gradle Plugin 的 `JdkImageTransform` 阶段导致 `jlink` 失败，即使 Kotlin 编译阶段可以通过。
-- 命令行 Gradle 缓存必须放在仓库内可写的 `.gradle` 目录，避免默认路径落到不可写的 `C:\.gradle`。
+- Android Studio 的 Gradle JVM 使用项目配置的 `#GRADLE_LOCAL_JAVA_HOME`，当前实际指向 Android Studio 自带的 `C:\Program Files\Android\Android Studio\jbr`（JDK 25）。
+- Android Studio 默认使用用户级 `C:\Users\<用户名>\.gradle` 缓存；当前缓存包含 Gradle 9.8.0、AGP 9.4.1 及项目依赖。命令行若将 `GRADLE_USER_HOME` 指向仓库内 `.gradle`，两者会使用不同的发行包和依赖缓存，不能据此判断 Android Studio 构建结果。
+- 若需与 Android Studio 保持一致，命令行应使用同一个 JDK 和用户级 Gradle 缓存；若需使用仓库内可写的 `.gradle` 做隔离构建，必须先确保对应 Gradle 发行包和全部依赖已缓存。
 - `local.properties` 中的 Android SDK 路径仍以本机实际安装位置为准，不提交该文件；`.gradle/config.properties` 和 `.android` 只作为本机环境配置，不纳入提交。
 
 PowerShell 验证命令：
@@ -230,7 +230,7 @@ $projectRoot = (Get-Location).Path
 $studioJdk = "C:\Program Files\Android\Android Studio\jbr"
 $env:JAVA_HOME = $studioJdk
 $env:Path = "$studioJdk\bin;$env:Path"
-$env:GRADLE_USER_HOME = Join-Path $projectRoot ".gradle"
+$env:GRADLE_USER_HOME = Join-Path $env:USERPROFILE ".gradle"
 $env:ANDROID_USER_HOME = Join-Path $projectRoot ".android"
 
 java -version
@@ -238,4 +238,4 @@ java -version
 .\gradlew :app:testDebugUnitTest --offline
 ```
 
-若命令行构建与 Android Studio 结果不一致，先对比 `java -version`、Gradle JVM、`JAVA_HOME`、`GRADLE_USER_HOME` 和 `local.properties`，再判断是否为代码问题。
+若命令行构建与 Android Studio 结果不一致，先对比 `java -version`、Gradle JVM、`JAVA_HOME`、`GRADLE_USER_HOME`、Gradle wrapper 发行包和 `local.properties`，再判断是否为代码问题。Android Studio 能编译而命令行失败时，优先检查两边是否使用了不同的 Gradle 缓存或未完成的离线依赖缓存。
