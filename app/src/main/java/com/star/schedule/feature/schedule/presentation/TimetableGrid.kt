@@ -55,6 +55,7 @@ fun TimetableGrid(
     showWeekend: Boolean,
     rowHeight: Dp,
     modifier: Modifier = Modifier,
+    bottomContentPadding: Dp = 8.dp,
 ) {
     val visibleDays = remember(showWeekend) {
         if (showWeekend) (1..7).toList() else (1..5).toList()
@@ -136,7 +137,9 @@ fun TimetableGrid(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            // Keep the clearance inside the scroll content so courses can pass behind
+            // the floating controls and still scroll fully above them at the end.
+            Spacer(modifier = Modifier.height(bottomContentPadding))
         }
     }
 }

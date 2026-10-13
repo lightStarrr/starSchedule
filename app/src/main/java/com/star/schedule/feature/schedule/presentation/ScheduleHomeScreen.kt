@@ -49,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -163,6 +165,9 @@ fun ScheduleHomeScreen(
     rowHeight: Dp = 60.dp,
     wallpaperState: WallpaperState = WallpaperState.None,
 ) {
+    var weekNavigationHeightPx by remember { mutableIntStateOf(0) }
+    val weekNavigationHeight = with(LocalDensity.current) { weekNavigationHeightPx.toDp() }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -207,6 +212,7 @@ fun ScheduleHomeScreen(
                     weekStartDate = weekStartDate,
                     showWeekend = showWeekend,
                     rowHeight = rowHeight,
+                    bottomContentPadding = weekNavigationHeight + 8.dp,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -217,7 +223,9 @@ fun ScheduleHomeScreen(
         if (emptyState != null) {
             EmptyTimetableState(
                 state = emptyState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = weekNavigationHeight),
             )
         }
 
@@ -227,6 +235,7 @@ fun ScheduleHomeScreen(
             onSelectWeekClick = onSelectWeekClick,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .onSizeChanged { weekNavigationHeightPx = it.height }
                 .navigationBarsPadding()
                 .padding(end = 20.dp, bottom = 8.dp),
         )
