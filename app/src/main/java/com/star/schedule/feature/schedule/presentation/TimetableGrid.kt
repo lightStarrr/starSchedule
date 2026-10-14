@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -168,13 +169,15 @@ private fun CourseDayColumn(
             val endIndex = periodIndexes[block.endPeriod]
             if (startIndex != null && endIndex != null && endIndex >= startIndex) {
                 val span = endIndex - startIndex + 1
+                val blockHeight = rowHeight * span + rowGap * (span - 1)
                 key(currentWeek, block.course.id, block.startPeriod, block.endPeriod) {
                     GridCourseCell(
                         course = block.course,
                         animationDelayMillis = (index * 35L).coerceAtMost(210L),
+                        cellHeight = blockHeight,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(rowHeight * span + rowGap * (span - 1))
+                            .height(blockHeight)
                             .offset(y = (rowHeight + rowGap) * startIndex),
                     )
                 }
@@ -257,6 +260,7 @@ private fun GridTimeCell(
 private fun GridCourseCell(
     course: CourseEntity?,
     animationDelayMillis: Long,
+    cellHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -273,6 +277,20 @@ private fun GridCourseCell(
                 offsetY.animateTo(0f, animationSpec = tween(durationMillis = 320))
             }
         }
+    }
+
+    val titleStyle = MaterialTheme.typography.labelLarge
+    val locationStyle = MaterialTheme.typography.labelSmall
+    val titleLineHeight = with(density) { titleStyle.lineHeight.toDp() }
+    val locationLineHeight = with(density) { locationStyle.lineHeight.toDp() }
+    val contentHeight = (cellHeight - 16.dp).coerceAtLeast(0.dp)
+    val lineLimits = remember(contentHeight, course?.location.isNullOrBlank()) {
+        calculateCourseTextLineLimits(
+            contentHeight = contentHeight,
+            titleLineHeight = titleLineHeight,
+            locationLineHeight = locationLineHeight,
+            hasLocation = !course?.location.isNullOrBlank(),
+        )
     }
 
     Box(
@@ -301,17 +319,66 @@ private fun GridCourseCell(
                 ) {
                     Text(
                         text = course.name,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = titleStyle,
                         fontWeight = FontWeight.SemiBold,
+                        maxLines = lineLimits.title,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     if (course.location.isNotBlank()) {
                         Text(
                             text = course.location,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = locationStyle,
+                            maxLines = lineLimits.location,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
             }
         }
     }
+}
+
+private data class CourseTextLineLimits(
+    val title: Int,
+    val location: Int,
+)
+
+private fun calculateCourseTextLineLimits(
+    contentHeight: Dp,
+    titleLineHeight: Dp,
+    locationLineHeight: Dp,
+    hasLocation: Boolean,
+): CourseTextLineLimits {
+    if (!hasLocation) {
+        return CourseTextLineLimits(
+            title = (contentHeight.value / titleLineHeight.value).toInt().coerceAtLeast(1),
+            location = 0,
+        )
+    }
+
+    var titleLines = (contentHeight.value * 0.6f / titleLineHeight.value)
+        .toInt()
+        .coerceAtLeast(1)
+    var locationLines = (contentHeight.value * 0.4f / locationLineHeight.value)
+        .toInt()
+        .coerceAtLeast(1)
+
+    fun usedHeight(): Float =
+        titleLines * titleLineHeight.value +
+            locationLines * locationLineHeight.value +
+            2.dp.value
+
+    while (usedHeight() > contentHeight.value && (titleLines > 1 || locationLines > 1)) {
+        if (titleLines > 1 && (titleLines * titleLineHeight.value) >=
+            (locationLines * locationLineHeight.value)
+        ) {
+            titleLines--
+        } else if (locationLines > 1) {
+            locationLines--
+        } else {
+            break
+        }
+    }
+
+    return CourseTextLineLimits(title = titleLines, location = locationLines)
 }
