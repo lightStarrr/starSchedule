@@ -1,7 +1,6 @@
 package com.star.schedule.feature.settings.presentation
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,11 +28,5 @@ class SettingsListLayoutTest {
         assertEquals(0, rows.first().index)
         assertEquals(7, rows.last().index)
         assertTrue(rows.all { it.count == rows.size })
-    }
-
-    @Test
-    fun `startup hint visibility follows preference`() {
-        assertTrue(showStartupHint(closed = false))
-        assertFalse(showStartupHint(closed = true))
     }
 }

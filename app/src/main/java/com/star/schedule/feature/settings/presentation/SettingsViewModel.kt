@@ -20,7 +20,6 @@ data class SettingsUiState(
     val reminderEnabled: Boolean = false,
     val notifyOnlyForFirstContinuousClass: Boolean = false,
     val hideFromRecents: Boolean = false,
-    val startupHintClosed: Boolean = false,
     val wakeUpSimulationAvailable: Boolean = false,
     val wakeUpProxyInstalled: Boolean = false,
     val wakeUpSimulationEnabled: Boolean = false,
@@ -33,7 +32,6 @@ data class SettingsUiState(
 private data class SettingsPreferences(
     val notifyOnlyFirst: Boolean,
     val hideFromRecents: Boolean,
-    val startupHintClosed: Boolean,
     val wakeUpSimulationEnabled: Boolean,
     val liveCapsuleBgColor: String?,
     val liveCapsuleIconPath: String?,
@@ -57,7 +55,6 @@ class SettingsViewModel(
     private val preferences = combine(
         repository.observePreference(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS),
         repository.observePreference(Constants.PREF_HIDE_FROM_RECENTS),
-        repository.observePreference(Constants.PREF_STARTUP_HINT_CLOSED),
         repository.observePreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED),
         repository.observePreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR),
         repository.observePreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH),
@@ -66,11 +63,10 @@ class SettingsViewModel(
         SettingsPreferences(
             notifyOnlyFirst = values[0] == "true",
             hideFromRecents = values[1] == "true",
-            startupHintClosed = values[2] == "true",
-            wakeUpSimulationEnabled = values[3] == "true",
-            liveCapsuleBgColor = values[4] as String?,
-            liveCapsuleIconPath = (values[5] as String?)?.takeIf { it.isNotBlank() },
-            liveNotificationTemplate = values[6] as String?,
+            wakeUpSimulationEnabled = values[2] == "true",
+            liveCapsuleBgColor = values[3] as String?,
+            liveCapsuleIconPath = (values[4] as String?)?.takeIf { it.isNotBlank() },
+            liveNotificationTemplate = values[5] as String?,
         )
     }
 
@@ -92,7 +88,6 @@ class SettingsViewModel(
             reminderEnabled = reminders,
             notifyOnlyForFirstContinuousClass = prefs.notifyOnlyFirst,
             hideFromRecents = prefs.hideFromRecents,
-            startupHintClosed = prefs.startupHintClosed,
             wakeUpSimulationAvailable = wakeUpSimulationAvailable,
             wakeUpProxyInstalled = wakeUpProxyInstalled,
             wakeUpSimulationEnabled = prefs.wakeUpSimulationEnabled,
@@ -146,12 +141,6 @@ class SettingsViewModel(
     fun setHideFromRecents(enabled: Boolean) {
         viewModelScope.launch {
             repository.setPreference(Constants.PREF_HIDE_FROM_RECENTS, enabled.toString())
-        }
-    }
-
-    fun closeStartupHint() {
-        viewModelScope.launch {
-            repository.setPreference(Constants.PREF_STARTUP_HINT_CLOSED, "true")
         }
     }
 
