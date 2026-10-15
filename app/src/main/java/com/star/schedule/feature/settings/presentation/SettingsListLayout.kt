@@ -34,5 +34,3 @@ internal fun notificationRows(
 
 internal fun List<SettingsRow>.positions(): List<SettingsRowPosition> =
     mapIndexed { index, row -> SettingsRowPosition(row, index, size) }
-
-internal fun showStartupHint(closed: Boolean): Boolean = !closed

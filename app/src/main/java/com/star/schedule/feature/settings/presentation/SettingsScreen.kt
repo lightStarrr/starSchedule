@@ -37,9 +37,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
@@ -121,7 +121,6 @@ fun SettingsRoute(
         onReminderEnabledChange = viewModel::setReminderEnabled,
         onNotifyOnlyFirstChange = viewModel::setNotifyOnlyForFirstContinuousClass,
         onHideFromRecentsChange = viewModel::setHideFromRecents,
-        onCloseStartupHint = viewModel::closeStartupHint,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
         onImportLiveIcon = viewModel::importLiveCapsuleIcon,
         onClearLiveIcon = viewModel::clearLiveCapsuleIcon,
@@ -148,7 +147,6 @@ private fun SettingsScreen(
     onReminderEnabledChange: (Boolean) -> Unit,
     onNotifyOnlyFirstChange: (Boolean) -> Unit,
     onHideFromRecentsChange: (Boolean) -> Unit,
-    onCloseStartupHint: () -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
     onImportLiveIcon: suspend (String) -> Result<Unit>,
     onClearLiveIcon: () -> Unit,
@@ -251,29 +249,6 @@ private fun SettingsScreen(
                         .align(Alignment.TopCenter),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    if (showStartupHint(state.startupHintClosed)) {
-                        item {
-                            SettingsGroup {
-                                SettingsInfoItem(
-                                    title = stringResource(R.string.startup_hint_primary),
-                                    supporting = stringResource(R.string.startup_hint_secondary),
-                                    shapeIndex = 0,
-                                    shapeCount = 1,
-                                    trailing = {
-                                        IconButton(onClick = onCloseStartupHint) {
-                                            Icon(
-                                                Icons.Rounded.Close,
-                                                contentDescription = stringResource(
-                                                    R.string.content_desc_close_hint,
-                                                ),
-                                            )
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-
                     item { SettingsSectionTitle(R.string.settings_section_timetable) }
                     item {
                         SettingsGroup {
@@ -740,22 +715,6 @@ private fun SettingsActionItem(
     supporting = supporting,
     onClick = onClick,
     leading = leading,
-    shapeIndex = shapeIndex,
-    shapeCount = shapeCount,
-)
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun SettingsInfoItem(
-    title: String,
-    supporting: String,
-    shapeIndex: Int,
-    shapeCount: Int,
-    trailing: (@Composable () -> Unit)? = null,
-) = SettingsListItem(
-    title = title,
-    supporting = supporting,
-    trailing = trailing,
     shapeIndex = shapeIndex,
     shapeCount = shapeCount,
 )

@@ -199,6 +199,8 @@
     <string name="content_desc_hint">Hint</string>
     <string name="startup_hint_primary">Please allow auto–start and background running</string>
     <string name="startup_hint_secondary">The app won\'t stay in the background; the system wakes it only to send notifications.</string>
+    <string name="startup_hint_do_not_show_again">Don’t show again</string>
+    <string name="startup_hint_save_failed">Could not save this preference. Please try again.</string>
     <string name="content_desc_close_hint">Dismiss hint</string>
     <string name="reminder_toggle_title">Pre–class reminder</string>
     <string name="wakeup_simulation_title">WakeUp simulation</string>

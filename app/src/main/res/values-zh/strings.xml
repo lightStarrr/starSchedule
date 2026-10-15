@@ -188,6 +188,8 @@
     <string name="content_desc_hint">提示</string>
     <string name="startup_hint_primary">请允许开机自启和后台运行</string>
     <string name="startup_hint_secondary">软件不会常驻后台，仅在需要发送通知时被系统唤起。</string>
+    <string name="startup_hint_do_not_show_again">不再弹出</string>
+    <string name="startup_hint_save_failed">保存失败，请重试。</string>
     <string name="content_desc_close_hint">关闭提示</string>
     <string name="reminder_toggle_title">课前提醒</string>
     <string name="wakeup_simulation_title">WakeUp模拟</string>
