@@ -86,8 +86,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -732,13 +737,15 @@ private fun SettingsSwitchItem(
     leading: (@Composable () -> Unit)? = null,
     stateDescription: String? = null,
 ) {
-    val modifier = stateDescription?.let { description ->
-        Modifier.semantics { this.stateDescription = description }
-    } ?: Modifier
+    val modifier = Modifier.semantics {
+        role = Role.Switch
+        toggleableState = ToggleableState(checked)
+        stateDescription?.let { this.stateDescription = it }
+    }
     SegmentedListItem(
-        modifier = modifier,
         onClick = { if (enabled) onCheckedChange(!checked) },
         shapes = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount),
+        modifier = modifier,
         enabled = enabled,
         verticalAlignment = Alignment.CenterVertically,
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -746,7 +753,14 @@ private fun SettingsSwitchItem(
         content = { Text(title) },
         supportingContent = { Text(supporting) },
         trailingContent = {
-            Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
+            // 整行已声明开关语义，这里清空子节点语义，避免同一开关被朗读两次。
+            // 保留 onCheckedChange 与交互源，是为了维持滑块按下时拉伸为胶囊的动画。
+            Switch(
+                checked = checked,
+                enabled = enabled,
+                onCheckedChange = onCheckedChange,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
         },
     )
 }
