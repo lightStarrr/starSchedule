@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,7 +24,8 @@ fun WallpaperBackground(
     modifier: Modifier = Modifier,
 ) {
     val path = (state as? WallpaperState.Ready)?.localPath
-    val bitmap by produceState<Bitmap?>(initialValue = null, path) {
+    val targetLongEdge = rememberScreenLongEdge()
+    val bitmap by produceState<Bitmap?>(initialValue = null, path, targetLongEdge) {
         value = path?.let {
             withContext(Dispatchers.IO) {
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -28,8 +33,11 @@ fun WallpaperBackground(
                 BitmapFactory.decodeFile(
                     it,
                     BitmapFactory.Options().apply {
-                        inSampleSize = maxOf(bounds.outWidth, bounds.outHeight)
-                            .coerceAtLeast(2048) / 2048
+                        inSampleSize = calculateInSampleSize(
+                            sourceWidth = bounds.outWidth,
+                            sourceHeight = bounds.outHeight,
+                            targetLongEdge = targetLongEdge,
+                        )
                     },
                 )
             }
@@ -45,5 +53,24 @@ fun WallpaperBackground(
             contentScale = ContentScale.Crop,
             modifier = modifier.fillMaxSize(),
         )
+    }
+}
+
+/**
+ * 返回屏幕长短边中的较大值（像素）。
+ *
+ * 取较大值而不是当前朝向的宽或高，横竖屏切换时目标尺寸不变，位图不需要重新解码。
+ */
+@Composable
+private fun rememberScreenLongEdge(): Int {
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    return remember(configuration.screenWidthDp, configuration.screenHeightDp, density) {
+        with(density) {
+            maxOf(
+                configuration.screenWidthDp.dp.toPx(),
+                configuration.screenHeightDp.dp.toPx(),
+            ).toInt()
+        }
     }
 }
