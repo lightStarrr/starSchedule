@@ -9,11 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,7 +46,6 @@ internal fun StartupHintDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Rounded.Info, contentDescription = null) },
         title = { Text(stringResource(R.string.startup_hint_primary)) },
         text = {
             Column(
@@ -57,9 +53,23 @@ internal fun StartupHintDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(stringResource(R.string.startup_hint_secondary))
+                if (state.saveFailed) {
+                    Text(
+                        text = stringResource(R.string.startup_hint_save_failed),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
                         .heightIn(min = 48.dp)
                         .toggleable(
                             value = state.doNotShowAgain,
@@ -79,17 +89,9 @@ internal fun StartupHintDialog(
                         modifier = Modifier.padding(start = 12.dp),
                     )
                 }
-                if (state.saveFailed) {
-                    Text(
-                        text = stringResource(R.string.startup_hint_save_failed),
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                TextButton(onClick = onConfirm, enabled = !state.isSaving) {
+                    Text(stringResource(R.string.action_close))
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !state.isSaving) {
-                Text(stringResource(R.string.action_confirm))
             }
         },
     )
