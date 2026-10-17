@@ -20,3 +20,7 @@ app/build
 app/release
 app/src/androidTest
 /gradle
+
+# 智能体本地工作数据与本机构建环境，不纳入提交
+.workbuddy/
+.android
