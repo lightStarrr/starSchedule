@@ -2,6 +2,8 @@ package com.star.schedule.feature.wallpaper.presentation
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.BitmapRegionDecoder
+import android.graphics.Rect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,8 +15,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.IntSize
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -24,22 +28,17 @@ fun WallpaperBackground(
     modifier: Modifier = Modifier,
 ) {
     val path = (state as? WallpaperState.Ready)?.localPath
-    val targetLongEdge = rememberScreenLongEdge()
-    val bitmap by produceState<Bitmap?>(initialValue = null, path, targetLongEdge) {
-        value = path?.let {
+    val targetSize = rememberTargetSize()
+    val bitmap by produceState<Bitmap?>(
+        initialValue = null,
+        path,
+        targetSize,
+    ) {
+        value = if (path == null || targetSize.width <= 0 || targetSize.height <= 0) {
+            null
+        } else {
             withContext(Dispatchers.IO) {
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(it, bounds)
-                BitmapFactory.decodeFile(
-                    it,
-                    BitmapFactory.Options().apply {
-                        inSampleSize = calculateInSampleSize(
-                            sourceWidth = bounds.outWidth,
-                            sourceHeight = bounds.outHeight,
-                            targetLongEdge = targetLongEdge,
-                        )
-                    },
-                )
+                decodeWallpaper(path, targetSize.width, targetSize.height)
             }
         }
     }
@@ -57,20 +56,62 @@ fun WallpaperBackground(
 }
 
 /**
- * 返回屏幕长短边中的较大值（像素）。
+ * 只解码屏幕可见的那部分原图，返回与屏幕尺寸接近 1:1 的位图。
  *
- * 取较大值而不是当前朝向的宽或高，横竖屏切换时目标尺寸不变，位图不需要重新解码。
+ * 使用 [BitmapRegionDecoder] 而不是先整图解码再交给 Image 缩放，是为了让超大壁纸的
+ * 内存占用只跟屏幕大小相关。
+ */
+private fun decodeWallpaper(
+    path: String,
+    targetWidth: Int,
+    targetHeight: Int,
+): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+
+    val spec = calculateWallpaperCrop(
+        sourceWidth = bounds.outWidth,
+        sourceHeight = bounds.outHeight,
+        targetWidth = targetWidth,
+        targetHeight = targetHeight,
+    )
+    val options = BitmapFactory.Options().apply { inSampleSize = spec.sampleSize }
+    val region = Rect(spec.left, spec.top, spec.left + spec.width, spec.top + spec.height)
+
+    val regionBitmap = runCatching {
+        val decoder = BitmapRegionDecoder.newInstance(path, false)
+        try {
+            decoder?.decodeRegion(region, options)
+        } finally {
+            decoder?.recycle()
+        }
+    }.getOrNull()
+    if (regionBitmap != null) return regionBitmap
+
+    // 区域解码失败时退回整图解码，尺寸仍受 sampleSize 约束。
+    return runCatching { BitmapFactory.decodeFile(path, options) }.getOrNull()
+}
+
+/**
+ * 壁纸要铺满的区域尺寸（像素）。
+ *
+ * 优先使用窗口容器尺寸，它随旋转变换，能保证裁切区域与当前朝向一致；
+ * 首次布局前容器尺寸为 0，退回按屏幕配置估算。
  */
 @Composable
-private fun rememberScreenLongEdge(): Int {
+private fun rememberTargetSize(): IntSize {
+    val containerSize = LocalWindowInfo.current.containerSize
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    return remember(configuration.screenWidthDp, configuration.screenHeightDp, density) {
-        with(density) {
-            maxOf(
-                configuration.screenWidthDp.dp.toPx(),
-                configuration.screenHeightDp.dp.toPx(),
-            ).toInt()
-        }
+    val fallbackSize = remember(configuration, density) {
+        IntSize(
+            (configuration.screenWidthDp * density.density).roundToInt(),
+            (configuration.screenHeightDp * density.density).roundToInt(),
+        )
+    }
+    return if (containerSize.width > 0 && containerSize.height > 0) {
+        containerSize
+    } else {
+        fallbackSize
     }
 }
