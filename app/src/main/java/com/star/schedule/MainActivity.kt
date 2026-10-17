@@ -6,20 +6,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import com.star.schedule.app.StarScheduleApp
-import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.feature.schedule.data.RoomScheduleRepository
 import com.star.schedule.feature.settings.data.RoomStartupHintRepository
 import com.star.schedule.feature.settings.presentation.StartupHintViewModel
 import com.star.schedule.feature.settings.presentation.StartupHintViewModelFactory
 import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
+import com.star.schedule.platform.recents.RecentsTaskVisibility
 import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,17 +41,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        lifecycleScope.launch {
-            val hideFromRecents = withContext(Dispatchers.IO) {
-                runCatching {
-                    DatabaseProvider.dao()
-                        .getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS)
-                        .firstOrNull() == "true"
-                }.getOrDefault(false)
-            }
-            if (hideFromRecents) finishAndRemoveTask()
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // 比进程级 onStop 更早：用户按 Home 或切到别的应用时，任务卡片可能已经在动画里了。
+        if (RecentsTaskVisibility.hideFromRecents) {
+            RecentsTaskVisibility.apply(this, excluded = true)
         }
     }
 }
