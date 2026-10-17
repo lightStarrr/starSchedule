@@ -65,6 +65,9 @@ internal class StatusBarAppearanceMonitor(
         return suspendCancellableCoroutine { continuation ->
             var completed = false
 
+            // 拷贝在 RenderThread 上异步执行，只能等 PixelCopy 回调后再回收目标位图。
+            // 若在协程取消时立即 recycle，已入队的拷贝仍会写入该位图的像素内存，
+            // RenderThread 会因访问已释放内存直接 abort。
             fun finish(result: Int) {
                 if (completed) return
                 completed = true
@@ -88,11 +91,6 @@ internal class StatusBarAppearanceMonitor(
                 }
                 if (!bitmap.isRecycled) bitmap.recycle()
                 if (continuation.isActive) continuation.resume(luminance)
-            }
-
-            continuation.invokeOnCancellation {
-                completed = true
-                if (!bitmap.isRecycled) bitmap.recycle()
             }
 
             runCatching {
