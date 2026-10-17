@@ -1,0 +1,64 @@
+package com.star.schedule
+
+import android.app.Application
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import com.star.schedule.core.common.Constants
+import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.platform.recents.RecentsTaskVisibility
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+
+class ScheduleApplication : Application() {
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    override fun onCreate() {
+        super.onCreate()
+        DatabaseProvider.init(this)
+        observeRecentsPreference()
+        observeProcessLifecycle()
+    }
+
+    /**
+     * 把「从最近任务隐藏」的偏好同步到内存，供生命周期回调同步读取。
+     *
+     * 关闭开关时立即解除隐藏：否则在设置页改完直接回到桌面，任务要等到下次回到前台
+     * 才恢复显示。
+     */
+    private fun observeRecentsPreference() {
+        applicationScope.launch {
+            DatabaseProvider.dao()
+                .getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS)
+                .collect { value ->
+                    val enabled = value == "true"
+                    RecentsTaskVisibility.hideFromRecents = enabled
+                    if (!enabled) {
+                        RecentsTaskVisibility.apply(this@ScheduleApplication, excluded = false)
+                    }
+                }
+        }
+    }
+
+    /**
+     * 用进程级生命周期而不是单个 Activity 的：从设置页直接回到桌面时，主界面早已处于
+     * stop 状态，收不到任何回调。
+     */
+    private fun observeProcessLifecycle() {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                RecentsTaskVisibility.apply(this@ScheduleApplication, excluded = false)
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                if (RecentsTaskVisibility.hideFromRecents) {
+                    RecentsTaskVisibility.apply(this@ScheduleApplication, excluded = true)
+                }
+            }
+        })
+    }
+}
