@@ -5,7 +5,6 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
@@ -36,9 +35,9 @@ fun WallpaperBackground(
             }
         }
     }
-    DisposableEffect(bitmap) {
-        onDispose { bitmap?.recycle() }
-    }
+    // 位图交给 Image 后会由渲染线程在后续帧继续读取，销毁时机与最后一次绘制
+    // 没有先后保证。主动 recycle 会让渲染线程访问已释放的像素内存并 abort，
+    // 因此这里不回收，改由 GC 释放。
     bitmap?.let { image ->
         Image(
             bitmap = image.asImageBitmap(),
