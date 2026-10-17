@@ -9,7 +9,6 @@ import com.star.schedule.feature.settings.domain.TimetableSummary
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -41,17 +40,6 @@ private data class SettingsPreferences(
 class SettingsViewModel(
     private val repository: SettingsRepository,
 ) : ViewModel() {
-    private val currentTimetableId = repository
-        .observePreference(Constants.PREF_CURRENT_TIMETABLE)
-        .map { it?.toLongOrNull() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    private val reminderEnabled = combine(
-        currentTimetableId,
-        repository.observePreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE),
-    ) { id, enabledId -> id != null && id == enabledId?.toLongOrNull() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
     private val preferences = combine(
         repository.observePreference(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS),
         repository.observePreference(Constants.PREF_HIDE_FROM_RECENTS),
@@ -77,15 +65,16 @@ class SettingsViewModel(
 
     val uiState: StateFlow<SettingsUiState> = combine(
         repository.observeTimetables(),
-        currentTimetableId,
+        repository.observePreference(Constants.PREF_CURRENT_TIMETABLE),
+        repository.observePreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE),
         preferences,
-        reminderEnabled,
-    ) { timetables, currentId, prefs, reminders ->
+    ) { timetables, currentIdValue, reminderIdValue, prefs ->
+        val currentId = currentIdValue?.toLongOrNull()
         SettingsUiState(
             isLoading = false,
             timetables = timetables,
             currentTimetableId = currentId,
-            reminderEnabled = reminders,
+            reminderEnabled = currentId != null && currentId == reminderIdValue?.toLongOrNull(),
             notifyOnlyForFirstContinuousClass = prefs.notifyOnlyFirst,
             hideFromRecents = prefs.hideFromRecents,
             wakeUpSimulationAvailable = wakeUpSimulationAvailable,
@@ -130,7 +119,7 @@ class SettingsViewModel(
                 Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS,
                 enabled.toString(),
             )
-            if (reminderEnabled.value) {
+            if (uiState.value.reminderEnabled) {
                 uiState.value.currentTimetableId?.let { timetableId ->
                     repository.enableRemindersForTimetable(timetableId)
                 }
