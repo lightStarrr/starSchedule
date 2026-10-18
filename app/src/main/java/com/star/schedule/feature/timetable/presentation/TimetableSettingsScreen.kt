@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -84,13 +85,14 @@ import com.star.schedule.feature.settings.presentation.SettingsListItem
 fun TimetableSettingsRoute(
     viewModel: TimetableSettingsViewModel,
     onBack: () -> Unit,
+    onOpenRowHeight: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     TimetableSettingsScreen(
         state = state,
         onBack = onBack,
         onApply = viewModel::apply,
-        onRowHeightChange = viewModel::setRowHeight,
+        onRowHeightClick = onOpenRowHeight,
     )
 }
 
@@ -100,7 +102,7 @@ private fun TimetableSettingsScreen(
     state: TimetableSettingsUiState,
     onBack: () -> Unit,
     onApply: (Long) -> Unit,
-    onRowHeightChange: (Long, Int) -> Unit,
+    onRowHeightClick: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
@@ -151,56 +153,23 @@ private fun TimetableSettingsScreen(
                         SettingsListItem(
                             title = stringResource(R.string.timetable_settings_row_height),
                             supporting = stringResource(R.string.timetable_settings_row_height_support),
+                            onClick = onRowHeightClick,
                             shapeIndex = 0,
                             shapeCount = 1,
                             trailing = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
-                                        onClick = {
-                                            onRowHeightChange(
-                                                previewed.id,
-                                                previewed.rowHeight -
-                                                    TimetableSettingsViewModel.ROW_HEIGHT_STEP
-                                            )
-                                        },
-                                        enabled = previewed.rowHeight >
-                                            TimetableSettingsViewModel.ROW_HEIGHT_MIN,
-                                        shapes = IconButtonDefaults.shapes(),
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Remove,
-                                            contentDescription = stringResource(
-                                                R.string.timetable_settings_row_height_decrease
-                                            ),
-                                        )
-                                    }
                                     Text(
                                         text = stringResource(
                                             R.string.row_height_value,
                                             previewed.rowHeight
                                         ),
                                         style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.width(56.dp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    IconButton(
-                                        onClick = {
-                                            onRowHeightChange(
-                                                previewed.id,
-                                                previewed.rowHeight +
-                                                    TimetableSettingsViewModel.ROW_HEIGHT_STEP
-                                            )
-                                        },
-                                        enabled = previewed.rowHeight <
-                                            TimetableSettingsViewModel.ROW_HEIGHT_MAX,
-                                        shapes = IconButtonDefaults.shapes(),
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Add,
-                                            contentDescription = stringResource(
-                                                R.string.timetable_settings_row_height_increase
-                                            ),
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Rounded.ChevronRight,
+                                        contentDescription = null,
+                                    )
                                 }
                             },
                         )

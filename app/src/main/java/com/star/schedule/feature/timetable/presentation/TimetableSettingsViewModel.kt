@@ -44,17 +44,6 @@ class TimetableSettingsViewModel(
         if (timetableId == uiState.value.currentId) return
         viewModelScope.launch { repository.selectTimetable(timetableId) }
     }
-
-    fun setRowHeight(timetableId: Long, rowHeight: Int) {
-        val clamped = rowHeight.coerceIn(ROW_HEIGHT_MIN, ROW_HEIGHT_MAX)
-        viewModelScope.launch { repository.setRowHeight(timetableId, clamped) }
-    }
-
-    companion object {
-        const val ROW_HEIGHT_MIN = 40
-        const val ROW_HEIGHT_MAX = 240
-        const val ROW_HEIGHT_STEP = 10
-    }
 }
 
 class TimetableSettingsViewModelFactory(
