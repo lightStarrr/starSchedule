@@ -181,6 +181,14 @@
     <string name="reminder_minutes_value">%1$d 分钟</string>
     <string name="import_xls_instruction">从教务系统导出课程表为xls文件，然后在此处选择该文件进行导入。</string>
     <string name="settings_title">设置</string>
+    <string name="settings_section_timetable">课表</string>
+    <string name="settings_section_notifications">通知</string>
+    <string name="settings_section_behavior">行为</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_current_timetable_title">当前课表</string>
+    <string name="settings_empty_timetable">还没有课表，请在课表编辑器中导入或新建一个。</string>
+    <string name="settings_reminder_requires_timetable">启用提醒前请先选择课表</string>
+    <string name="settings_selected_timetable">已选择</string>
     <string name="timetable_not_selected">未选择</string>
     <string name="current_timetable_label">当前课表: %1$s</string>
     <string name="select_timetable_title">选择课表</string>
