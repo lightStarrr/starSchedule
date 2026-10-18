@@ -1,5 +1,6 @@
 package com.star.schedule
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,7 +33,13 @@ class TimetableSettingsActivity : ComponentActivity() {
 
         setContent {
             StarScheduleTheme(dynamicColor = true) {
-                TimetableSettingsRoute(viewModel = viewModel, onBack = ::finish)
+                TimetableSettingsRoute(
+                    viewModel = viewModel,
+                    onBack = ::finish,
+                    onOpenRowHeight = {
+                        startActivity(Intent(this, RowHeightActivity::class.java))
+                    },
+                )
             }
         }
     }

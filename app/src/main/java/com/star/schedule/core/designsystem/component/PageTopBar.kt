@@ -11,6 +11,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -47,6 +48,40 @@ fun PageTopBar(
         },
         actions = actions,
         // 顶栏自带的状态栏内边距之外，再给左侧留 12dp，圆形按钮才不会顶着屏幕边缘。
+        windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.onBackground,
+        ),
+        scrollBehavior = scrollBehavior,
+    )
+}
+
+/**
+ * 不折叠的紧凑顶栏：只有一行小标题，右侧留给操作。
+ *
+ * 用在「整页预览 + 底部浮层」这类页面——标题不该占掉预览的高度。
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun CompactPageTopBar(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    scrollBehavior: TopAppBarScrollBehavior? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    TopAppBar(
+        title = { Text(title) },
+        modifier = modifier,
+        navigationIcon = {
+            Row {
+                CircleBackButton(onClick = onBack)
+                Spacer(Modifier.size(16.dp))
+            }
+        },
+        actions = actions,
         windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,

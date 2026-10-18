@@ -247,6 +247,7 @@
     <string name="timetable_settings_title">Timetable settings</string>
     <string name="timetable_settings_apply">Apply</string>
     <string name="timetable_settings_row_height">Row height</string>
+    <string name="timetable_settings_row_height_reset">Reset row height</string>
     <string name="timetable_settings_row_height_support">Height each class occupies in the timetable</string>
     <string name="timetable_settings_row_height_decrease">Decrease row height</string>
     <string name="timetable_settings_row_height_increase">Increase row height</string>
