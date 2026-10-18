@@ -1,12 +1,9 @@
 package com.star.schedule.feature.timetable.presentation
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +47,9 @@ import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.feature.schedule.presentation.TimetableGrid
 import kotlin.math.roundToInt
+
+/** 恢复默认按钮的直径，同时用作标题行里预留的槽位大小。 */
+private val RestoreButtonSize = 32.dp
 
 @Composable
 fun RowHeightRoute(
@@ -150,7 +150,7 @@ private fun RestoreDefaultButton(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
-        modifier = Modifier.size(32.dp),
+        modifier = Modifier.size(RestoreButtonSize),
     ) {
         Icon(
             imageVector = Icons.Rounded.RestartAlt,
@@ -186,18 +186,19 @@ private fun RowHeightPanel(
                         text = stringResource(R.string.timetable_settings_row_height),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    // 已经是默认行高时按钮收掉：缩小淡出，改过之后再放大淡入。
-                    AnimatedVisibility(
-                        visible = rowHeight != RowHeightViewModel.DEFAULT_ROW_HEIGHT,
-                        enter = fadeIn() +
-                            scaleIn(initialScale = 0.6f) +
-                            expandHorizontally(),
-                        exit = fadeOut() +
-                            scaleOut(targetScale = 0.6f) +
-                            shrinkHorizontally(),
+                    // 位置和尺寸always留着（32dp 的槽），只做淡入淡出 + 缩放，
+                    // 这样按钮出现/消失时标题行高度不变，右边的数值也不会被挤动。
+                    Spacer(Modifier.width(4.dp))
+                    Box(
+                        modifier = Modifier.size(RestoreButtonSize),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Spacer(Modifier.width(4.dp))
+                        // 用顶层重载，别用 RowScope 的那个（会按行内布局撑开宽度）。
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = rowHeight != RowHeightViewModel.DEFAULT_ROW_HEIGHT,
+                            enter = fadeIn() + scaleIn(initialScale = 0.6f),
+                            exit = fadeOut() + scaleOut(targetScale = 0.6f),
+                        ) {
                             RestoreDefaultButton(
                                 onClick = {
                                     onRowHeightChange(RowHeightViewModel.DEFAULT_ROW_HEIGHT)
