@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.app.StarScheduleApp
 import com.star.schedule.core.database.DatabaseProvider
@@ -14,15 +13,14 @@ import com.star.schedule.feature.settings.presentation.StartupHintViewModel
 import com.star.schedule.feature.settings.presentation.StartupHintViewModelFactory
 import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
 import com.star.schedule.platform.recents.RecentsTaskVisibility
-import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
+import com.star.schedule.platform.systembar.installEdgeToEdge
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         DatabaseProvider.init(this)
-        enableEdgeToEdge()
-        installAdaptiveStatusBarAppearance()
+        installEdgeToEdge()
         val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
         val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.dao())
         val startupHintViewModel = ViewModelProvider(

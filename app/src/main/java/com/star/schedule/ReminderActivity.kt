@@ -3,7 +3,6 @@ package com.star.schedule
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
@@ -13,7 +12,7 @@ import com.star.schedule.feature.settings.presentation.ReminderSettingsViewModel
 import com.star.schedule.feature.settings.presentation.ReminderSettingsViewModelFactory
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.platform.notification.NotificationPermissionGate
-import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
+import com.star.schedule.platform.systembar.installEdgeToEdge
 
 /**
  * 课前提醒的独立设置页：顶部用仿 AOSP 的主开关条控制开关，下面是与提醒相关的选项。
@@ -26,8 +25,7 @@ class ReminderActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         DatabaseProvider.init(this)
-        enableEdgeToEdge()
-        installAdaptiveStatusBarAppearance()
+        installEdgeToEdge()
 
         val settingsRepository = RoomSettingsRepository(
             context = this,

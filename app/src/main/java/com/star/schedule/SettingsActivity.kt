@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
@@ -14,7 +13,7 @@ import com.star.schedule.feature.settings.presentation.SettingsViewModel
 import com.star.schedule.feature.settings.presentation.SettingsViewModelFactory
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.platform.notification.NotificationPermissionGate
-import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
+import com.star.schedule.platform.systembar.installEdgeToEdge
 
 class SettingsActivity : ComponentActivity() {
     private val permissionGate = NotificationPermissionGate(this)
@@ -23,8 +22,7 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         DatabaseProvider.init(this)
-        enableEdgeToEdge()
-        installAdaptiveStatusBarAppearance()
+        installEdgeToEdge()
 
         val settingsRepository = RoomSettingsRepository(
             context = this,
