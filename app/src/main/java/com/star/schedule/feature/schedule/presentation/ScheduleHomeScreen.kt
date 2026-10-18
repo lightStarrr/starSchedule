@@ -19,7 +19,6 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Settings
@@ -86,7 +85,6 @@ fun ScheduleHomeRoute(
     timetableId: Long?,
     isSelectionLoading: Boolean,
     wallpaperState: WallpaperState = WallpaperState.None,
-    onEditClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
 ) {
     val homeDataFlow: Flow<HomeTimetableData?> = remember(repository, timetableId) {
@@ -137,7 +135,6 @@ fun ScheduleHomeRoute(
         showWeekend = timetable?.showWeekend ?: true,
         rowHeight = (timetable?.rowHeight ?: 60).dp,
         wallpaperState = wallpaperState,
-        onEditClick = onEditClick,
         onSwitchTimetableClick = {},
         onSettingsClick = onSettingsClick,
         onPreviousWeekClick = { currentWeek = (currentWeek - 1).coerceAtLeast(1) },
@@ -151,7 +148,6 @@ fun ScheduleHomeRoute(
 fun ScheduleHomeScreen(
     currentWeek: Int,
     dateRange: String,
-    onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onPreviousWeekClick: () -> Unit,
@@ -197,7 +193,6 @@ fun ScheduleHomeScreen(
             ScheduleHomeHeader(
                 currentWeek = currentWeek,
                 dateRange = dateRange,
-                onEditClick = onEditClick,
                 onSwitchTimetableClick = onSwitchTimetableClick,
                 onSettingsClick = onSettingsClick,
                 modifier = Modifier
@@ -257,7 +252,6 @@ fun ScheduleHomeScreen(
 private fun ScheduleHomeHeader(
     currentWeek: Int,
     dateRange: String,
-    onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -275,12 +269,10 @@ private fun ScheduleHomeHeader(
         }.single().measure(childConstraints)
 
         val variants = listOf(
-            HeaderActionVariant(HeaderActionLabelMode.ALL, overflowCount = 0),
-            HeaderActionVariant(HeaderActionLabelMode.EDIT_ONLY, overflowCount = 0),
+            HeaderActionVariant(HeaderActionLabelMode.FIRST_ONLY, overflowCount = 0),
             HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 0),
             HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 1),
             HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 2),
-            HeaderActionVariant(HeaderActionLabelMode.NONE, overflowCount = 3),
         )
         val actionConstraints = Constraints(maxHeight = constraints.maxHeight)
         val actionPlaceables = variants.map { variant ->
@@ -290,7 +282,6 @@ private fun ScheduleHomeHeader(
                     overflowCount = variant.overflowCount,
                     expandedOverflowCount = expandedOverflowCount,
                     onExpandedOverflowCountChange = { expandedOverflowCount = it },
-                    onEditClick = onEditClick,
                     onSwitchTimetableClick = onSwitchTimetableClick,
                     onSettingsClick = onSettingsClick,
                 )
@@ -348,16 +339,15 @@ private fun ScheduleHomeHeaderInfo(
 
 private enum class ScheduleHomeHeaderSlot {
     INFO,
-    ACTIONS_ALL,
-    ACTIONS_EDIT_ONLY,
+    ACTIONS_FIRST_ONLY,
     ACTIONS_NONE,
 }
 
 private enum class HeaderActionLabelMode(
     val slot: ScheduleHomeHeaderSlot,
 ) {
-    ALL(ScheduleHomeHeaderSlot.ACTIONS_ALL),
-    EDIT_ONLY(ScheduleHomeHeaderSlot.ACTIONS_EDIT_ONLY),
+    /** 只有第一个可见动作带文字，其余收成图标。 */
+    FIRST_ONLY(ScheduleHomeHeaderSlot.ACTIONS_FIRST_ONLY),
     NONE(ScheduleHomeHeaderSlot.ACTIONS_NONE),
 }
 
@@ -373,17 +363,14 @@ private fun HeaderSplitButtons(
     overflowCount: Int,
     expandedOverflowCount: Int,
     onExpandedOverflowCountChange: (Int) -> Unit,
-    onEditClick: () -> Unit,
     onSwitchTimetableClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val editLabel = stringResource(R.string.home_action_edit)
     val switchTimetableLabel = stringResource(R.string.home_action_switch_timetable)
     val settingsLabel = stringResource(R.string.home_action_settings)
 
     val actions = listOf(
-        HeaderAction(editLabel, Icons.Rounded.Edit, onEditClick),
         HeaderAction(switchTimetableLabel, Icons.Rounded.CalendarMonth, onSwitchTimetableClick),
         HeaderAction(settingsLabel, Icons.Rounded.Settings, onSettingsClick),
     )
@@ -396,8 +383,8 @@ private fun HeaderSplitButtons(
     ) {
         visibleActions.forEachIndexed { index, action ->
             val position = connectedPosition(index, visibleItemCount)
-            val showLabel = labelMode == HeaderActionLabelMode.ALL ||
-                (labelMode == HeaderActionLabelMode.EDIT_ONLY && index == 0 && overflowCount == 0)
+            val showLabel = labelMode == HeaderActionLabelMode.FIRST_ONLY &&
+                index == 0 && overflowCount == 0
             ConnectedActionButton(
                 position = position,
                 onClick = action.onClick,
@@ -640,7 +627,6 @@ private fun ScheduleHomeScreenPreview() {
         ScheduleHomeScreen(
             currentWeek = 1,
             dateRange = "9/21–9/27",
-            onEditClick = {},
             onSwitchTimetableClick = {},
             onSettingsClick = {},
             onPreviousWeekClick = {},
