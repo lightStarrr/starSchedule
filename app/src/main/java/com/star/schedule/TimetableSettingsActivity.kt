@@ -4,9 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
-import com.star.schedule.feature.timetable.presentation.TimetableSettingsScreen
+import com.star.schedule.feature.settings.data.RoomSettingsRepository
+import com.star.schedule.feature.timetable.presentation.TimetableSettingsRoute
+import com.star.schedule.feature.timetable.presentation.TimetableSettingsViewModel
+import com.star.schedule.feature.timetable.presentation.TimetableSettingsViewModelFactory
+import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
 
 class TimetableSettingsActivity : ComponentActivity() {
@@ -17,9 +22,19 @@ class TimetableSettingsActivity : ComponentActivity() {
         enableEdgeToEdge()
         installAdaptiveStatusBarAppearance()
 
+        val settingsRepository = RoomSettingsRepository(
+            context = this,
+            dao = DatabaseProvider.dao(),
+            notificationManager = UnifiedNotificationManager(this),
+        )
+        val viewModel = ViewModelProvider(
+            this,
+            TimetableSettingsViewModelFactory(settingsRepository),
+        )[TimetableSettingsViewModel::class.java]
+
         setContent {
             StarScheduleTheme(dynamicColor = true) {
-                TimetableSettingsScreen(onBack = ::finish)
+                TimetableSettingsRoute(viewModel = viewModel, onBack = ::finish)
             }
         }
     }

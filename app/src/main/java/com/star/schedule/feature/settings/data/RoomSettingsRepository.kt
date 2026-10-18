@@ -4,10 +4,13 @@ import android.content.Context
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.feature.settings.domain.SettingsRepository
+import com.star.schedule.feature.settings.domain.TimetablePreview
+import com.star.schedule.feature.settings.domain.TimetablePreviewBlock
 import com.star.schedule.feature.settings.domain.TimetableSummary
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.wakeup.WakeUpSupport
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -28,6 +31,51 @@ class RoomSettingsRepository(
                 )
             }
         }
+
+    override fun observeTimetablePreviews(): Flow<List<TimetablePreview>> =
+        combine(dao.getAllTimetables(), dao.getAllCoursesFlow()) { timetables, courses ->
+            val byTimetable = courses.groupBy { it.timetableId }
+            timetables.map { timetable ->
+                val blocks = byTimetable[timetable.id].orEmpty().flatMap { course ->
+                    contiguousSpans(course.periods).map { span ->
+                        TimetablePreviewBlock(
+                            dayOfWeek = course.dayOfWeek,
+                            startPeriod = span.first(),
+                            periodCount = span.size
+                        )
+                    }
+                }
+                TimetablePreview(
+                    id = timetable.id,
+                    name = timetable.name,
+                    hasWeekendCourses = blocks.any { it.dayOfWeek > 5 },
+                    rowHeight = timetable.rowHeight,
+                    startDate = timetable.startDate,
+                    blocks = blocks
+                )
+            }
+        }
+
+    override suspend fun setRowHeight(timetableId: Long, rowHeight: Int) {
+        val timetable = dao.getTimetableFlow(timetableId).first() ?: return
+        dao.updateTimetable(timetable.copy(rowHeight = rowHeight))
+    }
+
+    /** 预览里连着的节次要画成一整块，所以先按连续区间分组。 */
+    private fun contiguousSpans(periods: List<Int>): List<List<Int>> {
+        val sorted = periods.distinct().sorted()
+        if (sorted.isEmpty()) return emptyList()
+        val spans = mutableListOf<MutableList<Int>>()
+        sorted.forEach { period ->
+            val current = spans.lastOrNull()
+            if (current == null || period != current.last() + 1) {
+                spans += mutableListOf(period)
+            } else {
+                current += period
+            }
+        }
+        return spans
+    }
 
     override fun observePreference(key: String): Flow<String?> =
         dao.getPreferenceFlow(key)
