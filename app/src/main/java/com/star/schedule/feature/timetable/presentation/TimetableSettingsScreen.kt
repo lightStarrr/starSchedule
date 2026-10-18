@@ -2,6 +2,7 @@ package com.star.schedule.feature.timetable.presentation
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,6 +39,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +50,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
@@ -187,6 +190,7 @@ private fun TimetablePreviewPager(
 ) {
     val pageCount = previews.size + 1
     val pagerState = rememberPagerState(pageCount = { pageCount })
+    val scope = rememberCoroutineScope()
 
     // 当前课表变化（首次加载、点应用之后）时把预览滚到对应位置。
     LaunchedEffect(currentId, previews.size) {
@@ -233,6 +237,9 @@ private fun TimetablePreviewPager(
                         TimetablePreviewCard(
                             preview = preview,
                             applied = preview.id == currentId,
+                            onClick = {
+                                scope.launch { pagerState.animateScrollToPage(page) }
+                            },
                         )
                     }
                 }
@@ -262,6 +269,7 @@ private fun TimetablePreviewPager(
 private fun TimetablePreviewCard(
     preview: TimetablePreview,
     applied: Boolean,
+    onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(20.dp)
     val outline = if (applied) {
@@ -275,7 +283,9 @@ private fun TimetablePreviewCard(
             .height(PreviewCardHeight)
             .then(outline)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceBright),
+            .background(MaterialTheme.colorScheme.surfaceBright)
+            // 点露出来的相邻课表就把它滑到中间，不用手动划。
+            .clickable(onClick = onClick),
     ) {
         TimetableThumbnail(
             preview = preview,
