@@ -582,8 +582,8 @@ private const val PreviewFollowEpsilon = 0.001f
 private const val PreviewFollowFrameFallback = 1f / 60f
 
 // 卡片下方固定要占的高度：标题 20 + 标题与卡间距 8 + 卡与按钮间距 16 + 按钮 40 + 与设置间距 24，
-// 再加上想露出来的行高（50dp）。
-private val PreviewCardRowHeightPeek = 50.dp
+// 再加上想露出来的行高（35dp）。
+private val PreviewCardRowHeightPeek = 35.dp
 private val PreviewCardBelowSpace =
     20.dp + 8.dp + 16.dp + 40.dp + 24.dp + PreviewCardRowHeightPeek
 
