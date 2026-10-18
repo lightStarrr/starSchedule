@@ -141,9 +141,7 @@ fun TimetableGrid(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(GridColumnGap),
             ) {
                 GridTimeHeader(modifier = Modifier.width(timeColumnWidth))
@@ -240,11 +238,7 @@ private fun CourseDayColumn(
 
 @Composable
 private fun GridTimeHeader(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxHeight(),
-        contentAlignment = Alignment.Center,
-    ) {}
+    Box(modifier = modifier) {}
 }
 
 @Composable
@@ -257,13 +251,11 @@ private fun GridDayHeader(
     val labelStyle = MaterialTheme.typography.titleSmall.scaledFont(fontScale)
     val dateStyle = MaterialTheme.typography.labelSmall.scaledFont(fontScale)
     Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .padding(
-                start = GridHeaderHorizontalPadding,
-                end = GridHeaderHorizontalPadding,
-                bottom = 8.dp,
-            ),
+        // 高度由两行文字撑开，不写死、也不另外加下边距；和下面行之间的间隔交给格子之间那 2dp。
+        modifier = modifier.padding(
+            start = GridHeaderHorizontalPadding,
+            end = GridHeaderHorizontalPadding,
+        ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
     ) {
