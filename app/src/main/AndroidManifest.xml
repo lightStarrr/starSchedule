@@ -52,6 +52,10 @@
             android:name=".ReminderActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".TimetableSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
         <!-- 课程提醒广播接收器 -->
         <receiver android:name=".notification.CourseReminderReceiver"/>
         <receiver android:name=".notification.CourseNotificationUpdateReceiver" />

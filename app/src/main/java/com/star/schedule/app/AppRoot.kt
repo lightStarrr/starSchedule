@@ -26,6 +26,7 @@ fun StarScheduleApp(
     scheduleRepository: ScheduleRepository,
     wallpaperRepository: WallpaperRepository,
     startupHintViewModel: StartupHintViewModel,
+    onTimetableSettingsClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
     val selection by remember(scheduleRepository) {
@@ -50,6 +51,7 @@ fun StarScheduleApp(
                     timetableId = timetableId,
                     isSelectionLoading = selection == null,
                     wallpaperState = wallpaperState,
+                    onTimetableSettingsClick = onTimetableSettingsClick,
                     onSettingsClick = onSettingsClick,
                 )
                 StartupHintRoute(viewModel = startupHintViewModel)
