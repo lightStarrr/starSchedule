@@ -17,7 +17,7 @@ data class PreferenceEntity(
 data class TimetableEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,            // 课程表名
-    val showWeekend: Boolean,    // 是否显示周六周日
+    val showWeekend: Boolean,    // 保留字段：界面是否显示周末改为按课程自动判断
     val startDate: String,       // 学期开始日期
     val showFuture: Boolean = false, // 是否显示未来的课程
     val rowHeight: Int = 60,     // 课时行高度，默认60dp
