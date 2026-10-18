@@ -17,51 +17,32 @@ data class SettingsUiState(
     val timetables: List<TimetableSummary> = emptyList(),
     val currentTimetableId: Long? = null,
     val reminderEnabled: Boolean = false,
-    val notifyOnlyForFirstContinuousClass: Boolean = false,
     val hideFromRecents: Boolean = false,
     val wakeUpSimulationAvailable: Boolean = false,
     val wakeUpProxyInstalled: Boolean = false,
     val wakeUpSimulationEnabled: Boolean = false,
-    val liveCapsuleCustomizationAvailable: Boolean = false,
-    val liveCapsuleBgColor: String? = null,
-    val liveCapsuleIconPath: String? = null,
-    val liveNotificationTemplate: String? = null,
 )
 
 private data class SettingsPreferences(
-    val notifyOnlyFirst: Boolean,
     val hideFromRecents: Boolean,
     val wakeUpSimulationEnabled: Boolean,
-    val liveCapsuleBgColor: String?,
-    val liveCapsuleIconPath: String?,
-    val liveNotificationTemplate: String?,
 )
 
 class SettingsViewModel(
     private val repository: SettingsRepository,
 ) : ViewModel() {
     private val preferences = combine(
-        repository.observePreference(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS),
         repository.observePreference(Constants.PREF_HIDE_FROM_RECENTS),
         repository.observePreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED),
-        repository.observePreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR),
-        repository.observePreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH),
-        repository.observePreference(Constants.PREF_FLYME_LIVE_TEMPLATE),
-    ) { values ->
+    ) { hideFromRecents, wakeUpSimulation ->
         SettingsPreferences(
-            notifyOnlyFirst = values[0] == "true",
-            hideFromRecents = values[1] == "true",
-            wakeUpSimulationEnabled = values[2] == "true",
-            liveCapsuleBgColor = values[3] as String?,
-            liveCapsuleIconPath = (values[4] as String?)?.takeIf { it.isNotBlank() },
-            liveNotificationTemplate = values[5] as String?,
+            hideFromRecents = hideFromRecents == "true",
+            wakeUpSimulationEnabled = wakeUpSimulation == "true",
         )
     }
 
     private val wakeUpSimulationAvailable = repository.isWakeUpSimulationAvailable()
     private val wakeUpProxyInstalled = repository.isWakeUpProxyInstalled()
-    private val liveCapsuleCustomizationAvailable =
-        repository.isLiveCapsuleCustomizationAvailable()
 
     val uiState: StateFlow<SettingsUiState> = combine(
         repository.observeTimetables(),
@@ -75,15 +56,10 @@ class SettingsViewModel(
             timetables = timetables,
             currentTimetableId = currentId,
             reminderEnabled = currentId != null && currentId == reminderIdValue?.toLongOrNull(),
-            notifyOnlyForFirstContinuousClass = prefs.notifyOnlyFirst,
             hideFromRecents = prefs.hideFromRecents,
             wakeUpSimulationAvailable = wakeUpSimulationAvailable,
             wakeUpProxyInstalled = wakeUpProxyInstalled,
             wakeUpSimulationEnabled = prefs.wakeUpSimulationEnabled,
-            liveCapsuleCustomizationAvailable = liveCapsuleCustomizationAvailable,
-            liveCapsuleBgColor = prefs.liveCapsuleBgColor,
-            liveCapsuleIconPath = prefs.liveCapsuleIconPath,
-            liveNotificationTemplate = prefs.liveNotificationTemplate,
         )
     }.stateIn(
         viewModelScope,
@@ -91,7 +67,6 @@ class SettingsViewModel(
         SettingsUiState(
             wakeUpSimulationAvailable = wakeUpSimulationAvailable,
             wakeUpProxyInstalled = wakeUpProxyInstalled,
-            liveCapsuleCustomizationAvailable = liveCapsuleCustomizationAvailable,
         ),
     )
 
@@ -113,20 +88,6 @@ class SettingsViewModel(
         }
     }
 
-    fun setNotifyOnlyForFirstContinuousClass(enabled: Boolean) {
-        viewModelScope.launch {
-            repository.setPreference(
-                Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS,
-                enabled.toString(),
-            )
-            if (uiState.value.reminderEnabled) {
-                uiState.value.currentTimetableId?.let { timetableId ->
-                    repository.enableRemindersForTimetable(timetableId)
-                }
-            }
-        }
-    }
-
     fun setHideFromRecents(enabled: Boolean) {
         viewModelScope.launch {
             repository.setPreference(Constants.PREF_HIDE_FROM_RECENTS, enabled.toString())
@@ -142,27 +103,6 @@ class SettingsViewModel(
                 Constants.PREF_WAKEUP_SIMULATION_ENABLED,
                 enabled.toString(),
             )
-        }
-    }
-
-    suspend fun importLiveCapsuleIcon(uriString: String): Result<Unit> =
-        repository.importLiveCapsuleIcon(uriString)
-
-    fun clearLiveCapsuleIcon() {
-        viewModelScope.launch {
-            repository.clearLiveCapsuleIcon()
-        }
-    }
-
-    fun setLiveCapsuleBgColor(colorHex: String) {
-        viewModelScope.launch {
-            repository.setPreference(Constants.PREF_LIVE_CAPSULE_BG_COLOR, colorHex)
-        }
-    }
-
-    fun setLiveNotificationTemplate(template: String) {
-        viewModelScope.launch {
-            repository.setPreference(Constants.PREF_FLYME_LIVE_TEMPLATE, template)
         }
     }
 

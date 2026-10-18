@@ -203,6 +203,7 @@
     <string name="startup_hint_save_failed">Could not save this preference. Please try again.</string>
     <string name="content_desc_close_hint">Dismiss hint</string>
     <string name="reminder_toggle_title">Pre–class reminder</string>
+    <string name="reminder_switch_label">Enable reminders</string>
     <string name="wakeup_simulation_title">WakeUp simulation</string>
     <string name="wakeup_simulation_support">Simulate WakeUp timetable data; mutually exclusive with pre–class reminders</string>
     <string name="wakeup_simulation_proxy_missing">Install the WakeUp simulation shell first</string>
@@ -230,8 +231,6 @@
     <string name="github_title">GitHub</string>
     <string name="github_url">https://github.com/lightStarrr/starSchedule</string>
     <string name="qq_group_url">https://qun.qq.com/universal-share/share?ac=1&amp;authKey=vkf2HO4ASBIuSUo58JkyisXvAH3O2ahAWe8WCZhNtWb7naUMzjEaLdmFzqMq%2B1c9&amp;busi_data=eyJncm91cENvZGUiOiI5NDc1NzQ5NTMiLCJ0b2tlbiI6ImZlZ2k0bjV0RXRmMVphaEZDNDFPZkVHSmFZSzMxMUErRExWVXp0M2k4cHR2RmthaTdaR3JwR2dVL3Q1RWFIZ2oiLCJ1aW4iOiIyNzMzOTc3OTMyIn0%3D&amp;data=NkI03UL5UEBOZSjmEjCZ1XOX_FMW7sODMR0NVcuFpi5n-wd8cRrJzpDlKmpZ63I8SJ8U2_9S81TBshw62OIXcQ&amp;svctype=4&amp;tempid=h5_group_info</string>
-    <string name="settings_expanded">Expanded</string>
-    <string name="settings_collapsed">Collapsed</string>
     <string name="notification_icon_updated">Live notification icon updated</string>
     <string name="notification_icon_update_failed">Icon update failed: %1$s</string>
     <string name="live_notification_not_enabled">Live notifications are off. Enable them in Settings; otherwise standard notifications will be used</string>
