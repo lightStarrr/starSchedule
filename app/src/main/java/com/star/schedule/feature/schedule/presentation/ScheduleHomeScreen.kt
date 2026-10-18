@@ -170,7 +170,8 @@ fun ScheduleHomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface),
+            // 与设置页统一：二级页面用 surfaceContainer 打底，卡片/网格才浮得起来。
+            .background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
         WallpaperBackground(
             state = wallpaperState,
