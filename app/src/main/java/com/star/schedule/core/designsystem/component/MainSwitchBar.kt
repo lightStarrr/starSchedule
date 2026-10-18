@@ -5,13 +5,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -34,7 +29,7 @@ private val SwitchBarHorizontalPadding = 20.dp
 private val SwitchBarTitleMargin = 16.dp
 
 /**
- * 仿 AOSP 设置页的主开关条：整条可点，右侧是带勾/叉图标的 [Switch]。
+ * 仿 AOSP 设置页的主开关条：整条可点，右侧是 [Switch]。
  *
  * 与设置列表项里的开关不同，这一层是「页面级总开关」，只负责开关本身，
  * 不承载跳转，因此整条统一使用 [Role.Switch] 语义，内部的 Switch 不再单独暴露节点。
@@ -99,21 +94,12 @@ fun MainSwitchBar(
             // 整条已经带有开关语义，这里清空子节点，避免同一个开关被朗读两次。
             modifier = Modifier.clearAndSetSemantics { },
             colors = SwitchDefaults.colors(
-                checkedIconColor = MaterialTheme.colorScheme.primary,
                 // 关掉时开关条底色是 surfaceContainerHigh，轨道用 surface + outline 描边，
                 // 才不会和条本身糊成一片。
                 uncheckedThumbColor = MaterialTheme.colorScheme.outline,
                 uncheckedTrackColor = MaterialTheme.colorScheme.surface,
                 uncheckedBorderColor = MaterialTheme.colorScheme.outline,
-                uncheckedIconColor = MaterialTheme.colorScheme.surface,
             ),
-            thumbContent = {
-                Icon(
-                    imageVector = if (checked) Icons.Rounded.Check else Icons.Rounded.Close,
-                    contentDescription = null,
-                    modifier = Modifier.size(SwitchDefaults.IconSize),
-                )
-            },
         )
     }
 }
