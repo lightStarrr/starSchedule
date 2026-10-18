@@ -47,8 +47,11 @@ fun PageTopBar(
             }
         },
         actions = actions,
-        // 顶栏自带的状态栏内边距之外，再给左侧留 12dp，圆形按钮才不会顶着屏幕边缘。
-        windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
+        // 顶栏自带的状态栏内边距之外，左右各留 12dp：
+        // 系统栏本身没有横向内边距，只留左边的话返回键离边缘 16dp、右侧操作只有 4dp，看起来是歪的。
+        windowInsets = TopAppBarDefaults.windowInsets.add(
+            WindowInsets(left = 12.dp, right = 12.dp),
+        ),
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -82,7 +85,9 @@ fun CompactPageTopBar(
             }
         },
         actions = actions,
-        windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
+        windowInsets = TopAppBarDefaults.windowInsets.add(
+            WindowInsets(left = 12.dp, right = 12.dp),
+        ),
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
