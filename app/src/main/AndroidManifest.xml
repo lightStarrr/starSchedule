@@ -60,6 +60,13 @@
             android:name=".RowHeightActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
+        <!-- 崩溃页：独立进程，主进程崩掉后它还能正常显示 -->
+        <activity
+            android:name=".CrashActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:process=":crash"
+            android:theme="@style/Theme.StarSchedule" />
         <!-- 课程提醒广播接收器 -->
         <receiver android:name=".notification.CourseReminderReceiver"/>
         <receiver android:name=".notification.CourseNotificationUpdateReceiver" />

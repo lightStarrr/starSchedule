@@ -369,4 +369,17 @@
     <string name="qiangzhi_error_missing_timetable">Timetable not found; cannot update</string>
     <string name="qiangzhi_error_update_failed_with_reason">Update failed: %1$s</string>
     <string name="qiangzhi_timetable_name_prefix">Qiangzhi</string>
+    <string name="crash_screen_title">App crashed</string>
+    <string name="crash_headline">The app has stopped</string>
+    <string name="crash_headline_support">Copy or screenshot the info below and send it to the developer.</string>
+    <string name="crash_action_copy">Copy</string>
+    <string name="crash_action_copy_trace">Copy details</string>
+    <string name="crash_action_restart">Reopen</string>
+    <string name="crash_no_report">No crash report was found; it may have been cleared.</string>
+    <string name="crash_meta_time">Time</string>
+    <string name="crash_meta_version">Version</string>
+    <string name="crash_meta_device">Device</string>
+    <string name="crash_meta_thread">Thread</string>
+    <string name="crash_trace_title">Stack trace</string>
+    <string name="crash_copied">Copied</string>
 </resources>

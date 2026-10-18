@@ -366,4 +366,17 @@
     <string name="qiangzhi_error_missing_timetable">课表不存在，无法更新</string>
     <string name="qiangzhi_error_update_failed_with_reason">更新失败：%1$s</string>
     <string name="qiangzhi_timetable_name_prefix">强智教务</string>
+    <string name="crash_screen_title">应用崩溃了</string>
+    <string name="crash_headline">应用刚刚停止运行</string>
+    <string name="crash_headline_support">把下面的信息复制或截图发给开发者，能帮助定位问题。</string>
+    <string name="crash_action_copy">复制</string>
+    <string name="crash_action_copy_trace">复制信息</string>
+    <string name="crash_action_restart">重新打开</string>
+    <string name="crash_no_report">没有读到崩溃信息，可能已经被清理掉了。</string>
+    <string name="crash_meta_time">时间</string>
+    <string name="crash_meta_version">版本</string>
+    <string name="crash_meta_device">设备</string>
+    <string name="crash_meta_thread">线程</string>
+    <string name="crash_trace_title">完整堆栈</string>
+    <string name="crash_copied">已复制，可以直接粘贴给开发者</string>
 </resources>

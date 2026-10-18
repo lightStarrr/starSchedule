@@ -6,6 +6,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.platform.crash.CrashHandler
 import com.star.schedule.platform.recents.RecentsTaskVisibility
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,14 +16,25 @@ import kotlinx.coroutines.launch
 
 class ScheduleApplication : Application() {
 
+    private companion object {
+        const val CRASH_PROCESS_SUFFIX = ":crash"
+    }
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
+        // 崩溃页跑在独立的 :crash 进程，那边不用再装一遍——否则崩溃页自己出错就没人接了。
+        if (!isCrashProcess()) {
+            CrashHandler.install(this)
+        }
         DatabaseProvider.init(this)
         observeRecentsPreference()
         observeProcessLifecycle()
     }
+
+    private fun isCrashProcess(): Boolean =
+        applicationInfo.processName?.endsWith(CRASH_PROCESS_SUFFIX) == true
 
     /**
      * 把「从最近任务隐藏」的偏好同步到内存，供生命周期回调同步读取。
