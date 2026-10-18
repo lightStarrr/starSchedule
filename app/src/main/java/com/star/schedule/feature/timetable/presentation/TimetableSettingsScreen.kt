@@ -1,9 +1,7 @@
 package com.star.schedule.feature.timetable.presentation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -27,11 +25,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -43,7 +45,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -139,6 +140,7 @@ private fun TimetableSettingsScreen(
                                         },
                                         enabled = previewed.rowHeight >
                                             TimetableSettingsViewModel.ROW_HEIGHT_MIN,
+                                        shapes = IconButtonDefaults.shapes(),
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Remove,
@@ -165,6 +167,7 @@ private fun TimetableSettingsScreen(
                                         },
                                         enabled = previewed.rowHeight <
                                             TimetableSettingsViewModel.ROW_HEIGHT_MAX,
+                                        shapes = IconButtonDefaults.shapes(),
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Add,
@@ -255,8 +258,9 @@ private fun TimetablePreviewPager(
         val previewed = previews.getOrNull(pagerState.currentPage)
         Spacer(Modifier.height(16.dp))
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            FilledTonalButton(
+            Button(
                 onClick = { previewed?.let { onApply(it.id) } },
+                shapes = ButtonDefaults.shapes(),
                 enabled = previewed != null && previewed.id != currentId,
             ) {
                 Icon(
@@ -277,21 +281,21 @@ private fun TimetablePreviewCard(
     applied: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(20.dp)
-    val outline = if (applied) {
-        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
-    } else {
-        Modifier
-    }
-    Box(
+    Card(
+        onClick = onClick,
         modifier = Modifier
             .width(PreviewCardWidth)
-            .height(PreviewCardHeight)
-            .then(outline)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceBright)
-            // 点露出来的相邻课表就把它滑到中间，不用手动划。
-            .clickable(onClick = onClick),
+            .height(PreviewCardHeight),
+        shape = PreviewCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceBright,
+        ),
+        // 当前课表用 primary 描边；卡片本身用 Card，点击、水波纹、语义都由组件自带。
+        border = if (applied) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
     ) {
         TimetableThumbnail(
             preview = preview,
@@ -334,24 +338,28 @@ private fun TimetableThumbnail(
 
 @Composable
 private fun NewTimetableCard() {
-    Box(
+    Card(
         modifier = Modifier
             .width(PreviewCardWidth)
-            .height(PreviewCardHeight)
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        contentAlignment = Alignment.Center,
+            .height(PreviewCardHeight),
+        shape = PreviewCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
     ) {
-        // TODO(设计): 新建课表的流程还没定，先只放占位，不挂点击。
-        Icon(
-            imageVector = Icons.Rounded.Add,
-            contentDescription = stringResource(R.string.timetable_settings_new),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(32.dp),
-        )
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // TODO(设计): 新建课表的流程还没定，先只放占位，不挂点击。
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = stringResource(R.string.timetable_settings_new),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(32.dp),
+            )
+        }
     }
 }
 
+private val PreviewCardShape = RoundedCornerShape(20.dp)
 private val PreviewCardWidth = 128.dp
 private val PreviewCardHeight = 240.dp
 private const val THUMBNAIL_ROWS = 12
