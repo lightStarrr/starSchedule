@@ -51,6 +51,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -211,12 +212,14 @@ private fun TimetablePreviewPager(
     Column(modifier = Modifier.fillMaxWidth()) {
         // 左右各留 (宽 - 卡片宽)/2，居中的那一页才落在屏幕正中，两侧各露出半张相邻课表。
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val sidePadding = ((maxWidth - PreviewCardWidth) / 2).coerceAtLeast(16.dp)
+            val cardWidth = (maxWidth * PreviewCardWidthFraction).coerceAtMost(PreviewCardMaxWidth)
+            val cardHeight = cardWidth * PreviewCardAspect
+            val sidePadding = ((maxWidth - cardWidth) / 2).coerceAtLeast(16.dp)
             HorizontalPager(
                 state = pagerState,
                 contentPadding = PaddingValues(horizontal = sidePadding),
                 pageSpacing = 12.dp,
-                pageSize = PageSize.Fixed(PreviewCardWidth),
+                pageSize = PageSize.Fixed(cardWidth),
             ) { page ->
                 val preview = previews.getOrNull(page)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -240,11 +243,13 @@ private fun TimetablePreviewPager(
                     }
                     Spacer(Modifier.height(8.dp))
                     if (preview == null) {
-                        NewTimetableCard()
+                        NewTimetableCard(width = cardWidth, height = cardHeight)
                     } else {
                         TimetablePreviewCard(
                             preview = preview,
                             applied = preview.id == currentId,
+                            width = cardWidth,
+                            height = cardHeight,
                             onClick = {
                                 scope.launch { pagerState.animateScrollToPage(page) }
                             },
@@ -279,13 +284,15 @@ private fun TimetablePreviewPager(
 private fun TimetablePreviewCard(
     preview: TimetablePreview,
     applied: Boolean,
+    width: Dp,
+    height: Dp,
     onClick: () -> Unit,
 ) {
     Card(
         onClick = onClick,
         modifier = Modifier
-            .width(PreviewCardWidth)
-            .height(PreviewCardHeight),
+            .width(width)
+            .height(height),
         shape = PreviewCardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceBright,
@@ -337,11 +344,11 @@ private fun TimetableThumbnail(
 }
 
 @Composable
-private fun NewTimetableCard() {
+private fun NewTimetableCard(width: Dp, height: Dp) {
     Card(
         modifier = Modifier
-            .width(PreviewCardWidth)
-            .height(PreviewCardHeight),
+            .width(width)
+            .height(height),
         shape = PreviewCardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -359,7 +366,10 @@ private fun NewTimetableCard() {
     }
 }
 
-private val PreviewCardShape = RoundedCornerShape(20.dp)
-private val PreviewCardWidth = 128.dp
-private val PreviewCardHeight = 240.dp
+private val PreviewCardShape = RoundedCornerShape(24.dp)
+
+// 预览卡占可用宽度的比例，高度按手机常见比例 9:19.5 推出来。
+private const val PreviewCardWidthFraction = 0.64f
+private val PreviewCardMaxWidth = 280.dp
+private const val PreviewCardAspect = 19.5f / 9f
 private const val THUMBNAIL_ROWS = 12
