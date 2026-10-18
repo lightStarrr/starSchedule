@@ -36,7 +36,15 @@ class RoomSettingsRepository(
         combine(dao.getAllTimetables(), dao.getAllCoursesFlow()) { timetables, courses ->
             val byTimetable = courses.groupBy { it.timetableId }
             timetables.map { timetable ->
-                val blocks = byTimetable[timetable.id].orEmpty().flatMap { course ->
+                val courses = byTimetable[timetable.id].orEmpty()
+                // 预览只画「第一个有课的周」：把所有周次的课摞在一起会糊成一片，也看不出这是一张课表。
+                val firstWeek = courses.mapNotNull { course -> course.weeks.minOrNull() }.minOrNull()
+                val previewCourses = if (firstWeek == null) {
+                    emptyList()
+                } else {
+                    courses.filter { firstWeek in it.weeks }
+                }
+                val blocks = previewCourses.flatMap { course ->
                     contiguousSpans(course.periods).map { span ->
                         TimetablePreviewBlock(
                             dayOfWeek = course.dayOfWeek,
