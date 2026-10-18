@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,7 +35,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -74,8 +71,8 @@ import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.star.schedule.R
-import com.star.schedule.core.designsystem.component.CircleBackButton
 import com.star.schedule.core.designsystem.component.MainSwitchBar
+import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.feature.settings.domain.TimetableSummary
 import com.star.schedule.notification.FlymeLiveTemplate
 import kotlinx.coroutines.Dispatchers
@@ -172,20 +169,9 @@ private fun ReminderSettingsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.reminder_toggle_title)) },
-                navigationIcon = {
-                    Row {
-                        CircleBackButton(onClick = onBack)
-                        Spacer(Modifier.size(16.dp))
-                    }
-                },
-                windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                ),
+            PageTopBar(
+                title = stringResource(R.string.reminder_toggle_title),
+                onBack = onBack,
                 scrollBehavior = scrollBehavior,
             )
         },
