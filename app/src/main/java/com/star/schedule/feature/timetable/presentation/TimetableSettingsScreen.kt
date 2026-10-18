@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -366,7 +367,8 @@ private fun Modifier.previewCardSize(
     .layout { measurable, _ ->
         val fraction = progress.value.coerceIn(0f, 1f)
         val width = lerp(maxWidth, PreviewCardCollapsedWidth, fraction).roundToPx()
-        val height = lerp(maxHeight, PreviewCardCollapsedHeight, fraction).roundToPx()
+        // 高度始终由宽度按同一比例推出来：宽高各自插值会让卡片越缩越扁。
+        val height = (width.toFloat() * PreviewCardAspect).roundToInt()
         val placeable = measurable.measure(
             Constraints.fixed(maxWidth.roundToPx(), maxHeight.roundToPx()),
         )
@@ -374,8 +376,9 @@ private fun Modifier.previewCardSize(
     }
     .graphicsLayer {
         val fraction = progress.value.coerceIn(0f, 1f)
-        scaleX = lerp(maxWidth, PreviewCardCollapsedWidth, fraction).toPx() / maxWidth.toPx()
-        scaleY = lerp(maxHeight, PreviewCardCollapsedHeight, fraction).toPx() / maxHeight.toPx()
+        val scaledWidth = lerp(maxWidth, PreviewCardCollapsedWidth, fraction).toPx()
+        scaleX = scaledWidth / maxWidth.toPx()
+        scaleY = scaledWidth / maxWidth.toPx()
         transformOrigin = TransformOrigin(0f, 0f)
     }
 
@@ -527,7 +530,6 @@ private const val PreviewFollowEpsilon = 0.001f
 // 第一帧没有上一帧可比，按 60fps 估一个 dt。
 private const val PreviewFollowFrameFallback = 1f / 60f
 
-// 顶栏完全收起后的尺寸，就是最早那版 128×240dp。
+// 顶栏完全收起后只定宽度，高度按 PreviewCardAspect 推出来（128dp 宽 ≈ 277dp 高）。
 private val PreviewCardCollapsedWidth = 128.dp
-private val PreviewCardCollapsedHeight = 240.dp
 private const val THUMBNAIL_ROWS = 12
