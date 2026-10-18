@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -71,6 +72,7 @@ import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.core.designsystem.component.MainSwitchBar
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.feature.settings.domain.TimetableSummary
@@ -165,9 +167,12 @@ private fun ReminderSettingsScreen(
 
     val rows = reminderDetailRows(state.liveCapsuleCustomizationAvailable).detailPositions()
         .associateBy { it.row }
+    val navigationBarInset = navigationBarBottomInset()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        // 让列表能滑到手势条下面，避免手势条后面留一条纯背景的带子。
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             PageTopBar(
                 title = stringResource(R.string.reminder_toggle_title),
@@ -191,7 +196,7 @@ private fun ReminderSettingsScreen(
                         .fillMaxWidth()
                         .widthIn(max = 720.dp)
                         .align(Alignment.TopCenter),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp + navigationBarInset),
                 ) {
                     item {
                         Column(

@@ -6,6 +6,8 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import com.star.schedule.core.designsystem.navigationBarBottomInset
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -109,9 +111,12 @@ private fun SettingsScreen(
     var clickCount by rememberSaveable { mutableIntStateOf(0) }
     var resetJob by remember { mutableStateOf<Job?>(null) }
 
+    val navigationBarInset = navigationBarBottomInset()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        // 不吃系统栏内边距：内容要能滑到手势条下面，手势条后面才不会留一条纯背景的带子。
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             PageTopBar(
                 title = stringResource(R.string.settings_title),
@@ -135,7 +140,7 @@ private fun SettingsScreen(
                         .fillMaxWidth()
                         .widthIn(max = 720.dp)
                         .align(Alignment.TopCenter),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp + navigationBarInset),
                 ) {
                     item { SettingsSectionTitle(R.string.settings_section_timetable) }
                     item {
