@@ -53,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
@@ -119,6 +120,8 @@ private fun TimetableSettingsScreen(
                     pagerState = pagerState,
                     previews = state.previews,
                     currentId = state.currentId,
+                    // 顶栏折叠多少，预览就缩多少：展开时满尺寸，收起后回到原来那张小卡。
+                    collapsedFraction = scrollBehavior.state.collapsedFraction,
                     onApply = onApply,
                 )
                 if (previewed != null) {
@@ -197,6 +200,7 @@ private fun TimetablePreviewPager(
     pagerState: PagerState,
     previews: List<TimetablePreview>,
     currentId: Long?,
+    collapsedFraction: Float,
     onApply: (Long) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -212,8 +216,10 @@ private fun TimetablePreviewPager(
     Column(modifier = Modifier.fillMaxWidth()) {
         // 左右各留 (宽 - 卡片宽)/2，居中的那一页才落在屏幕正中，两侧各露出半张相邻课表。
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val cardWidth = (maxWidth * PreviewCardWidthFraction).coerceAtMost(PreviewCardMaxWidth)
-            val cardHeight = cardWidth * PreviewCardAspect
+            val fraction = collapsedFraction.coerceIn(0f, 1f)
+            val expandedWidth = (maxWidth * PreviewCardWidthFraction).coerceAtMost(PreviewCardMaxWidth)
+            val cardWidth = lerp(expandedWidth, PreviewCardCollapsedWidth, fraction)
+            val cardHeight = lerp(expandedWidth * PreviewCardAspect, PreviewCardCollapsedHeight, fraction)
             val sidePadding = ((maxWidth - cardWidth) / 2).coerceAtLeast(16.dp)
             HorizontalPager(
                 state = pagerState,
@@ -372,4 +378,8 @@ private val PreviewCardShape = RoundedCornerShape(24.dp)
 private const val PreviewCardWidthFraction = 0.64f
 private val PreviewCardMaxWidth = 280.dp
 private const val PreviewCardAspect = 19.5f / 9f
+
+// 顶栏完全收起后的尺寸，就是最早那版 128×240dp。
+private val PreviewCardCollapsedWidth = 128.dp
+private val PreviewCardCollapsedHeight = 240.dp
 private const val THUMBNAIL_ROWS = 12
