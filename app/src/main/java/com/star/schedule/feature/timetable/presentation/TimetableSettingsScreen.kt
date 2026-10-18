@@ -2,8 +2,6 @@ package com.star.schedule.feature.timetable.presentation
 
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -49,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +66,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
-import kotlinx.coroutines.flow.collectLatest
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
@@ -218,15 +220,36 @@ private fun TimetablePreviewPager(
     onApply: (Long) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    // 折叠进度不是直接照着滚，而是用弹簧追：手指动得快时卡片会稍稍滞后，停下来再补到位。
+    // 折叠进度不直接照着滚，而是做指数平滑（一阶低通，Unity 里叫 SmoothDamp）：
+    // 每帧按 dt 把当前值往目标靠一定比例。目标一直在变也不会有问题——
+    // 弹簧那种「每次重设目标就把速度清零」的做法，慢速滚动时会一直追不上，看着像卡住。
     // Animatable 的值是 State，下面都在测量/绘制阶段读，不会引起重组。
     val progress = remember { Animatable(topBarState.collapsedFraction) }
     LaunchedEffect(topBarState) {
-        snapshotFlow { topBarState.collapsedFraction }.collectLatest { target ->
-            progress.animateTo(
-                targetValue = target,
-                animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
-            )
+        var lastFrameNanos = 0L
+        while (isActive) {
+            // 停下来时不占帧：等目标真的变了再开始追。
+            snapshotFlow { topBarState.collapsedFraction }.first { it != progress.value }
+            lastFrameNanos = 0L
+            while (isActive) {
+                // 每帧重新读目标，而不是「一变就重启动画」——后者会把速度清零，慢速拖动时几乎不动。
+                val frameNanos = withFrameNanos { it }
+                val deltaSeconds = if (lastFrameNanos == 0L) {
+                    PreviewFollowFrameFallback
+                } else {
+                    ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                }
+                lastFrameNanos = frameNanos
+                val target = topBarState.collapsedFraction
+                val current = progress.value
+                val diff = target - current
+                if (abs(diff) <= PreviewFollowEpsilon) {
+                    progress.snapTo(target)
+                    break
+                }
+                val alpha = 1f - exp(-deltaSeconds / PreviewFollowTimeConstant)
+                progress.snapTo(current + diff * alpha)
+            }
         }
     }
     // 记住一个稳定回调，页面拿到的是同一个函数实例，折叠时上层重组才能跳过页面内容。
@@ -515,6 +538,13 @@ private val PreviewCardShape = RoundedCornerShape(24.dp)
 private const val PreviewCardWidthFraction = 0.64f
 private val PreviewCardMaxWidth = 280.dp
 private const val PreviewCardAspect = 19.5f / 9f
+
+// 折叠跟随的时间常数（秒）：越小越贴手，越大越飘。0.08 大约是 5 帧的迟滞。
+private const val PreviewFollowTimeConstant = 0.08f
+private const val PreviewFollowEpsilon = 0.001f
+
+// 第一帧没有上一帧可比，按 60fps 估一个 dt。
+private const val PreviewFollowFrameFallback = 1f / 60f
 
 // 顶栏完全收起后的尺寸，就是最早那版 128×240dp。
 private val PreviewCardCollapsedWidth = 128.dp
