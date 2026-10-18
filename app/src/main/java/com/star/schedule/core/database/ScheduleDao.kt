@@ -246,6 +246,9 @@ abstract class ScheduleDao {
     @Query("SELECT * FROM course WHERE timetableId = :timetableId ORDER BY dayOfWeek ASC")
     abstract fun getCoursesFlow(timetableId: Long): Flow<List<CourseEntity>>
 
+    @Query("SELECT * FROM course")
+    abstract fun getAllCoursesFlow(): Flow<List<CourseEntity>>
+
     @OptIn(ExperimentalCoroutinesApi::class)
     open fun getCoursesForDateFlow(
         timetableId: Long,

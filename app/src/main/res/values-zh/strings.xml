@@ -242,6 +242,12 @@
     <string name="home_date_range_template">%1$d月%2$d日–%3$d月%4$d日</string>
     <string name="home_action_switch_timetable">课表设置</string>
     <string name="timetable_settings_title">课表设置</string>
+    <string name="timetable_settings_apply">应用</string>
+    <string name="timetable_settings_row_height">行高</string>
+    <string name="timetable_settings_row_height_support">每节课在课表中占用的高度</string>
+    <string name="timetable_settings_row_height_decrease">减小行高</string>
+    <string name="timetable_settings_row_height_increase">增大行高</string>
+    <string name="timetable_settings_new">新建课表</string>
     <string name="home_action_timetable_short">课表</string>
     <string name="home_action_settings">设置</string>
     <string name="home_action_more">更多操作</string>

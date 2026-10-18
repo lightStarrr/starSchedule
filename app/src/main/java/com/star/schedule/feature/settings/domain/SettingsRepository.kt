@@ -5,6 +5,10 @@ import kotlinx.coroutines.flow.Flow
 interface SettingsRepository {
     fun observeTimetables(): Flow<List<TimetableSummary>>
 
+    fun observeTimetablePreviews(): Flow<List<TimetablePreview>>
+
+    suspend fun setRowHeight(timetableId: Long, rowHeight: Int)
+
     fun observePreference(key: String): Flow<String?>
 
     suspend fun setPreference(key: String, value: String)
