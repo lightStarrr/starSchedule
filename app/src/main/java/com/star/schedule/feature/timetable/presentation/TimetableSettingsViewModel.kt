@@ -17,8 +17,6 @@ data class TimetableSettingsUiState(
     val previews: List<TimetablePreview> = emptyList(),
     val currentId: Long? = null
 ) {
-    val current: TimetablePreview?
-        get() = previews.firstOrNull { it.id == currentId }
 }
 
 class TimetableSettingsViewModel(
@@ -47,10 +45,9 @@ class TimetableSettingsViewModel(
         viewModelScope.launch { repository.selectTimetable(timetableId) }
     }
 
-    fun setRowHeight(rowHeight: Int) {
-        val id = uiState.value.currentId ?: return
+    fun setRowHeight(timetableId: Long, rowHeight: Int) {
         val clamped = rowHeight.coerceIn(ROW_HEIGHT_MIN, ROW_HEIGHT_MAX)
-        viewModelScope.launch { repository.setRowHeight(id, clamped) }
+        viewModelScope.launch { repository.setRowHeight(timetableId, clamped) }
     }
 
     companion object {

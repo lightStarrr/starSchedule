@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -78,9 +79,12 @@ private fun TimetableSettingsScreen(
     state: TimetableSettingsUiState,
     onBack: () -> Unit,
     onApply: (Long) -> Unit,
-    onRowHeightChange: (Int) -> Unit,
+    onRowHeightChange: (Long, Int) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // pager 状态提到这一层：下面的设置列表要跟着「居中那张」走，而不是已经应用的那张。
+    val pagerState = rememberPagerState(pageCount = { state.previews.size + 1 })
+    val previewed = state.previews.getOrNull(pagerState.currentPage)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -110,12 +114,12 @@ private fun TimetableSettingsScreen(
                     .verticalScroll(rememberScrollState()),
             ) {
                 TimetablePreviewPager(
+                    pagerState = pagerState,
                     previews = state.previews,
                     currentId = state.currentId,
                     onApply = onApply,
                 )
-                val current = state.current
-                if (current != null) {
+                if (previewed != null) {
                     Spacer(Modifier.height(24.dp))
                     SettingsGroup {
                         SettingsListItem(
@@ -128,11 +132,12 @@ private fun TimetableSettingsScreen(
                                     IconButton(
                                         onClick = {
                                             onRowHeightChange(
-                                                current.rowHeight -
+                                                previewed.id,
+                                                previewed.rowHeight -
                                                     TimetableSettingsViewModel.ROW_HEIGHT_STEP
                                             )
                                         },
-                                        enabled = current.rowHeight >
+                                        enabled = previewed.rowHeight >
                                             TimetableSettingsViewModel.ROW_HEIGHT_MIN,
                                     ) {
                                         Icon(
@@ -145,7 +150,7 @@ private fun TimetableSettingsScreen(
                                     Text(
                                         text = stringResource(
                                             R.string.row_height_value,
-                                            current.rowHeight
+                                            previewed.rowHeight
                                         ),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.width(56.dp),
@@ -153,11 +158,12 @@ private fun TimetableSettingsScreen(
                                     IconButton(
                                         onClick = {
                                             onRowHeightChange(
-                                                current.rowHeight +
+                                                previewed.id,
+                                                previewed.rowHeight +
                                                     TimetableSettingsViewModel.ROW_HEIGHT_STEP
                                             )
                                         },
-                                        enabled = current.rowHeight <
+                                        enabled = previewed.rowHeight <
                                             TimetableSettingsViewModel.ROW_HEIGHT_MAX,
                                     ) {
                                         Icon(
@@ -184,12 +190,11 @@ private fun TimetableSettingsScreen(
  */
 @Composable
 private fun TimetablePreviewPager(
+    pagerState: PagerState,
     previews: List<TimetablePreview>,
     currentId: Long?,
     onApply: (Long) -> Unit,
 ) {
-    val pageCount = previews.size + 1
-    val pagerState = rememberPagerState(pageCount = { pageCount })
     val scope = rememberCoroutineScope()
 
     // 当前课表变化（首次加载、点应用之后）时把预览滚到对应位置。
@@ -246,12 +251,13 @@ private fun TimetablePreviewPager(
             }
         }
 
-        val settled = previews.getOrNull(pagerState.settledPage)
+        // 用 currentPage 而不是 settledPage：滑动过半按钮就该跟着变，settledPage 要等动画完全停下。
+        val previewed = previews.getOrNull(pagerState.currentPage)
         Spacer(Modifier.height(16.dp))
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             FilledTonalButton(
-                onClick = { settled?.let { onApply(it.id) } },
-                enabled = settled != null && settled.id != currentId,
+                onClick = { previewed?.let { onApply(it.id) } },
+                enabled = previewed != null && previewed.id != currentId,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
