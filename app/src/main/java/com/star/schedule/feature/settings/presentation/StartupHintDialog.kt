@@ -1,6 +1,7 @@
 package com.star.schedule.feature.settings.presentation
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -69,30 +70,37 @@ internal fun StartupHintDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        // 波纹默认会被裁成整行的矩形，和右侧 TextButton 的胶囊形状对不上；
-                        // 按按钮的 full 形状裁一下，两边的高亮才一致。
-                        .clip(CircleShape)
-                        .toggleable(
-                            value = state.doNotShowAgain,
-                            enabled = !state.isSaving,
-                            role = Role.Checkbox,
-                            onValueChange = onDoNotShowAgainChange,
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
+                // 用 Box 撑开剩余宽度、让可点区域只包住内容：
+                // 既保证「关闭」贴右，又不会让水波纹横跨整行空到右边。
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterStart,
                 ) {
-                    Checkbox(
-                        checked = state.doNotShowAgain,
-                        onCheckedChange = null,
-                        enabled = !state.isSaving,
-                    )
-                    Text(
-                        text = stringResource(R.string.startup_hint_do_not_show_again),
-                        modifier = Modifier.padding(start = 12.dp),
-                    )
+                    Row(
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .clip(CircleShape)
+                            .toggleable(
+                                value = state.doNotShowAgain,
+                                enabled = !state.isSaving,
+                                role = Role.Checkbox,
+                                onValueChange = onDoNotShowAgainChange,
+                            )
+                            // 放在 toggleable 之后，波纹会把这段留白也包进去，
+                            // 复选框和文字就不会贴着胶囊边缘。
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = state.doNotShowAgain,
+                            onCheckedChange = null,
+                            enabled = !state.isSaving,
+                        )
+                        Text(
+                            text = stringResource(R.string.startup_hint_do_not_show_again),
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
                 }
                 TextButton(onClick = onConfirm, enabled = !state.isSaving) {
                     Text(stringResource(R.string.action_close))
