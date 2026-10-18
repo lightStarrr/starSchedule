@@ -3,7 +3,6 @@ package com.star.schedule
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
@@ -12,15 +11,14 @@ import com.star.schedule.feature.timetable.presentation.TimetableSettingsRoute
 import com.star.schedule.feature.timetable.presentation.TimetableSettingsViewModel
 import com.star.schedule.feature.timetable.presentation.TimetableSettingsViewModelFactory
 import com.star.schedule.notification.UnifiedNotificationManager
-import com.star.schedule.platform.systembar.installAdaptiveStatusBarAppearance
+import com.star.schedule.platform.systembar.installEdgeToEdge
 
 class TimetableSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         DatabaseProvider.init(this)
-        enableEdgeToEdge()
-        installAdaptiveStatusBarAppearance()
+        installEdgeToEdge()
 
         val settingsRepository = RoomSettingsRepository(
             context = this,
