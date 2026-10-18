@@ -3,31 +3,19 @@ package com.star.schedule.feature.settings.presentation
 internal enum class SettingsRow {
     WakeUp,
     Reminder,
-    OnlyFirst,
-    Icon,
-    CapsuleColor,
-    Template,
     InstantTest,
     DelayedTest,
 }
 
 internal data class SettingsRowPosition(val row: SettingsRow, val index: Int, val count: Int)
 
-internal fun notificationRows(
-    reminderEnabled: Boolean,
-    wakeUpAvailable: Boolean,
-    liveCapsuleAvailable: Boolean,
-): List<SettingsRow> = buildList {
+/**
+ * 通知分组里常驻的行。课前提醒的具体选项已经搬到独立的 ReminderActivity，
+ * 这里只保留一行入口，因此不再有随开关展开/收起而变化的行。
+ */
+internal fun notificationRows(wakeUpAvailable: Boolean): List<SettingsRow> = buildList {
     if (wakeUpAvailable) add(SettingsRow.WakeUp)
     add(SettingsRow.Reminder)
-    if (reminderEnabled) {
-        add(SettingsRow.OnlyFirst)
-        add(SettingsRow.Icon)
-        if (liveCapsuleAvailable) {
-            add(SettingsRow.CapsuleColor)
-            add(SettingsRow.Template)
-        }
-    }
     add(SettingsRow.InstantTest)
     add(SettingsRow.DelayedTest)
 }
