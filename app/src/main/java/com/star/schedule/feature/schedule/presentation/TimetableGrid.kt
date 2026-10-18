@@ -89,7 +89,22 @@ fun TimetableGrid(
         (20.sp.toPx() + 16.sp.toPx() * 2 + 16.dp.toPx()).toDp()
     }.coerceAtLeast(72.dp)
     val effectiveRowHeight = maxOf(rowHeight, minimumTimeCellHeight)
-    val timeColumnWidth = 40.dp
+    // 时间栏宽度按实际时间文本量出来：写死 40dp 时「08:00」比栏还宽，
+    // 居中后左右各溢出一截，屏幕边缘那侧会被裁掉。
+    val timeTextMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val timeTextStyle = MaterialTheme.typography.labelSmall
+    val timeColumnWidth = remember(sortedLessonTimes, density, timeTextStyle) {
+        val widest = sortedLessonTimes.maxOfOrNull { lessonTime ->
+            maxOf(
+                timeTextMeasurer.measure(AnnotatedString(lessonTime.startTime), timeTextStyle)
+                    .size.width,
+                timeTextMeasurer.measure(AnnotatedString(lessonTime.endTime), timeTextStyle)
+                    .size.width,
+            )
+        } ?: 0
+        with(density) { widest.toDp() + GridTimeColumnSidePadding * 2 }.coerceAtLeast(40.dp)
+    }
 
     BoxWithConstraints(
         modifier = modifier,
@@ -381,6 +396,9 @@ private fun GridCourseCell(
 }
 
 private val GridColumnGap = 2.dp
+
+/** 时间栏里文字与两侧的留白。 */
+private val GridTimeColumnSidePadding = 3.dp
 
 /** 表头文字到列边缘的留白（GridDayHeader 的左右 padding）。 */
 private val GridHeaderHorizontalPadding = 8.dp
