@@ -85,6 +85,7 @@ fun ScheduleHomeRoute(
     timetableId: Long?,
     isSelectionLoading: Boolean,
     wallpaperState: WallpaperState = WallpaperState.None,
+    onTimetableSettingsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
 ) {
     val homeDataFlow: Flow<HomeTimetableData?> = remember(repository, timetableId) {
@@ -135,7 +136,7 @@ fun ScheduleHomeRoute(
         showWeekend = timetable?.showWeekend ?: true,
         rowHeight = (timetable?.rowHeight ?: 60).dp,
         wallpaperState = wallpaperState,
-        onSwitchTimetableClick = {},
+        onTimetableSettingsClick = onTimetableSettingsClick,
         onSettingsClick = onSettingsClick,
         onPreviousWeekClick = { currentWeek = (currentWeek - 1).coerceAtLeast(1) },
         onNextWeekClick = { currentWeek += 1 },
@@ -148,7 +149,7 @@ fun ScheduleHomeRoute(
 fun ScheduleHomeScreen(
     currentWeek: Int,
     dateRange: String,
-    onSwitchTimetableClick: () -> Unit,
+    onTimetableSettingsClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onPreviousWeekClick: () -> Unit,
     onNextWeekClick: () -> Unit,
@@ -193,7 +194,7 @@ fun ScheduleHomeScreen(
             ScheduleHomeHeader(
                 currentWeek = currentWeek,
                 dateRange = dateRange,
-                onSwitchTimetableClick = onSwitchTimetableClick,
+                onTimetableSettingsClick = onTimetableSettingsClick,
                 onSettingsClick = onSettingsClick,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -252,7 +253,7 @@ fun ScheduleHomeScreen(
 private fun ScheduleHomeHeader(
     currentWeek: Int,
     dateRange: String,
-    onSwitchTimetableClick: () -> Unit,
+    onTimetableSettingsClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -282,7 +283,7 @@ private fun ScheduleHomeHeader(
                     overflowCount = variant.overflowCount,
                     expandedOverflowCount = expandedOverflowCount,
                     onExpandedOverflowCountChange = { expandedOverflowCount = it },
-                    onSwitchTimetableClick = onSwitchTimetableClick,
+                    onTimetableSettingsClick = onTimetableSettingsClick,
                     onSettingsClick = onSettingsClick,
                 )
             }.single().measure(actionConstraints)
@@ -363,15 +364,15 @@ private fun HeaderSplitButtons(
     overflowCount: Int,
     expandedOverflowCount: Int,
     onExpandedOverflowCountChange: (Int) -> Unit,
-    onSwitchTimetableClick: () -> Unit,
+    onTimetableSettingsClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val switchTimetableLabel = stringResource(R.string.home_action_switch_timetable)
+    val timetableSettingsLabel = stringResource(R.string.home_action_switch_timetable)
     val settingsLabel = stringResource(R.string.home_action_settings)
 
     val actions = listOf(
-        HeaderAction(switchTimetableLabel, Icons.Rounded.CalendarMonth, onSwitchTimetableClick),
+        HeaderAction(timetableSettingsLabel, Icons.Rounded.CalendarMonth, onTimetableSettingsClick),
         HeaderAction(settingsLabel, Icons.Rounded.Settings, onSettingsClick),
     )
     val visibleActions = actions.drop(overflowCount)
@@ -627,7 +628,7 @@ private fun ScheduleHomeScreenPreview() {
         ScheduleHomeScreen(
             currentWeek = 1,
             dateRange = "9/21–9/27",
-            onSwitchTimetableClick = {},
+            onTimetableSettingsClick = {},
             onSettingsClick = {},
             onPreviousWeekClick = {},
             onNextWeekClick = {},

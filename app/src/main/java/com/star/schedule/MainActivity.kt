@@ -34,6 +34,9 @@ class MainActivity : ComponentActivity() {
                 scheduleRepository = scheduleRepository,
                 wallpaperRepository = wallpaperRepository,
                 startupHintViewModel = startupHintViewModel,
+                onTimetableSettingsClick = {
+                    startActivity(Intent(this, TimetableSettingsActivity::class.java))
+                },
                 onSettingsClick = {
                     startActivity(Intent(this, SettingsActivity::class.java))
                 },
