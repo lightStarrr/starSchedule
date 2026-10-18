@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,6 +75,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.presentation.SettingsGroup
 import com.star.schedule.feature.settings.presentation.SettingsListItem
@@ -101,6 +103,7 @@ private fun TimetableSettingsScreen(
     onRowHeightChange: (Long, Int) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val navigationBarInset = navigationBarBottomInset()
     // pager 状态提到这一层：下面的设置列表要跟着「居中那张」走，而不是已经应用的那张。
     val pagerState = rememberPagerState(pageCount = { state.previews.size + 1 })
     val previewed = state.previews.getOrNull(pagerState.currentPage)
@@ -108,6 +111,8 @@ private fun TimetableSettingsScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        // 内容滑到手势条下面，手势条后面才不会留一条纯背景的带子。
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             PageTopBar(
                 title = stringResource(R.string.timetable_settings_title),
@@ -201,7 +206,7 @@ private fun TimetableSettingsScreen(
                         )
                     }
                 }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(24.dp + navigationBarInset))
             }
         }
     }
