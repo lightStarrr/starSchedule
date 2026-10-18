@@ -133,7 +133,8 @@ fun ScheduleHomeRoute(
         hasTimetable = timetable != null,
         isLoading = isLoading,
         weekStartDate = weekStartDate,
-        showWeekend = timetable?.showWeekend ?: true,
+        // 周末列不再由偏好决定：课表里没有周末的课就不占这两列。
+        showWeekend = courses.any { it.dayOfWeek > 5 },
         rowHeight = (timetable?.rowHeight ?: 60).dp,
         wallpaperState = wallpaperState,
         onTimetableSettingsClick = onTimetableSettingsClick,
