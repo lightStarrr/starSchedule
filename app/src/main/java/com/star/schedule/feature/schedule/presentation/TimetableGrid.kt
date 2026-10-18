@@ -82,7 +82,7 @@ fun TimetableGrid(
         (20.sp.toPx() + 16.sp.toPx() * 2 + 16.dp.toPx()).toDp()
     }.coerceAtLeast(72.dp)
     val effectiveRowHeight = maxOf(rowHeight, minimumTimeCellHeight)
-    val timeColumnWidth = 52.dp
+    val timeColumnWidth = 40.dp
 
     Box(
         modifier = modifier,
@@ -230,8 +230,9 @@ private fun GridTimeCell(
     modifier: Modifier = Modifier,
 ) {
     Column(
+        // 不带左右内边距：和右侧课程列的分隔交给格子之间那 2dp 的缝。
         modifier = modifier
-            .padding(horizontal = 2.dp, vertical = 8.dp),
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
