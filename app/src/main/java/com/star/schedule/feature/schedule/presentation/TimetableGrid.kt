@@ -82,7 +82,7 @@ fun TimetableGrid(
         (20.sp.toPx() + 16.sp.toPx() * 2 + 16.dp.toPx()).toDp()
     }.coerceAtLeast(72.dp)
     val effectiveRowHeight = maxOf(rowHeight, minimumTimeCellHeight)
-    val timeColumnWidth = 58.dp
+    val timeColumnWidth = 52.dp
 
     Box(
         modifier = modifier,
@@ -231,7 +231,7 @@ private fun GridTimeCell(
 ) {
     Column(
         modifier = modifier
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .padding(horizontal = 2.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
