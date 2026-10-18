@@ -1,7 +1,6 @@
 package com.star.schedule.feature.settings.presentation
 
 import android.content.Intent
-import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,10 +35,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,8 +47,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -97,14 +91,11 @@ private fun SettingsScreen(
     onEnableReminder: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val currentTimetable = state.timetables.firstOrNull { it.id == state.currentTimetableId }
     val versionName = remember(context) {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
     }
-    var clickCount by rememberSaveable { mutableIntStateOf(0) }
-    var resetJob by remember { mutableStateOf<Job?>(null) }
 
     val navigationBarInset = navigationBarBottomInset()
     Scaffold(
@@ -226,26 +217,10 @@ private fun SettingsScreen(
                     item { SettingsSectionTitle(R.string.settings_section_about) }
                     item {
                         SettingsGroup {
-                            SettingsActionItem(
+                            // 只展示版本信息，之前的「连点五次播放彩蛋」已经去掉。
+                            SettingsListItem(
                                 title = stringResource(R.string.about_app_title),
                                 supporting = stringResource(R.string.version_label, versionName),
-                                onClick = {
-                                    clickCount++
-                                    if (clickCount >= 5) {
-                                        MediaPlayer.create(context, R.raw.egg)?.apply {
-                                            start()
-                                            setOnCompletionListener { it.release() }
-                                        }
-                                        clickCount = 0
-                                        resetJob?.cancel()
-                                    } else {
-                                        resetJob?.cancel()
-                                        resetJob = scope.launch {
-                                            delay(2_000)
-                                            clickCount = 0
-                                        }
-                                    }
-                                },
                                 shapeIndex = 0,
                                 shapeCount = 3,
                                 leading = { Icon(Icons.Rounded.Info, contentDescription = null) },
