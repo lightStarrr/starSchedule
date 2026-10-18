@@ -70,12 +70,6 @@ class SettingsViewModel(
         ),
     )
 
-    fun selectTimetable(timetableId: Long) {
-        viewModelScope.launch {
-            repository.selectTimetable(timetableId)
-        }
-    }
-
     fun setReminderEnabled(enabled: Boolean) {
         val timetableId = uiState.value.currentTimetableId ?: return
         viewModelScope.launch {

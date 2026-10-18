@@ -26,7 +26,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -52,7 +51,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
-import com.star.schedule.feature.settings.domain.TimetableSummary
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -70,7 +68,6 @@ fun SettingsRoute(
         state = state,
         onBack = onBack,
         onOpenReminderSettings = onOpenReminderSettings,
-        onSelectTimetable = viewModel::selectTimetable,
         onReminderEnabledChange = viewModel::setReminderEnabled,
         onHideFromRecentsChange = viewModel::setHideFromRecents,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
@@ -92,7 +89,6 @@ private fun SettingsScreen(
     state: SettingsUiState,
     onBack: () -> Unit,
     onOpenReminderSettings: () -> Unit,
-    onSelectTimetable: (Long) -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onHideFromRecentsChange: (Boolean) -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
@@ -107,7 +103,6 @@ private fun SettingsScreen(
     val versionName = remember(context) {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
     }
-    var showTimetablePicker by rememberSaveable { mutableStateOf(false) }
     var clickCount by rememberSaveable { mutableIntStateOf(0) }
     var resetJob by remember { mutableStateOf<Job?>(null) }
 
@@ -142,34 +137,6 @@ private fun SettingsScreen(
                         .align(Alignment.TopCenter),
                     contentPadding = PaddingValues(bottom = 24.dp + navigationBarInset),
                 ) {
-                    item { SettingsSectionTitle(R.string.settings_section_timetable) }
-                    item {
-                        SettingsGroup {
-                            SettingsListItem(
-                                title = stringResource(R.string.settings_current_timetable_title),
-                                supporting = currentTimetable?.name
-                                    ?: stringResource(R.string.timetable_not_selected),
-                                enabled = state.timetables.isNotEmpty(),
-                                onClick = { showTimetablePicker = true },
-                                shapeIndex = 0,
-                                shapeCount = 1,
-                                trailing = {
-                                    Icon(Icons.Rounded.ChevronRight, contentDescription = null)
-                                },
-                            )
-                        }
-                    }
-                    if (state.timetables.isEmpty()) {
-                        item {
-                            Text(
-                                text = stringResource(R.string.settings_empty_timetable),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                            )
-                        }
-                    }
-
                     item { SettingsSectionTitle(R.string.settings_section_notifications) }
                     item {
                         val positions = notificationRows(state.wakeUpSimulationAvailable)
@@ -319,53 +286,4 @@ private fun SettingsScreen(
             }
         }
     }
-
-    if (showTimetablePicker) {
-        TimetablePickerDialog(
-            timetables = state.timetables,
-            selectedId = state.currentTimetableId,
-            onSelect = { timetableId ->
-                onSelectTimetable(timetableId)
-                showTimetablePicker = false
-            },
-            onDismiss = { showTimetablePicker = false },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun TimetablePickerDialog(
-    timetables: List<TimetableSummary>,
-    selectedId: Long?,
-    onSelect: (Long) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.select_timetable_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                timetables.forEachIndexed { index, timetable ->
-                    SegmentedListItem(
-                        onClick = { onSelect(timetable.id) },
-                        shapes = ListItemDefaults.segmentedShapes(index, timetables.size),
-                        colors = ListItemDefaults.colors(),
-                        leadingContent = {
-                            Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
-                        },
-                        content = { Text(timetable.name) },
-                        supportingContent = {
-                            if (timetable.id == selectedId) {
-                                Text(stringResource(R.string.settings_selected_timetable))
-                            }
-                        },
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
 }
