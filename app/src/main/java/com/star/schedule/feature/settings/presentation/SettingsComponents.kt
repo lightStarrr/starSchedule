@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
@@ -60,6 +61,19 @@ internal fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
+private fun settingsItemColors(): ListItemColors {
+    // 列表项用 surfaceBright，页面底色是 surfaceContainer，项与项的空隙自然露出底色；
+    // 禁用态与选中态保持同一底色，只靠内容颜色变淡，避免行在状态切换时换一个色阶。
+    val container = MaterialTheme.colorScheme.surfaceBright
+    return ListItemDefaults.colors(
+        containerColor = container,
+        selectedContainerColor = container,
+        disabledContainerColor = container,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
 internal fun SettingsListItem(
     title: String,
     supporting: String,
@@ -70,7 +84,7 @@ internal fun SettingsListItem(
     shapeIndex: Int,
     shapeCount: Int,
 ) {
-    val colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+    val colors = settingsItemColors()
     if (onClick == null) {
         SegmentedListItem(
             shapes = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount),
@@ -145,7 +159,7 @@ internal fun SettingsSwitchItem(
         modifier = modifier,
         enabled = enabled,
         verticalAlignment = Alignment.CenterVertically,
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = settingsItemColors(),
         leadingContent = leading,
         content = { Text(title) },
         supportingContent = { Text(supporting) },
