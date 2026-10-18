@@ -552,12 +552,14 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
+        // goAsync() 可能已经被 Glance 的父实现消费掉而返回 null，判空再用；
+        // 直接把 finish() 写在 finally 前面也救不了——NPE 就是从这里抛出来的。
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 TwoDaysWidget.updateWidgetContent(context)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
 
@@ -599,7 +601,9 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
 
             if (validAppWidgetIds.isEmpty()) return
 
-            val pendingResult = goAsync()
+            // 这里不能再调 goAsync()：Glance 的 super.onUpdate 已经取了广播的 PendingResult
+            // 并在自己的协程结束时 finish，再调一次拿到的是 null，finish() 会直接 NPE。
+            // 刷新本身用独立协程跑完即可，不向系统申请延长广播生命周期。
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     if (!DatabaseProvider.isInitialized()) {
@@ -608,8 +612,6 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
                     TwoDaysWidget.updateWidgetContent(context)
                 } catch (e: Exception) {
                     Log.e("TwoDaysWidgetReceiver", "更新失败", e)
-                } finally {
-                    pendingResult.finish()
                 }
             }
 

@@ -23,7 +23,8 @@ class BootCompletedReceiver : BroadcastReceiver() {
                 } catch (exception: Exception) {
                     Log.e("BootCompleted", "重新设置提醒失败", exception)
                 } finally {
-                    pendingResult.finish()
+                    // 某些情况下 goAsync() 会返回 null，直接 finish() 会 NPE。
+                    pendingResult?.finish()
                 }
             }
         }
