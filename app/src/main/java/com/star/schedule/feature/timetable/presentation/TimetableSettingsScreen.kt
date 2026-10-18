@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -136,20 +137,46 @@ private fun TimetableSettingsScreen(
                 LoadingIndicator()
             }
         } else {
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState()),
+                    .padding(innerPadding),
             ) {
-                TimetablePreviewPager(
-                    pagerState = pagerState,
-                    previews = state.previews,
-                    currentId = state.currentId,
-                    // 直接传 state：折叠进度在 layout / draw 阶段读，避免每帧重组卡片内容。
-                    topBarState = scrollBehavior.state,
-                    onApply = onApply,
-                )
+                val configuration = LocalConfiguration.current
+                // 真实的高宽比：竖屏 >1，横屏 <1。不做下限夹取，横屏时卡片才会跟着变扁变宽。
+                val screenAspect = (
+                    configuration.screenHeightDp.toFloat() /
+                        configuration.screenWidthDp.toFloat()
+                    ).coerceAtLeast(0.2f)
+                // 顶栏折叠会让 innerPadding 每帧变化，maxHeight 也就跟着变；
+                // 卡片尺寸只在进入页面（顶栏展开）时量一次，滚动时不再跟着变，否则会一直缩放。
+                val viewportHeight = remember(
+                    configuration.screenWidthDp,
+                    configuration.screenHeightDp,
+                ) { maxHeight }
+                // 尺寸受两个方向同时约束：不能超出剩余高度，也不能横向超出窗口。
+                // 先由可用高度反推宽度，再用窗口宽度收一次，最后按比例得到高度。
+                val availableHeight = (viewportHeight - PreviewCardBelowSpace)
+                    .coerceAtLeast(0.dp)
+                val cardMaxWidth = (availableHeight / screenAspect)
+                    .coerceAtMost(maxWidth * PreviewCardWidthMaxFraction)
+                    .coerceIn(PreviewCardMinWidth, PreviewCardMaxWidth)
+                val cardMaxHeight = cardMaxWidth * screenAspect
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    TimetablePreviewPager(
+                        pagerState = pagerState,
+                        previews = state.previews,
+                        currentId = state.currentId,
+                        // 直接传 state：折叠进度在 layout / draw 阶段读，避免每帧重组卡片内容。
+                        topBarState = scrollBehavior.state,
+                        maxCardWidth = cardMaxWidth,
+                        maxCardHeight = cardMaxWidth * screenAspect,
+                        onApply = onApply,
+                    )
                 if (previewed != null) {
                     Spacer(Modifier.height(24.dp))
                     SettingsGroup {
@@ -178,7 +205,8 @@ private fun TimetableSettingsScreen(
                         )
                     }
                 }
-                Spacer(Modifier.height(24.dp + navigationBarInset))
+                    Spacer(Modifier.height(24.dp + navigationBarInset))
+                }
             }
         }
     }
@@ -194,6 +222,8 @@ private fun TimetablePreviewPager(
     previews: List<TimetablePreview>,
     currentId: Long?,
     topBarState: TopAppBarState,
+    maxCardWidth: Dp,
+    maxCardHeight: Dp,
     onApply: (Long) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -245,13 +275,8 @@ private fun TimetablePreviewPager(
     Column(modifier = Modifier.fillMaxWidth()) {
         // 左右各留 (宽 - 卡片宽)/2，居中的那一页才落在屏幕正中，两侧各露出半张相邻课表。
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val maxCardWidth = (maxWidth * PreviewCardWidthFraction).coerceAtMost(PreviewCardMaxWidth)
-            // 预览卡用手机屏幕本身的比例，看起来才像一块真实的屏幕。
+            // 卡片尺寸由上层按可用高度算好传进来；这里只要屏幕宽度算圆角比例。
             val configuration = LocalConfiguration.current
-            val screenAspect = (
-                configuration.screenHeightDp.toFloat() / configuration.screenWidthDp.toFloat()
-                ).coerceAtLeast(1.2f)
-            val maxCardHeight = maxCardWidth * screenAspect
             // 圆角跟着设备屏幕走：屏幕圆角多大，就按「卡片宽 / 屏幕宽」等比缩到卡片上；
             // 取不到（模拟器、老系统）时退回 24dp。
             val screenCornerRadius = rememberScreenCornerRadius()
@@ -545,7 +570,8 @@ private val PreviewCardMaxCorner = 36.dp
 private val PreviewCardContentInset = 8.dp
 
 // 预览卡占可用宽度的比例，高度按手机常见比例 9:19.5 推出来。
-private const val PreviewCardWidthFraction = 0.64f
+// 宽度主要由高度倒推，这里只做「别超过屏宽太多」的安全上限。
+private const val PreviewCardWidthMaxFraction = 0.8f
 private val PreviewCardMaxWidth = 280.dp
 
 // 折叠跟随的时间常数（秒）：越小越贴手，越大越飘。0.08 大约是 5 帧的迟滞。
@@ -554,6 +580,15 @@ private const val PreviewFollowEpsilon = 0.001f
 
 // 第一帧没有上一帧可比，按 60fps 估一个 dt。
 private const val PreviewFollowFrameFallback = 1f / 60f
+
+// 卡片下方固定要占的高度：标题 20 + 标题与卡间距 8 + 卡与按钮间距 16 + 按钮 40 + 与设置间距 24，
+// 再加上想露出来的行高（50dp）。
+private val PreviewCardRowHeightPeek = 50.dp
+private val PreviewCardBelowSpace =
+    20.dp + 8.dp + 16.dp + 40.dp + 24.dp + PreviewCardRowHeightPeek
+
+/** 极端窗口（横屏、分屏）下卡片也不至于被压没或糊成一条线。 */
+private val PreviewCardMinWidth = 160.dp
 
 // 顶栏完全收起后只定宽度，高度按 PreviewCardAspect 推出来（128dp 宽 ≈ 277dp 高）。
 private val PreviewCardCollapsedWidth = 128.dp
