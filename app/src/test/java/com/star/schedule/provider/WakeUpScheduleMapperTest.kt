@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
@@ -78,6 +79,97 @@ class WakeUpScheduleMapperTest {
         assertEquals(
             "[]",
             WakeUpScheduleMapper.toJson(date, timetable, listOf(course(periods = listOf(1, 2))), lessonTimes.take(1))
+        )
+    }
+
+    @Test
+    fun dropsFinishedCoursesWhenExportingToday() {
+        val courses = listOf(
+            course(id = 1, name = "已下课", periods = listOf(1)),
+            course(id = 2, name = "正在上", periods = listOf(2)),
+            course(id = 3, name = "还没上", periods = listOf(3))
+        )
+
+        val result = Json.parseToJsonElement(
+            WakeUpScheduleMapper.toJson(
+                date = date,
+                timetable = timetable,
+                courses = courses,
+                lessonTimes = lessonTimes,
+                zoneId = ZoneId.of("Asia/Shanghai"),
+                now = date.atTime(9, 0)
+            )
+        ).jsonArray
+
+        assertEquals(listOf(2002L, 3003L), result.map {
+            it.jsonObject.getValue("id").jsonPrimitive.content.toLong()
+        })
+    }
+
+    @Test
+    fun dropsCourseExactlyAtItsEndTime() {
+        val courses = listOf(course(id = 1, periods = listOf(1)))
+
+        val result = Json.parseToJsonElement(
+            WakeUpScheduleMapper.toJson(
+                date = date,
+                timetable = timetable,
+                courses = courses,
+                lessonTimes = lessonTimes,
+                zoneId = ZoneId.of("Asia/Shanghai"),
+                now = date.atTime(8, 45)
+            )
+        ).jsonArray
+
+        assertEquals("[]", result.toString())
+    }
+
+    @Test
+    fun keepsWholeDayWhenExportingAnotherDate() {
+        val courses = listOf(
+            course(id = 1, periods = listOf(1)),
+            course(id = 2, periods = listOf(2))
+        )
+
+        val result = Json.parseToJsonElement(
+            WakeUpScheduleMapper.toJson(
+                date = date.plusDays(1),
+                timetable = timetable,
+                courses = courses.map { it.copy(dayOfWeek = 4) },
+                lessonTimes = lessonTimes,
+                zoneId = ZoneId.of("Asia/Shanghai"),
+                now = date.atTime(23, 0)
+            )
+        ).jsonArray
+
+        assertEquals(2, result.size)
+    }
+
+    @Test
+    fun reportsNextEndTimeOnlyForToday() {
+        val courses = listOf(
+            course(id = 1, periods = listOf(1)),
+            course(id = 2, periods = listOf(2))
+        )
+
+        assertEquals(
+            date.atTime(9, 40),
+            WakeUpScheduleMapper.nextEndTime(
+                date, timetable, courses, lessonTimes,
+                ZoneId.of("Asia/Shanghai"), date.atTime(9, 0)
+            )
+        )
+        assertNull(
+            WakeUpScheduleMapper.nextEndTime(
+                date, timetable, courses, lessonTimes,
+                ZoneId.of("Asia/Shanghai"), date.atTime(11, 0)
+            )
+        )
+        assertNull(
+            WakeUpScheduleMapper.nextEndTime(
+                date.plusDays(1), timetable, courses, lessonTimes,
+                ZoneId.of("Asia/Shanghai"), date.atTime(9, 0)
+            )
         )
     }
 
