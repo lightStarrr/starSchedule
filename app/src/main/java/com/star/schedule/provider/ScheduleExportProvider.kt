@@ -21,16 +21,20 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 class ScheduleExportProvider : ContentProvider() {
     private val handler = Handler(Looper.getMainLooper())
     private val secondRefresh = Runnable { notifyWakeUpRefresh() }
+    private val boundaryRefresh = Runnable { notifyWakeUpRefresh() }
     private val firstRefresh = Runnable {
         notifyWakeUpRefresh()
         handler.postDelayed(secondRefresh, SECOND_REFRESH_DELAY_MS)
@@ -92,13 +96,37 @@ class ScheduleExportProvider : ContentProvider() {
         val dao = DatabaseProvider.dao()
         val timetableId = currentTimetableId()
         val timetable = dao.getTimetableFlow(timetableId).first()
+        val courses = dao.getCoursesFlow(timetableId).first()
+        val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
+        val zoneId = ZoneId.systemDefault()
+        val now = LocalDateTime.now(zoneId)
         val date = requestedDate(uri).let { if (tomorrow) it.plusDays(1) else it }
-        WakeUpScheduleMapper.toJson(
-            date = date,
-            timetable = timetable,
-            courses = dao.getCoursesFlow(timetableId).first(),
-            lessonTimes = dao.getLessonTimesFlow(timetableId).first()
+        // 边界按「今天」算，与本次请求的是哪一天无关：course_list 与 next_course_list 都会走到这里，
+        // 用请求日期算会互相把对方排好的刷新取消掉。今天没有课了就是 null，等于清掉旧的回调。
+        scheduleBoundaryRefresh(
+            WakeUpScheduleMapper.nextEndTime(
+                date = LocalDate.now(zoneId),
+                timetable = timetable,
+                courses = courses,
+                lessonTimes = lessonTimes,
+                zoneId = zoneId,
+                now = now
+            )
         )
+        WakeUpScheduleMapper.toJson(date, timetable, courses, lessonTimes, zoneId, now)
+    }
+
+    /**
+     * 下课不会改数据库，系统不会自己重查，已经结束的课会一直挂在胶囊里；
+     * 这里按最近的一次下课时刻补一发刷新，让它重新拉取。
+     */
+    private fun scheduleBoundaryRefresh(endAt: LocalDateTime?) {
+        handler.removeCallbacks(boundaryRefresh)
+        endAt ?: return
+        val zoneId = ZoneId.systemDefault()
+        val delayMs = Duration.between(ZonedDateTime.now(zoneId), endAt.atZone(zoneId)).toMillis()
+        if (delayMs < 0) return
+        handler.postDelayed(boundaryRefresh, delayMs + BOUNDARY_SLACK_MS)
     }
 
     private fun requestedDate(uri: Uri): LocalDate {
@@ -174,6 +202,7 @@ class ScheduleExportProvider : ContentProvider() {
         private const val TAG = "ScheduleExportProvider"
         private const val REFRESH_DEBOUNCE_MS = 250L
         private const val SECOND_REFRESH_DELAY_MS = 1_000L
+        private const val BOUNDARY_SLACK_MS = 1_000L
         private const val WAKE_UP_AUTHORITY = "com.suda.yzune.wakeupschedule.provider"
         private val WAKE_UP_REFRESH_URI = "content://$WAKE_UP_AUTHORITY/refresh".toUri()
     }
@@ -188,26 +217,11 @@ internal object WakeUpScheduleMapper {
         timetable: TimetableEntity?,
         courses: List<CourseEntity>,
         lessonTimes: List<LessonTimeEntity>,
-        zoneId: ZoneId = ZoneId.systemDefault()
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        now: LocalDateTime = LocalDateTime.now(zoneId)
     ): String {
-        val startDate = timetable?.startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-            ?: return "[]"
-        val week = Math.floorDiv(ChronoUnit.DAYS.between(startDate, date), 7L).toInt() + 1
-        if (week < 1) return "[]"
-
-        val timesByPeriod = lessonTimes.associateBy { it.period }
-        val exported = courses.asSequence()
-            .filter { it.dayOfWeek == date.dayOfWeek.value && week in it.weeks }
-            .flatMap { course ->
-                contiguousGroups(course.periods).mapNotNull { periods ->
-                    exportCourse(course, periods, timesByPeriod)
-                }.asSequence()
-            }
-            .sortedWith(compareBy<ExportedCourse> { it.startTime }.thenBy { it.id })
-            .toList()
-
         return buildJsonArray {
-            exported.forEach { course ->
+            exportedCourses(date, timetable, courses, lessonTimes, now).forEach { course ->
                 add(buildJsonObject {
                     put("id", course.id)
                     put("courseName", course.name)
@@ -222,6 +236,54 @@ internal object WakeUpScheduleMapper {
                 })
             }
         }.toString()
+    }
+
+    /**
+     * 今天还没下课的课程里最早的结束时刻，用来在边界发一次刷新；非今天的日期没有边界可等，返回 null。
+     */
+    fun nextEndTime(
+        date: LocalDate,
+        timetable: TimetableEntity?,
+        courses: List<CourseEntity>,
+        lessonTimes: List<LessonTimeEntity>,
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        now: LocalDateTime = LocalDateTime.now(zoneId)
+    ): LocalDateTime? {
+        if (date != now.toLocalDate()) return null
+        return exportedCourses(date, timetable, courses, lessonTimes, now)
+            .minByOrNull { it.endTime }
+            ?.let { date.atTime(it.endTime) }
+    }
+
+    /**
+     * 只有当天的课表会剔除已经结束的课，保证模拟数据里只剩「正在上」和「还没上」的课；
+     * 未来日期整天的课都还没开始，原样返回。
+     */
+    private fun exportedCourses(
+        date: LocalDate,
+        timetable: TimetableEntity?,
+        courses: List<CourseEntity>,
+        lessonTimes: List<LessonTimeEntity>,
+        now: LocalDateTime
+    ): List<ExportedCourse> {
+        val startDate = timetable?.startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            ?: return emptyList()
+        val week = Math.floorDiv(ChronoUnit.DAYS.between(startDate, date), 7L).toInt() + 1
+        if (week < 1) return emptyList()
+
+        val isToday = date == now.toLocalDate()
+        val nowTime = now.toLocalTime()
+        val timesByPeriod = lessonTimes.associateBy { it.period }
+        return courses.asSequence()
+            .filter { it.dayOfWeek == date.dayOfWeek.value && week in it.weeks }
+            .flatMap { course ->
+                contiguousGroups(course.periods).mapNotNull { periods ->
+                    exportCourse(course, periods, timesByPeriod)
+                }.asSequence()
+            }
+            .filter { !isToday || it.endTime.isAfter(nowTime) }
+            .sortedWith(compareBy<ExportedCourse> { it.startTime }.thenBy { it.id })
+            .toList()
     }
 
     private fun exportCourse(
