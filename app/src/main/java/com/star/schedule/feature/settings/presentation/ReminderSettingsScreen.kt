@@ -166,8 +166,6 @@ private fun ReminderSettingsScreen(
 
     val rows = reminderDetailRows(state.liveCapsuleCustomizationAvailable).detailPositions()
         .associateBy { it.row }
-    val detailsEnabled = state.reminderEnabled
-
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surface,
@@ -232,113 +230,105 @@ private fun ReminderSettingsScreen(
                             )
                         }
                     }
-                    item {
-                        SettingsGroup {
-                            val firstPosition = rows.getValue(ReminderDetailRow.OnlyFirst)
-                            SettingsSwitchItem(
-                                title = stringResource(R.string.only_first_continuous_title),
-                                supporting = stringResource(R.string.only_first_continuous_support),
-                                checked = state.notifyOnlyForFirstContinuousClass,
-                                enabled = detailsEnabled,
-                                onCheckedChange = onNotifyOnlyFirstChange,
-                                shapeIndex = firstPosition.index,
-                                shapeCount = firstPosition.count,
-                            )
-                            val iconPosition = rows.getValue(ReminderDetailRow.Icon)
-                            SettingsListItem(
-                                title = stringResource(R.string.notification_icon_title),
-                                supporting = stringResource(
-                                    if (state.liveCapsuleIconPath == null) {
-                                        R.string.notification_icon_subtitle_empty
-                                    } else {
-                                        R.string.notification_icon_subtitle_set
-                                    },
-                                ),
-                                enabled = detailsEnabled,
-                                onClick = { liveIconPicker.launch(arrayOf("image/*")) },
-                                shapeIndex = iconPosition.index,
-                                shapeCount = iconPosition.count,
-                                trailing = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (liveIconBitmap != null) {
-                                            Image(
-                                                bitmap = liveIconBitmap!!.asImageBitmap(),
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .clip(MaterialTheme.shapes.small),
-                                                contentScale = ContentScale.Crop,
-                                            )
+
+                    // 总开关关闭时整块列表不渲染，与 InstallerX-Revived 的网络设置页一致。
+                    if (state.reminderEnabled) {
+                        item {
+                            SettingsGroup {
+                                val firstPosition = rows.getValue(ReminderDetailRow.OnlyFirst)
+                                SettingsSwitchItem(
+                                    title = stringResource(R.string.only_first_continuous_title),
+                                    supporting = stringResource(R.string.only_first_continuous_support),
+                                    checked = state.notifyOnlyForFirstContinuousClass,
+                                    onCheckedChange = onNotifyOnlyFirstChange,
+                                    shapeIndex = firstPosition.index,
+                                    shapeCount = firstPosition.count,
+                                )
+                                val iconPosition = rows.getValue(ReminderDetailRow.Icon)
+                                SettingsListItem(
+                                    title = stringResource(R.string.notification_icon_title),
+                                    supporting = stringResource(
+                                        if (state.liveCapsuleIconPath == null) {
+                                            R.string.notification_icon_subtitle_empty
                                         } else {
-                                            Icon(
-                                                painter = painterResource(R.drawable.ic_notification),
-                                                contentDescription = null,
-                                                tint = if (detailsEnabled) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                                },
-                                            )
-                                        }
-                                        if (state.liveCapsuleIconPath != null && detailsEnabled) {
-                                            IconButton(onClick = onClearLiveIcon) {
+                                            R.string.notification_icon_subtitle_set
+                                        },
+                                    ),
+                                    onClick = { liveIconPicker.launch(arrayOf("image/*")) },
+                                    shapeIndex = iconPosition.index,
+                                    shapeCount = iconPosition.count,
+                                    trailing = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (liveIconBitmap != null) {
+                                                Image(
+                                                    bitmap = liveIconBitmap!!.asImageBitmap(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(MaterialTheme.shapes.small),
+                                                    contentScale = ContentScale.Crop,
+                                                )
+                                            } else {
                                                 Icon(
-                                                    Icons.Rounded.Close,
-                                                    contentDescription = stringResource(
-                                                        R.string.action_reset_default,
-                                                    ),
+                                                    painter = painterResource(R.drawable.ic_notification),
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
                                                 )
                                             }
+                                            if (state.liveCapsuleIconPath != null) {
+                                                IconButton(onClick = onClearLiveIcon) {
+                                                    Icon(
+                                                        Icons.Rounded.Close,
+                                                        contentDescription = stringResource(
+                                                            R.string.action_reset_default,
+                                                        ),
+                                                    )
+                                                }
+                                            }
                                         }
+                                    },
+                                )
+                                if (state.liveCapsuleCustomizationAvailable) {
+                                    val colorPosition = rows[ReminderDetailRow.CapsuleColor]
+                                    val templatePosition = rows[ReminderDetailRow.Template]
+                                    if (colorPosition != null && templatePosition != null) {
+                                        SettingsListItem(
+                                            title = stringResource(R.string.live_capsule_bg_title),
+                                            supporting = stringResource(R.string.live_capsule_bg_support),
+                                            onClick = {
+                                                selectedColor = savedColor
+                                                colorPickerController.wheelColor = savedColor
+                                                showColorPicker = true
+                                            },
+                                            shapeIndex = colorPosition.index,
+                                            shapeCount = colorPosition.count,
+                                            trailing = {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(width = 48.dp, height = 24.dp)
+                                                        .background(savedColor, MaterialTheme.shapes.small)
+                                                        .border(
+                                                            1.dp,
+                                                            MaterialTheme.colorScheme.primary,
+                                                            MaterialTheme.shapes.small,
+                                                        ),
+                                                )
+                                            },
+                                        )
+                                        SettingsListItem(
+                                            title = stringResource(R.string.live_notification_template_title),
+                                            supporting = stringResource(liveTemplate.descriptionRes),
+                                            onClick = { showTemplatePicker = true },
+                                            shapeIndex = templatePosition.index,
+                                            shapeCount = templatePosition.count,
+                                            trailing = {
+                                                Text(
+                                                    text = stringResource(liveTemplate.titleRes),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                )
+                                            },
+                                        )
                                     }
-                                },
-                            )
-                            if (state.liveCapsuleCustomizationAvailable) {
-                                val colorPosition = rows[ReminderDetailRow.CapsuleColor]
-                                val templatePosition = rows[ReminderDetailRow.Template]
-                                if (colorPosition != null && templatePosition != null) {
-                                    SettingsListItem(
-                                        title = stringResource(R.string.live_capsule_bg_title),
-                                        supporting = stringResource(R.string.live_capsule_bg_support),
-                                        enabled = detailsEnabled,
-                                        onClick = {
-                                            selectedColor = savedColor
-                                            colorPickerController.wheelColor = savedColor
-                                            showColorPicker = true
-                                        },
-                                        shapeIndex = colorPosition.index,
-                                        shapeCount = colorPosition.count,
-                                        trailing = {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(width = 48.dp, height = 24.dp)
-                                                    .background(savedColor, MaterialTheme.shapes.small)
-                                                    .border(
-                                                        1.dp,
-                                                        MaterialTheme.colorScheme.primary,
-                                                        MaterialTheme.shapes.small,
-                                                    ),
-                                            )
-                                        },
-                                    )
-                                    SettingsListItem(
-                                        title = stringResource(R.string.live_notification_template_title),
-                                        supporting = stringResource(liveTemplate.descriptionRes),
-                                        enabled = detailsEnabled,
-                                        onClick = { showTemplatePicker = true },
-                                        shapeIndex = templatePosition.index,
-                                        shapeCount = templatePosition.count,
-                                        trailing = {
-                                            Text(
-                                                text = stringResource(liveTemplate.titleRes),
-                                                color = if (detailsEnabled) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                                },
-                                            )
-                                        },
-                                    )
                                 }
                             }
                         }

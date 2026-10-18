@@ -3,14 +3,19 @@ package com.star.schedule.feature.settings.presentation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,14 +150,22 @@ internal fun SettingsSwitchItem(
         content = { Text(title) },
         supportingContent = { Text(supporting) },
         trailingContent = {
-            Switch(
-                checked = checked,
-                enabled = enabled,
-                onCheckedChange = onCheckedChange,
-                // 整行即开关时清空子节点语义，避免同一个开关被朗读两次；
-                // 左右分区时保留，让开关自己成为一个可聚焦节点。
-                modifier = if (navigates) Modifier else Modifier.clearAndSetSemantics { },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 左右分区时用一条竖线把「可点的标题区」和「开关区」分开，
+                // 尺寸与安装器设置页一致：32dp 高，线后留 16dp。
+                if (navigates) {
+                    VerticalDivider(modifier = Modifier.height(32.dp))
+                    Spacer(Modifier.width(16.dp))
+                }
+                Switch(
+                    checked = checked,
+                    enabled = enabled,
+                    onCheckedChange = onCheckedChange,
+                    // 整行即开关时清空子节点语义，避免同一个开关被朗读两次；
+                    // 左右分区时保留，让开关自己成为一个可聚焦节点。
+                    modifier = if (navigates) Modifier else Modifier.clearAndSetSemantics { },
+                )
+            }
         },
     )
 }
