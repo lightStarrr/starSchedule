@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,9 +32,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.star.schedule.R
@@ -84,9 +91,24 @@ fun TimetableGrid(
     val effectiveRowHeight = maxOf(rowHeight, minimumTimeCellHeight)
     val timeColumnWidth = 40.dp
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier,
     ) {
+        // 一列的可用宽度决定字号：7 列挤在 360dp 的机器上时，「周一」和「10/12」都会被截断，
+        // 课程名甚至只能一行一个字。这里按需把整套字号降一档，直到表头和两个字都放得下。
+        val columnWidth = (
+            (maxWidth - timeColumnWidth - GridColumnGap * visibleDays.size) / visibleDays.size
+            ).coerceAtLeast(24.dp)
+        val fontScale = rememberGridFontScale(
+            columnWidth = columnWidth,
+            dayLabelTexts = visibleDays.map { day ->
+                stringResource(R.string.weekday_column_label, dayLabels[day - 1])
+            },
+            dateTexts = visibleDays.map { day ->
+                val date = weekStartDate.plusDays((day - 1).toLong())
+                "${date.monthValue}/${date.dayOfMonth}"
+            },
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -97,7 +119,7 @@ fun TimetableGrid(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(GridColumnGap),
             ) {
                 GridTimeHeader(modifier = Modifier.width(timeColumnWidth))
                 visibleDays.forEach { day ->
@@ -105,6 +127,7 @@ fun TimetableGrid(
                     GridDayHeader(
                         dayLabel = dayLabels[day - 1],
                         date = date,
+                        fontScale = fontScale,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -112,7 +135,7 @@ fun TimetableGrid(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(GridColumnGap),
             ) {
                 Column(
                     modifier = Modifier.width(timeColumnWidth),
@@ -121,6 +144,7 @@ fun TimetableGrid(
                     sortedLessonTimes.forEach { lessonTime ->
                         GridTimeCell(
                             lessonTime = lessonTime,
+                            fontScale = fontScale,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(effectiveRowHeight),
@@ -133,6 +157,7 @@ fun TimetableGrid(
                         courseBlocks = courseBlocksByDay[day].orEmpty(),
                         currentWeek = currentWeek,
                         rowHeight = effectiveRowHeight,
+                        fontScale = fontScale,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -150,6 +175,7 @@ private fun CourseDayColumn(
     courseBlocks: List<CourseBlock>,
     currentWeek: Int,
     rowHeight: Dp,
+    fontScale: Float,
     modifier: Modifier = Modifier,
 ) {
     val rowGap = 2.dp
@@ -175,6 +201,7 @@ private fun CourseDayColumn(
                         course = block.course,
                         animationDelayMillis = (index * 35L).coerceAtMost(210L),
                         cellHeight = blockHeight,
+                        fontScale = fontScale,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(blockHeight)
@@ -199,18 +226,25 @@ private fun GridTimeHeader(modifier: Modifier = Modifier) {
 private fun GridDayHeader(
     dayLabel: String,
     date: LocalDate,
+    fontScale: Float,
     modifier: Modifier = Modifier,
 ) {
+    val labelStyle = MaterialTheme.typography.titleSmall.scaledFont(fontScale)
+    val dateStyle = MaterialTheme.typography.labelSmall.scaledFont(fontScale)
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+            .padding(
+                start = GridHeaderHorizontalPadding,
+                end = GridHeaderHorizontalPadding,
+                bottom = 8.dp,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
     ) {
         Text(
             text = stringResource(R.string.weekday_column_label, dayLabel),
-            style = MaterialTheme.typography.titleSmall,
+            style = labelStyle,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -218,7 +252,7 @@ private fun GridDayHeader(
         Text(
             text = "${date.monthValue}/${date.dayOfMonth}",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelSmall,
+            style = dateStyle,
             maxLines = 1,
         )
     }
@@ -227,8 +261,11 @@ private fun GridDayHeader(
 @Composable
 private fun GridTimeCell(
     lessonTime: LessonTimeEntity,
+    fontScale: Float,
     modifier: Modifier = Modifier,
 ) {
+    val periodStyle = MaterialTheme.typography.titleSmall.scaledFont(fontScale)
+    val timeStyle = MaterialTheme.typography.labelSmall.scaledFont(fontScale)
     Column(
         // 不带左右内边距：和右侧课程列的分隔交给格子之间那 2dp 的缝。
         modifier = modifier
@@ -238,20 +275,20 @@ private fun GridTimeCell(
     ) {
         Text(
             text = lessonTime.period.toString(),
-            style = MaterialTheme.typography.titleSmall,
+            style = periodStyle,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = lessonTime.startTime,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelSmall,
+            style = timeStyle,
             maxLines = 1,
         )
         Text(
             text = lessonTime.endTime,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelSmall,
+            style = timeStyle,
             maxLines = 1,
         )
     }
@@ -262,6 +299,7 @@ private fun GridCourseCell(
     course: CourseEntity?,
     animationDelayMillis: Long,
     cellHeight: Dp,
+    fontScale: Float,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -280,8 +318,8 @@ private fun GridCourseCell(
         }
     }
 
-    val titleStyle = MaterialTheme.typography.labelLarge
-    val locationStyle = MaterialTheme.typography.labelSmall
+    val titleStyle = MaterialTheme.typography.labelLarge.scaledFont(fontScale)
+    val locationStyle = MaterialTheme.typography.labelSmall.scaledFont(fontScale)
     val titleLineHeight = with(density) { titleStyle.lineHeight.toDp() }
     val locationLineHeight = with(density) { locationStyle.lineHeight.toDp() }
     val contentHeight = (cellHeight - 16.dp).coerceAtLeast(0.dp)
@@ -296,7 +334,7 @@ private fun GridCourseCell(
 
     Box(
         modifier = modifier
-            .padding(2.dp),
+            .padding(GridCourseCellOuterPadding),
     ) {
         if (course != null) {
             Card(
@@ -315,7 +353,10 @@ private fun GridCourseCell(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(
+                            horizontal = courseContentPadding(fontScale),
+                            vertical = 6.dp,
+                        ),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
@@ -337,6 +378,94 @@ private fun GridCourseCell(
             }
         }
     }
+}
+
+private val GridColumnGap = 2.dp
+
+/** 表头文字到列边缘的留白（GridDayHeader 的左右 padding）。 */
+private val GridHeaderHorizontalPadding = 8.dp
+
+/** 课程卡片外层的贴边留白与卡片内的左右 padding（后者随字号一起收）。 */
+private val GridCourseCellOuterPadding = 2.dp
+private val GridCourseCellContentPadding = 8.dp
+private val GridCourseCellMinContentPadding = 4.dp
+
+private fun courseContentPadding(fontScale: Float): Dp =
+    (GridCourseCellContentPadding * fontScale).coerceAtLeast(GridCourseCellMinContentPadding)
+
+private const val MaxFontScale = 1f
+private const val MinFontScale = 0.6f
+private const val FontScaleStep = 0.05f
+
+/** 判定「一行放得下两个汉字」用的样本。 */
+private const val CourseTitleMinSample = "课程"
+
+/** 测量结果和真实排版之间留一点余量，避免刚好卡在临界值时仍然断行。 */
+private val FontFitSafetyMargin = 1.dp
+
+/**
+ * 按列宽挑一档字号：表头（周一 / 10/12）要完整显示，课程名至少能一行两个汉字。
+ * 逐档往下试，都不满足时取最小值，保证内容不溢出。
+ */
+@Composable
+private fun rememberGridFontScale(
+    columnWidth: Dp,
+    dayLabelTexts: List<String>,
+    dateTexts: List<String>,
+): Float {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val labelStyle = MaterialTheme.typography.titleSmall
+    val dateStyle = MaterialTheme.typography.labelSmall
+    val titleStyle = MaterialTheme.typography.labelLarge
+
+    return remember(columnWidth, dayLabelTexts, dateTexts, labelStyle, dateStyle, titleStyle) {
+        val safetyMargin = with(density) { FontFitSafetyMargin.toPx() }
+        val headerAvailable = with(density) {
+            (columnWidth - GridHeaderHorizontalPadding * 2).toPx()
+        } - safetyMargin
+
+        val candidates = generateSequence(MaxFontScale) { previous ->
+            (previous - FontScaleStep).takeIf { it >= MinFontScale - 1e-4f }
+        }
+        candidates.firstOrNull { scale ->
+            val courseAvailable = with(density) {
+                (
+                    columnWidth -
+                        GridCourseCellOuterPadding * 2 -
+                        courseContentPadding(scale) * 2
+                    ).toPx()
+            } - safetyMargin
+            maxLineWidth(dayLabelTexts, labelStyle.scaledFont(scale), measurer) <= headerAvailable &&
+                maxLineWidth(dateTexts, dateStyle.scaledFont(scale), measurer) <= headerAvailable &&
+                maxLineWidth(
+                    listOf(CourseTitleMinSample),
+                    titleStyle.scaledFont(scale),
+                    measurer,
+                ) <= courseAvailable
+        } ?: MinFontScale
+    }
+}
+
+private fun maxLineWidth(
+    texts: List<String>,
+    style: TextStyle,
+    measurer: TextMeasurer,
+): Float = texts.maxOfOrNull { text ->
+    measurer.measure(
+        text = AnnotatedString(text),
+        style = style,
+        maxLines = 1,
+        softWrap = false,
+    ).size.width
+}?.toFloat() ?: 0f
+
+private fun TextStyle.scaledFont(scale: Float): TextStyle {
+    if (scale == MaxFontScale) return this
+    return copy(
+        fontSize = if (fontSize.isSpecified) fontSize * scale else fontSize,
+        lineHeight = if (lineHeight.isSpecified) lineHeight * scale else lineHeight,
+    )
 }
 
 private data class CourseTextLineLimits(
