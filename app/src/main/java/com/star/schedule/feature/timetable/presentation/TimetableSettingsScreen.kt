@@ -60,6 +60,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -78,6 +79,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.platform.display.rememberScreenCornerRadius
 import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.presentation.SettingsGroup
 import com.star.schedule.feature.settings.presentation.SettingsListItem
@@ -244,7 +246,21 @@ private fun TimetablePreviewPager(
         // 左右各留 (宽 - 卡片宽)/2，居中的那一页才落在屏幕正中，两侧各露出半张相邻课表。
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val maxCardWidth = (maxWidth * PreviewCardWidthFraction).coerceAtMost(PreviewCardMaxWidth)
-            val maxCardHeight = maxCardWidth * PreviewCardAspect
+            // 预览卡用手机屏幕本身的比例，看起来才像一块真实的屏幕。
+            val configuration = LocalConfiguration.current
+            val screenAspect = (
+                configuration.screenHeightDp.toFloat() / configuration.screenWidthDp.toFloat()
+                ).coerceAtLeast(1.2f)
+            val maxCardHeight = maxCardWidth * screenAspect
+            // 圆角跟着设备屏幕走：屏幕圆角多大，就按「卡片宽 / 屏幕宽」等比缩到卡片上；
+            // 取不到（模拟器、老系统）时退回 24dp。
+            val screenCornerRadius = rememberScreenCornerRadius()
+            val cardCorner = if (screenCornerRadius > 0.dp) {
+                (screenCornerRadius * (maxCardWidth.value / configuration.screenWidthDp))
+                    .coerceIn(PreviewCardMinCorner, PreviewCardMaxCorner)
+            } else {
+                PreviewCardFallbackCorner
+            }
             // pageSize 与 contentPadding 传的是「会自己读折叠进度」的对象，
             // pager 在测量时才取值，所以折叠过程中这一层不会重组。
             val pageSize = remember(progress, maxCardWidth) {
@@ -272,6 +288,7 @@ private fun TimetablePreviewPager(
                     progress = progress,
                     maxCardWidth = maxCardWidth,
                     maxCardHeight = maxCardHeight,
+                    corner = cardCorner,
                     onSelect = onSelectPage,
                 )
             }
@@ -310,6 +327,7 @@ private fun TimetablePreviewPage(
     progress: Animatable<Float, AnimationVector1D>,
     maxCardWidth: Dp,
     maxCardHeight: Dp,
+    corner: Dp,
     onSelect: (Int) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -337,6 +355,7 @@ private fun TimetablePreviewPage(
                 progress = progress,
                 maxWidth = maxCardWidth,
                 maxHeight = maxCardHeight,
+                corner = corner,
             )
         } else {
             TimetablePreviewCard(
@@ -345,6 +364,7 @@ private fun TimetablePreviewPage(
                 progress = progress,
                 maxWidth = maxCardWidth,
                 maxHeight = maxCardHeight,
+                corner = corner,
                 onClick = { onSelect(page) },
             )
         }
@@ -368,7 +388,7 @@ private fun Modifier.previewCardSize(
         val fraction = progress.value.coerceIn(0f, 1f)
         val width = lerp(maxWidth, PreviewCardCollapsedWidth, fraction).roundToPx()
         // 高度始终由宽度按同一比例推出来：宽高各自插值会让卡片越缩越扁。
-        val height = (width.toFloat() * PreviewCardAspect).roundToInt()
+        val height = (width.toFloat() * maxHeight.value / maxWidth.value).roundToInt()
         val placeable = measurable.measure(
             Constraints.fixed(maxWidth.roundToPx(), maxHeight.roundToPx()),
         )
@@ -389,12 +409,13 @@ private fun TimetablePreviewCard(
     progress: Animatable<Float, AnimationVector1D>,
     maxWidth: Dp,
     maxHeight: Dp,
+    corner: Dp,
     onClick: () -> Unit,
 ) {
     Card(
         onClick = onClick,
         modifier = Modifier.previewCardSize(progress, maxWidth, maxHeight),
-        shape = PreviewCardShape,
+        shape = RoundedCornerShape(corner),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceBright,
         ),
@@ -407,6 +428,7 @@ private fun TimetablePreviewCard(
     ) {
         TimetableThumbnail(
             preview = preview,
+            corner = corner,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(PreviewCardContentInset),
@@ -418,6 +440,7 @@ private fun TimetablePreviewCard(
 @Composable
 private fun TimetableThumbnail(
     preview: TimetablePreview,
+    corner: Dp,
     modifier: Modifier = Modifier,
 ) {
     val columns = if (preview.hasWeekendCourses) 7 else 5
@@ -428,7 +451,7 @@ private fun TimetableThumbnail(
         val cellHeight = size.height / THUMBNAIL_ROWS
         val gap = 1.dp.toPx()
         // 同心圆角：内圆角 = 外圆角 - 内容内边距，再按方块短边收敛，避免小方块被切成正圆。
-        val concentricCorner = (PreviewCardCorner - PreviewCardContentInset).toPx()
+        val concentricCorner = (corner - PreviewCardContentInset).toPx().coerceAtLeast(0f)
         preview.blocks.forEach { block ->
             if (block.dayOfWeek > columns) return@forEach
             val top = (block.startPeriod - 1) * cellHeight
@@ -452,10 +475,11 @@ private fun NewTimetableCard(
     progress: Animatable<Float, AnimationVector1D>,
     maxWidth: Dp,
     maxHeight: Dp,
+    corner: Dp,
 ) {
     Card(
         modifier = Modifier.previewCardSize(progress, maxWidth, maxHeight),
-        shape = PreviewCardShape,
+        shape = RoundedCornerShape(corner),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -512,8 +536,10 @@ private class CollapsingContentPadding(
         lerp(expandedWidth, collapsedWidth, progress.value.coerceIn(0f, 1f))
 }
 
-private val PreviewCardCorner = 24.dp
-private val PreviewCardShape = RoundedCornerShape(PreviewCardCorner)
+// 卡片圆角以「设备屏幕圆角」为准，这三个值负责缩放后的收口与取不到时的兜底。
+private val PreviewCardFallbackCorner = 24.dp
+private val PreviewCardMinCorner = 12.dp
+private val PreviewCardMaxCorner = 36.dp
 
 // 卡片内容区到卡片边缘的间距；内圆角按「外圆角 - 间距」同心计算。
 private val PreviewCardContentInset = 8.dp
@@ -521,7 +547,6 @@ private val PreviewCardContentInset = 8.dp
 // 预览卡占可用宽度的比例，高度按手机常见比例 9:19.5 推出来。
 private const val PreviewCardWidthFraction = 0.64f
 private val PreviewCardMaxWidth = 280.dp
-private const val PreviewCardAspect = 19.5f / 9f
 
 // 折叠跟随的时间常数（秒）：越小越贴手，越大越飘。0.08 大约是 5 帧的迟滞。
 private const val PreviewFollowTimeConstant = 0.08f
