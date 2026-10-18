@@ -9,7 +9,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -93,13 +92,7 @@ fun MainSwitchBar(
             enabled = enabled,
             // 整条已经带有开关语义，这里清空子节点，避免同一个开关被朗读两次。
             modifier = Modifier.clearAndSetSemantics { },
-            colors = SwitchDefaults.colors(
-                // 关掉时开关条底色是 surfaceContainerHigh，轨道用 surface + outline 描边，
-                // 才不会和条本身糊成一片。
-                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surface,
-                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
-            ),
+            // 用 M3 默认配色，和列表项里的开关保持完全一致，不再单独定制轨道颜色。
         )
     }
 }
