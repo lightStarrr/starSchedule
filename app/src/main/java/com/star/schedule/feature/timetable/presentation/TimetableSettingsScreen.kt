@@ -432,7 +432,7 @@ private fun TimetablePreviewCard(
             preview = preview,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(PreviewCardContentInset),
         )
     }
 }
@@ -450,18 +450,21 @@ private fun TimetableThumbnail(
         val cellWidth = size.width / columns
         val cellHeight = size.height / THUMBNAIL_ROWS
         val gap = 1.dp.toPx()
+        // 同心圆角：内圆角 = 外圆角 - 内容内边距，再按方块短边收敛，避免小方块被切成正圆。
+        val concentricCorner = (PreviewCardCorner - PreviewCardContentInset).toPx()
         preview.blocks.forEach { block ->
             if (block.dayOfWeek > columns) return@forEach
             val top = (block.startPeriod - 1) * cellHeight
             if (top >= size.height) return@forEach
+            val blockWidth = (cellWidth - gap * 2).coerceAtLeast(1f)
+            val blockHeight = (cellHeight * block.periodCount - gap * 2).coerceAtLeast(1f)
             drawRoundRect(
                 color = blockColor,
                 topLeft = Offset((block.dayOfWeek - 1) * cellWidth + gap, top + gap),
-                size = Size(
-                    width = (cellWidth - gap * 2).coerceAtLeast(1f),
-                    height = (cellHeight * block.periodCount - gap * 2).coerceAtLeast(1f),
+                size = Size(blockWidth, blockHeight),
+                cornerRadius = CornerRadius(
+                    concentricCorner.coerceAtMost(minOf(blockWidth, blockHeight) / 2f),
                 ),
-                cornerRadius = CornerRadius(2.dp.toPx()),
             )
         }
     }
@@ -532,7 +535,11 @@ private class CollapsingContentPadding(
         lerp(expandedWidth, collapsedWidth, progress.value.coerceIn(0f, 1f))
 }
 
-private val PreviewCardShape = RoundedCornerShape(24.dp)
+private val PreviewCardCorner = 24.dp
+private val PreviewCardShape = RoundedCornerShape(PreviewCardCorner)
+
+// 卡片内容区到卡片边缘的间距；内圆角按「外圆角 - 间距」同心计算。
+private val PreviewCardContentInset = 8.dp
 
 // 预览卡占可用宽度的比例，高度按手机常见比例 9:19.5 推出来。
 private const val PreviewCardWidthFraction = 0.64f
