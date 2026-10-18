@@ -67,8 +67,10 @@ object CrashStore {
     }
 
     private fun buildReport(context: Context, thread: Thread, throwable: Throwable): CrashReport {
+        // 带上 versionCode：用户反馈时才能对上当时那一份 mapping.txt。
         val version = runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            "${info.versionName} (${info.longVersionCode})"
         }.getOrNull().orEmpty()
         // 展示最内层的 cause：框架常把真正的异常包在「Unable to start activity」之类的外层里。
         val root = generateSequence(throwable) { it.cause }.lastOrNull() ?: throwable
