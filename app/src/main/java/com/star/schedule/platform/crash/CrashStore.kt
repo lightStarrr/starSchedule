@@ -2,6 +2,7 @@ package com.star.schedule.platform.crash
 
 import android.content.Context
 import android.os.Build
+import com.star.schedule.BuildConfig
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -44,7 +45,7 @@ object CrashStore {
     private const val SECTION_TRACE = "===trace"
 
     fun save(context: Context, thread: Thread, throwable: Throwable): CrashReport? {
-        val report = buildReport(context, thread, throwable)
+        val report = buildReport(thread, throwable)
         val dir = dir(context) ?: return report
         runCatching {
             File(dir, LATEST_FILE).writeText(encode(report))
@@ -66,12 +67,9 @@ object CrashStore {
         dir(context)?.listFiles()?.forEach { runCatching { it.delete() } }
     }
 
-    private fun buildReport(context: Context, thread: Thread, throwable: Throwable): CrashReport {
-        // 带上 versionCode：用户反馈时才能对上当时那一份 mapping.txt。
-        val version = runCatching {
-            val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            "${info.versionName} (${info.longVersionCode})"
-        }.getOrNull().orEmpty()
+    private fun buildReport(thread: Thread, throwable: Throwable): CrashReport {
+        // 用编译期写死的构建标识：版本 + git 短哈希 + 打包时间，能直接对上 archiveMapping 存的那份 mapping。
+        val version = BuildConfig.BUILD_STAMP
         // 展示最内层的 cause：框架常把真正的异常包在「Unable to start activity」之类的外层里。
         val root = generateSequence(throwable) { it.cause }.lastOrNull() ?: throwable
         return CrashReport(

@@ -1,9 +1,21 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.legacy.kapt)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// 每次构建生成一个可追溯的标识：git 短哈希 + 构建时间，配合 versionCode 唯一定位一次打包。
+val gitShortSha: String = runCatching {
+    providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }
+        .standardOutput.asText.get().trim()
+}.getOrDefault("nogit")
+val buildTime: String = LocalDateTime.now()
+    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+val buildId: String = "$gitShortSha-${buildTime.replace("-", "").replace(" ", "").replace(":", "")}"
 
 android {
     namespace = "com.star.schedule"
@@ -15,6 +27,13 @@ android {
         targetSdk = 36
         versionCode = 120
         versionName = "1.2.0"
+
+        buildConfigField("String", "BUILD_ID", "\"$buildId\"")
+        buildConfigField(
+            "String",
+            "BUILD_STAMP",
+            "\"$versionName ($versionCode) · $gitShortSha · $buildTime\"",
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -38,6 +57,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     lint {
         // M3E alpha28 brings Compose 1.13 lint, which flags existing context resource reads.
@@ -82,4 +102,21 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+/**
+ * 每次 release 混淆完成后把 mapping.txt 归档到仓库外的 mappings/ 目录。
+ * build/ 会被 clean 掉，历史版本的堆栈就再也还原不了了。
+ */
+val mappingFile = layout.buildDirectory.file("outputs/mapping/release/mapping.txt")
+val archiveMapping = tasks.register<Copy>("archiveMapping") {
+    from(mappingFile)
+    into(rootProject.layout.projectDirectory.dir("mappings"))
+    rename { "mapping-$buildId.txt" }
+    onlyIf { mappingFile.get().asFile.exists() }
+    doFirst { logger.lifecycle("归档 mapping：mappings/mapping-$buildId.txt") }
+}
+
+tasks.matching { it.name == "minifyReleaseWithR8" }.configureEach {
+    finalizedBy(archiveMapping)
 }

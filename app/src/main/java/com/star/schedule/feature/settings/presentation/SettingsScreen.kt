@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.star.schedule.BuildConfig
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
 import kotlinx.coroutines.launch
@@ -93,9 +94,8 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val currentTimetable = state.timetables.firstOrNull { it.id == state.currentTimetableId }
-    val versionName = remember(context) {
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-    }
+    // 直接读编译期常量：任何一次打包都能被唯一定位，不用再猜用户装的是哪版。
+    val buildStamp = BuildConfig.BUILD_STAMP
 
     val navigationBarInset = navigationBarBottomInset()
     Scaffold(
@@ -220,7 +220,7 @@ private fun SettingsScreen(
                             // 只展示版本信息，之前的「连点五次播放彩蛋」已经去掉。
                             SettingsListItem(
                                 title = stringResource(R.string.about_app_title),
-                                supporting = stringResource(R.string.version_label, versionName),
+                                supporting = stringResource(R.string.version_label, buildStamp),
                                 shapeIndex = 0,
                                 shapeCount = 3,
                                 leading = { Icon(Icons.Rounded.Info, contentDescription = null) },
