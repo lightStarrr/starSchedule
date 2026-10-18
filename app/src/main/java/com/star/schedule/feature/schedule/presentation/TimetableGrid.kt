@@ -84,12 +84,6 @@ fun TimetableGrid(
     val courseBlocksByDay = remember(courseBlocks) {
         courseBlocks.groupBy { it.dayOfWeek }
     }
-    val minimumTimeCellHeight = with(LocalDensity.current) {
-        // Three text lines plus the cell's vertical padding must fit even when
-        // the user selects a row height smaller than the time column needs.
-        (20.sp.toPx() + 16.sp.toPx() * 2 + 16.dp.toPx()).toDp()
-    }.coerceAtLeast(72.dp)
-    val effectiveRowHeight = maxOf(rowHeight, minimumTimeCellHeight)
     // 时间栏宽度按实际时间文本量出来：写死 40dp 时「08:00」比栏还宽，
     // 居中后左右各溢出一截，屏幕边缘那侧会被裁掉。
     val timeTextMeasurer = rememberTextMeasurer()
@@ -125,6 +119,21 @@ fun TimetableGrid(
                 "${date.monthValue}/${date.dayOfMonth}"
             },
         )
+        // 时间栏至少要放得下「节次 + 开始 + 结束」三行。按当前字号实测这三行的高度，
+        // 而不是拿 sp 数值去估——估出来的值比实际大，行高调到下限时格子里会剩一圈空白。
+        // 单元格本身不加内边距，行距完全交给格子之间那 2dp 的缝。
+        val periodStyle = MaterialTheme.typography.titleSmall
+        val timeStyle = MaterialTheme.typography.labelSmall
+        val minimumTimeCellHeight = remember(fontScale, periodStyle, timeStyle, density) {
+            val periodHeight = timeTextMeasurer
+                .measure(AnnotatedString("8"), periodStyle.scaledFont(fontScale))
+                .size.height
+            val timeHeight = timeTextMeasurer
+                .measure(AnnotatedString("08:00"), timeStyle.scaledFont(fontScale))
+                .size.height
+            with(density) { (periodHeight + timeHeight * 2).toDp() }
+        }
+        val effectiveRowHeight = maxOf(rowHeight, minimumTimeCellHeight)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -284,8 +293,7 @@ private fun GridTimeCell(
     val timeStyle = MaterialTheme.typography.labelSmall.scaledFont(fontScale)
     Column(
         // 不带左右内边距：和右侧课程列的分隔交给格子之间那 2dp 的缝。
-        modifier = modifier
-            .padding(vertical = 8.dp),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
