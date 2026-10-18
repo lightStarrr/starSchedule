@@ -1,5 +1,9 @@
 package com.star.schedule.feature.timetable.presentation
 
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -39,21 +43,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
@@ -120,8 +134,8 @@ private fun TimetableSettingsScreen(
                     pagerState = pagerState,
                     previews = state.previews,
                     currentId = state.currentId,
-                    // 顶栏折叠多少，预览就缩多少：展开时满尺寸，收起后回到原来那张小卡。
-                    collapsedFraction = scrollBehavior.state.collapsedFraction,
+                    // 直接传 state：折叠进度在 layout / draw 阶段读，避免每帧重组卡片内容。
+                    topBarState = scrollBehavior.state,
                     onApply = onApply,
                 )
                 if (previewed != null) {
@@ -200,10 +214,25 @@ private fun TimetablePreviewPager(
     pagerState: PagerState,
     previews: List<TimetablePreview>,
     currentId: Long?,
-    collapsedFraction: Float,
+    topBarState: TopAppBarState,
     onApply: (Long) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    // 折叠进度不是直接照着滚，而是用弹簧追：手指动得快时卡片会稍稍滞后，停下来再补到位。
+    // Animatable 的值是 State，下面都在测量/绘制阶段读，不会引起重组。
+    val progress = remember { Animatable(topBarState.collapsedFraction) }
+    LaunchedEffect(topBarState) {
+        snapshotFlow { topBarState.collapsedFraction }.collectLatest { target ->
+            progress.animateTo(
+                targetValue = target,
+                animationSpec = spring(dampingRatio = 1f, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+    }
+    // 记住一个稳定回调，页面拿到的是同一个函数实例，折叠时上层重组才能跳过页面内容。
+    val onSelectPage: (Int) -> Unit = remember(pagerState, scope) {
+        { page -> scope.launch { pagerState.animateScrollToPage(page) } }
+    }
 
     // 当前课表变化（首次加载、点应用之后）时把预览滚到对应位置。
     LaunchedEffect(currentId, previews.size) {
@@ -216,52 +245,37 @@ private fun TimetablePreviewPager(
     Column(modifier = Modifier.fillMaxWidth()) {
         // 左右各留 (宽 - 卡片宽)/2，居中的那一页才落在屏幕正中，两侧各露出半张相邻课表。
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val fraction = collapsedFraction.coerceIn(0f, 1f)
-            val expandedWidth = (maxWidth * PreviewCardWidthFraction).coerceAtMost(PreviewCardMaxWidth)
-            val cardWidth = lerp(expandedWidth, PreviewCardCollapsedWidth, fraction)
-            val cardHeight = lerp(expandedWidth * PreviewCardAspect, PreviewCardCollapsedHeight, fraction)
-            val sidePadding = ((maxWidth - cardWidth) / 2).coerceAtLeast(16.dp)
+            val maxCardWidth = (maxWidth * PreviewCardWidthFraction).coerceAtMost(PreviewCardMaxWidth)
+            val maxCardHeight = maxCardWidth * PreviewCardAspect
+            // pageSize 与 contentPadding 传的是「会自己读折叠进度」的对象，
+            // pager 在测量时才取值，所以折叠过程中这一层不会重组。
+            val pageSize = remember(progress, maxCardWidth) {
+                CollapsingPageSize(progress, maxCardWidth, PreviewCardCollapsedWidth)
+            }
+            val contentPadding = remember(progress, maxWidth, maxCardWidth) {
+                CollapsingContentPadding(
+                    progress = progress,
+                    viewportWidth = maxWidth,
+                    expandedWidth = maxCardWidth,
+                    collapsedWidth = PreviewCardCollapsedWidth,
+                )
+            }
             HorizontalPager(
                 state = pagerState,
-                contentPadding = PaddingValues(horizontal = sidePadding),
+                contentPadding = contentPadding,
                 pageSpacing = 12.dp,
-                pageSize = PageSize.Fixed(cardWidth),
+                pageSize = pageSize,
             ) { page ->
                 val preview = previews.getOrNull(page)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier.height(20.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (preview != null) {
-                            Text(
-                                text = preview.name,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (preview.id == currentId) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    if (preview == null) {
-                        NewTimetableCard(width = cardWidth, height = cardHeight)
-                    } else {
-                        TimetablePreviewCard(
-                            preview = preview,
-                            applied = preview.id == currentId,
-                            width = cardWidth,
-                            height = cardHeight,
-                            onClick = {
-                                scope.launch { pagerState.animateScrollToPage(page) }
-                            },
-                        )
-                    }
-                }
+                TimetablePreviewPage(
+                    page = page,
+                    preview = preview,
+                    applied = preview != null && preview.id == currentId,
+                    progress = progress,
+                    maxCardWidth = maxCardWidth,
+                    maxCardHeight = maxCardHeight,
+                    onSelect = onSelectPage,
+                )
             }
         }
 
@@ -286,19 +300,100 @@ private fun TimetablePreviewPager(
     }
 }
 
+/**
+ * 一页预览。参数全部取稳定值（[TimetablePreview] 标了 @Immutable、[TopAppBarState] 是 @Stable），
+ * 所以顶栏折叠导致上层重组时，这里会被跳过；缩放发生在 layout / draw 阶段。
+ */
+@Composable
+private fun TimetablePreviewPage(
+    page: Int,
+    preview: TimetablePreview?,
+    applied: Boolean,
+    progress: Animatable<Float, AnimationVector1D>,
+    maxCardWidth: Dp,
+    maxCardHeight: Dp,
+    onSelect: (Int) -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier.height(20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (preview != null) {
+                Text(
+                    text = preview.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (applied) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (preview == null) {
+            NewTimetableCard(
+                progress = progress,
+                maxWidth = maxCardWidth,
+                maxHeight = maxCardHeight,
+            )
+        } else {
+            TimetablePreviewCard(
+                preview = preview,
+                applied = applied,
+                progress = progress,
+                maxWidth = maxCardWidth,
+                maxHeight = maxCardHeight,
+                onClick = { onSelect(page) },
+            )
+        }
+    }
+}
+
+/**
+ * 折叠缩放全部走 layout + draw：
+ * - `layout` 里读 [TopAppBarState.collapsedFraction]，只让测量阶段失效；
+ * - 子节点始终按最大尺寸测量，约束不变，所以缩小时不会重新测量里面的 Canvas；
+ * - 真正的缩放交给 `graphicsLayer`，只触发重绘。
+ *
+ * 三者加起来，滚动过程中卡片内容既不会重组、也不会重测。
+ */
+private fun Modifier.previewCardSize(
+    progress: Animatable<Float, AnimationVector1D>,
+    maxWidth: Dp,
+    maxHeight: Dp,
+): Modifier = this
+    .layout { measurable, _ ->
+        val fraction = progress.value.coerceIn(0f, 1f)
+        val width = lerp(maxWidth, PreviewCardCollapsedWidth, fraction).roundToPx()
+        val height = lerp(maxHeight, PreviewCardCollapsedHeight, fraction).roundToPx()
+        val placeable = measurable.measure(
+            Constraints.fixed(maxWidth.roundToPx(), maxHeight.roundToPx()),
+        )
+        layout(width, height) { placeable.place(0, 0) }
+    }
+    .graphicsLayer {
+        val fraction = progress.value.coerceIn(0f, 1f)
+        scaleX = lerp(maxWidth, PreviewCardCollapsedWidth, fraction).toPx() / maxWidth.toPx()
+        scaleY = lerp(maxHeight, PreviewCardCollapsedHeight, fraction).toPx() / maxHeight.toPx()
+        transformOrigin = TransformOrigin(0f, 0f)
+    }
+
 @Composable
 private fun TimetablePreviewCard(
     preview: TimetablePreview,
     applied: Boolean,
-    width: Dp,
-    height: Dp,
+    progress: Animatable<Float, AnimationVector1D>,
+    maxWidth: Dp,
+    maxHeight: Dp,
     onClick: () -> Unit,
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier
-            .width(width)
-            .height(height),
+        modifier = Modifier.previewCardSize(progress, maxWidth, maxHeight),
         shape = PreviewCardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceBright,
@@ -350,11 +445,13 @@ private fun TimetableThumbnail(
 }
 
 @Composable
-private fun NewTimetableCard(width: Dp, height: Dp) {
+private fun NewTimetableCard(
+    progress: Animatable<Float, AnimationVector1D>,
+    maxWidth: Dp,
+    maxHeight: Dp,
+) {
     Card(
-        modifier = Modifier
-            .width(width)
-            .height(height),
+        modifier = Modifier.previewCardSize(progress, maxWidth, maxHeight),
         shape = PreviewCardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -370,6 +467,46 @@ private fun NewTimetableCard(width: Dp, height: Dp) {
             )
         }
     }
+}
+
+
+/**
+ * 页宽随顶栏折叠变化，但取值发生在测量阶段（[PageSize.calculateMainAxisPageSize] 在 measure 里调用），
+ * 所以 pager 不会因为折叠而重组。
+ */
+private class CollapsingPageSize(
+    private val progress: Animatable<Float, AnimationVector1D>,
+    private val expandedWidth: Dp,
+    private val collapsedWidth: Dp,
+) : PageSize {
+    override fun Density.calculateMainAxisPageSize(
+        availableSpace: Int,
+        pageSpacing: Int,
+    ): Int = lerp(expandedWidth, collapsedWidth, progress.value.coerceIn(0f, 1f)).roundToPx()
+}
+
+/**
+ * 左右留白 = (视口宽 - 页宽) / 2，保证居中的一页始终在屏幕正中。
+ * 同样把折叠进度的读取放到了测量阶段。
+ */
+private class CollapsingContentPadding(
+    private val progress: Animatable<Float, AnimationVector1D>,
+    private val viewportWidth: Dp,
+    private val expandedWidth: Dp,
+    private val collapsedWidth: Dp,
+) : PaddingValues {
+    override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp =
+        ((viewportWidth - currentWidth()) / 2).coerceAtLeast(16.dp)
+
+    override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp =
+        calculateLeftPadding(layoutDirection)
+
+    override fun calculateTopPadding(): Dp = 0.dp
+
+    override fun calculateBottomPadding(): Dp = 0.dp
+
+    private fun currentWidth(): Dp =
+        lerp(expandedWidth, collapsedWidth, progress.value.coerceIn(0f, 1f))
 }
 
 private val PreviewCardShape = RoundedCornerShape(24.dp)
