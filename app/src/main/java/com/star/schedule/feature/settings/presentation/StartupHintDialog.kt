@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -71,6 +73,9 @@ internal fun StartupHintDialog(
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
+                        // 波纹默认会被裁成整行的矩形，和右侧 TextButton 的胶囊形状对不上；
+                        // 按按钮的 full 形状裁一下，两边的高亮才一致。
+                        .clip(CircleShape)
                         .toggleable(
                             value = state.doNotShowAgain,
                             enabled = !state.isSaving,
