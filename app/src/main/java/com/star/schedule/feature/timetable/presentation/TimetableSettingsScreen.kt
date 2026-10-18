@@ -79,6 +79,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.CourseBlockCornerRadius
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.platform.display.rememberScreenCornerRadius
 import com.star.schedule.feature.settings.domain.TimetablePreview
@@ -453,7 +454,6 @@ private fun TimetablePreviewCard(
     ) {
         TimetableThumbnail(
             preview = preview,
-            corner = corner,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(PreviewCardContentInset),
@@ -465,7 +465,6 @@ private fun TimetablePreviewCard(
 @Composable
 private fun TimetableThumbnail(
     preview: TimetablePreview,
-    corner: Dp,
     modifier: Modifier = Modifier,
 ) {
     val columns = if (preview.hasWeekendCourses) 7 else 5
@@ -475,8 +474,9 @@ private fun TimetableThumbnail(
         val cellWidth = size.width / columns
         val cellHeight = size.height / THUMBNAIL_ROWS
         val gap = 1.dp.toPx()
-        // 同心圆角：内圆角 = 外圆角 - 内容内边距，再按方块短边收敛，避免小方块被切成正圆。
-        val concentricCorner = (corner - PreviewCardContentInset).toPx().coerceAtLeast(0f)
+        // 方块圆角与首页课表一致，不再按卡片外圆角做同心推导——
+        // 窄列上同心算出来接近胶囊，和真实课表对不上。
+        val blockCorner = CourseBlockCornerRadius.toPx()
         preview.blocks.forEach { block ->
             if (block.dayOfWeek > columns) return@forEach
             val top = (block.startPeriod - 1) * cellHeight
@@ -488,7 +488,7 @@ private fun TimetableThumbnail(
                 topLeft = Offset((block.dayOfWeek - 1) * cellWidth + gap, top + gap),
                 size = Size(blockWidth, blockHeight),
                 cornerRadius = CornerRadius(
-                    concentricCorner.coerceAtMost(minOf(blockWidth, blockHeight) / 2f),
+                    blockCorner.coerceAtMost(minOf(blockWidth, blockHeight) / 2f),
                 ),
             )
         }
@@ -566,8 +566,8 @@ private val PreviewCardFallbackCorner = 24.dp
 private val PreviewCardMinCorner = 12.dp
 private val PreviewCardMaxCorner = 36.dp
 
-// 卡片内容区到卡片边缘的间距；内圆角按「外圆角 - 间距」同心计算。
-private val PreviewCardContentInset = 8.dp
+// 卡片内容区到卡片边缘的间距。留白加大一点，方块的小圆角才不会贴着卡片边缘显得突兀。
+private val PreviewCardContentInset = 12.dp
 
 // 预览卡占可用宽度的比例，高度按手机常见比例 9:19.5 推出来。
 // 宽度主要由高度倒推，这里只做「别超过屏宽太多」的安全上限。
