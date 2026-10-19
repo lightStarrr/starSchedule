@@ -99,6 +99,20 @@ class RoomSettingsRepository(
         dao.setPreference(Constants.PREF_CURRENT_TIMETABLE, timetableId.toString())
     }
 
+    override suspend fun renameTimetable(timetableId: Long, name: String) {
+        val timetable = dao.getAllTimetablesOnce().firstOrNull { it.id == timetableId } ?: return
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || trimmed == timetable.name) return
+        dao.updateTimetableWithReminders(timetable.copy(name = trimmed))
+    }
+
+    override suspend fun deleteTimetable(timetableId: Long) {
+        val timetable = dao.getAllTimetablesOnce().firstOrNull { it.id == timetableId } ?: return
+        dao.deleteTimetableWithReminders(timetable)
+        // 删掉的正好是当前课表时，把当前指向挪到剩下的一份；没有剩下的就置空。
+        dao.ensureValidCurrentTimetable()
+    }
+
     override fun isLiveCapsuleCustomizationAvailable(): Boolean =
         notificationManager.isLiveCapsuleCustomizationAvailable()
 

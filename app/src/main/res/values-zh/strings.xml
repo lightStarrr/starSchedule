@@ -379,4 +379,8 @@
     <string name="crash_meta_thread">线程</string>
     <string name="crash_trace_title">完整堆栈</string>
     <string name="crash_copied">已复制，可以直接粘贴给开发者</string>
+    <string name="timetable_action_edit_name">编辑名称</string>
+    <string name="timetable_edit_name_hint">课表名称</string>
+    <string name="timetable_delete_title">删除课表？</string>
+    <string name="timetable_delete_message">确定删除“%1$s”？课表内的课程和节次会一起删除。</string>
 </resources>

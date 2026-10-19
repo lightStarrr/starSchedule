@@ -44,6 +44,14 @@ class TimetableSettingsViewModel(
         if (timetableId == uiState.value.currentId) return
         viewModelScope.launch { repository.selectTimetable(timetableId) }
     }
+
+    fun rename(timetableId: Long, name: String) {
+        viewModelScope.launch { repository.renameTimetable(timetableId, name) }
+    }
+
+    fun delete(timetableId: Long) {
+        viewModelScope.launch { repository.deleteTimetable(timetableId) }
+    }
 }
 
 class TimetableSettingsViewModelFactory(
