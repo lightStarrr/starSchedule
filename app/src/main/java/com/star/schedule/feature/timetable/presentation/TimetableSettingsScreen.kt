@@ -1,5 +1,31 @@
 package com.star.schedule.feature.timetable.presentation
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.toShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
@@ -98,6 +124,8 @@ fun TimetableSettingsRoute(
         onBack = onBack,
         onApply = viewModel::apply,
         onRowHeightClick = onOpenRowHeight,
+        onRename = viewModel::rename,
+        onDelete = viewModel::delete,
     )
 }
 
@@ -108,13 +136,24 @@ private fun TimetableSettingsScreen(
     onBack: () -> Unit,
     onApply: (Long) -> Unit,
     onRowHeightClick: () -> Unit,
+    onRename: (Long, String) -> Unit,
+    onDelete: (Long) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
     // pager 状态提到这一层：下面的设置列表要跟着「居中那张」走，而不是已经应用的那张。
     val pagerState = rememberPagerState(pageCount = { state.previews.size + 1 })
     val previewed = state.previews.getOrNull(pagerState.currentPage)
+    // 长按卡片弹出的操作菜单：只记 id + 卡片在屏幕上的中心，按钮画在根布局上，
+    // 这样点卡片外面任何地方都能关掉。
+    var actionMenu by remember { mutableStateOf<TimetableActionMenu?>(null) }
+    var renaming by remember { mutableStateOf<TimetablePreview?>(null) }
+    var deleting by remember { mutableStateOf<TimetablePreview?>(null) }
 
+    // 翻页、点卡片外面都要能把菜单收起来，所以菜单画在整个页面之上。
+    LaunchedEffect(pagerState.currentPage) { actionMenu = null }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -177,6 +216,7 @@ private fun TimetableSettingsScreen(
                         maxCardWidth = cardMaxWidth,
                         maxCardHeight = cardMaxWidth * screenAspect,
                         onApply = onApply,
+                        onLongPress = { id, bounds -> actionMenu = TimetableActionMenu(id, bounds) },
                     )
                 if (previewed != null) {
                     Spacer(Modifier.height(24.dp))
@@ -211,6 +251,61 @@ private fun TimetableSettingsScreen(
             }
         }
     }
+
+    actionMenu?.let { menu ->
+        TimetableCardActionOverlay(
+            bounds = menu.bounds,
+            onRename = {
+                renaming = state.previews.firstOrNull { it.id == menu.timetableId }
+                actionMenu = null
+            },
+            onDelete = {
+                deleting = state.previews.firstOrNull { it.id == menu.timetableId }
+                actionMenu = null
+            },
+            onDismiss = { actionMenu = null },
+        )
+    }
+    }
+
+    renaming?.let { target ->
+        RenameTimetableDialog(
+            initialName = target.name,
+            onDismiss = { renaming = null },
+            onConfirm = { name ->
+                onRename(target.id, name)
+                renaming = null
+            },
+        )
+    }
+
+    deleting?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text(stringResource(R.string.timetable_delete_title)) },
+            text = {
+                Text(stringResource(R.string.timetable_delete_message, target.name))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete(target.id)
+                        deleting = null
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.action_delete),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleting = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 /**
@@ -226,6 +321,7 @@ private fun TimetablePreviewPager(
     maxCardWidth: Dp,
     maxCardHeight: Dp,
     onApply: (Long) -> Unit,
+    onLongPress: (Long, Rect) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     // 折叠进度不直接照着滚，而是做指数平滑（一阶低通，Unity 里叫 SmoothDamp）：
@@ -316,6 +412,7 @@ private fun TimetablePreviewPager(
                     maxCardHeight = maxCardHeight,
                     corner = cardCorner,
                     onSelect = onSelectPage,
+                    onLongPress = onLongPress,
                 )
             }
         }
@@ -355,6 +452,7 @@ private fun TimetablePreviewPage(
     maxCardHeight: Dp,
     corner: Dp,
     onSelect: (Int) -> Unit,
+    onLongPress: (Long, Rect) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -392,6 +490,7 @@ private fun TimetablePreviewPage(
                 maxHeight = maxCardHeight,
                 corner = corner,
                 onClick = { onSelect(page) },
+                onLongPress = { bounds -> onLongPress(preview.id, bounds) },
             )
         }
     }
@@ -437,10 +536,19 @@ private fun TimetablePreviewCard(
     maxHeight: Dp,
     corner: Dp,
     onClick: () -> Unit,
+    onLongPress: (Rect) -> Unit,
 ) {
+    // 长按要知道卡片在屏幕上的位置，菜单按钮才好画在卡片正中。
+    var boundsInRoot by remember { mutableStateOf(Rect.Zero) }
     Card(
-        onClick = onClick,
-        modifier = Modifier.previewCardSize(progress, maxWidth, maxHeight),
+        modifier = Modifier
+            .previewCardSize(progress, maxWidth, maxHeight)
+            .onGloballyPositioned { boundsInRoot = it.boundsInRoot() }
+            .combinedClickable(
+                role = Role.Button,
+                onClick = onClick,
+                onLongClick = { onLongPress(boundsInRoot) },
+            ),
         shape = RoundedCornerShape(corner),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceBright,
@@ -603,3 +711,148 @@ private val PreviewCardMinWidth = 160.dp
 // 顶栏完全收起后只定宽度，高度按 PreviewCardAspect 推出来（128dp 宽 ≈ 277dp 高）。
 private val PreviewCardCollapsedWidth = 128.dp
 private const val THUMBNAIL_ROWS = 12
+
+
+/** 长按卡片后浮在页面上的操作菜单，位置跟着卡片走。 */
+private data class TimetableActionMenu(
+    val timetableId: Long,
+    val bounds: Rect,
+)
+
+private val TimetableActionButtonMinSize = 48.dp
+private val TimetableActionButtonMaxSize = 88.dp
+private val TimetableActionButtonGap = 12.dp
+
+/**
+ * 卡片中心浮出两个按钮：编辑名称 / 删除。
+ *
+ * 整层铺满屏幕接管点击，点按钮以外任何地方都收起；按钮尺寸按卡片短边收敛，
+ * 卡片折叠变小的时候不会顶出卡片外。
+ */
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun TimetableCardActionOverlay(
+    bounds: Rect,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val density = LocalDensity.current
+    // 宽高比决定排布：卡片宽于高就横排，否则竖排。
+    val horizontal = bounds.width >= bounds.height
+    // 大卡片上按短边的 30% 撑开，小卡片上限收到 64dp，别顶出卡片外。
+    val buttonSize = with(density) {
+        (minOf(bounds.width, bounds.height) * 0.3f).toDp()
+    }.coerceIn(TimetableActionButtonMinSize, TimetableActionButtonMaxSize)
+    val stackWidth =
+        if (horizontal) buttonSize * 2 + TimetableActionButtonGap else buttonSize
+    val stackHeight =
+        if (horizontal) buttonSize else buttonSize * 2 + TimetableActionButtonGap
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+    ) {
+        Box(
+            modifier = Modifier.offset {
+                IntOffset(
+                    (bounds.center.x - with(density) { stackWidth.toPx() } / 2f).roundToInt(),
+                    (bounds.center.y - with(density) { stackHeight.toPx() } / 2f).roundToInt(),
+                )
+            },
+        ) {
+            val buttons: @Composable () -> Unit = {
+                TimetableActionButton(
+                    label = stringResource(R.string.timetable_action_edit_name),
+                    icon = Icons.Rounded.Edit,
+                    shape = MaterialShapes.Flower.toShape(),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    size = buttonSize,
+                    onClick = onRename,
+                )
+                TimetableActionButton(
+                    label = stringResource(R.string.action_delete),
+                    icon = Icons.Rounded.Delete,
+                    shape = MaterialShapes.Burst.toShape(),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    size = buttonSize,
+                    onClick = onDelete,
+                )
+            }
+            if (horizontal) {
+                Row(horizontalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
+                    buttons()
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
+                    buttons()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimetableActionButton(
+    label: String,
+    icon: ImageVector,
+    shape: Shape,
+    containerColor: Color,
+    contentColor: Color,
+    size: Dp,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(shape)
+            .background(containerColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(size * 0.45f),
+        )
+    }
+}
+
+@Composable
+private fun RenameTimetableDialog(
+    initialName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.timetable_action_edit_name)) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                label = { Text(stringResource(R.string.timetable_edit_name_hint)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name) },
+                enabled = name.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}

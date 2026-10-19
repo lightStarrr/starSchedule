@@ -382,4 +382,8 @@
     <string name="crash_meta_thread">Thread</string>
     <string name="crash_trace_title">Stack trace</string>
     <string name="crash_copied">Copied</string>
+    <string name="timetable_action_edit_name">Edit name</string>
+    <string name="timetable_edit_name_hint">Timetable name</string>
+    <string name="timetable_delete_title">Delete timetable?</string>
+    <string name="timetable_delete_message">Delete “%1$s”? Its courses and lesson times will be removed as well.</string>
 </resources>
