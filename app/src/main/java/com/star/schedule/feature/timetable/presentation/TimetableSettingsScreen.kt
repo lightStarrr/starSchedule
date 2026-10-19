@@ -766,7 +766,7 @@ private fun TimetableCardActionOverlay(
                 TimetableActionButton(
                     label = stringResource(R.string.timetable_action_edit_name),
                     icon = Icons.Rounded.Edit,
-                    shape = MaterialShapes.Flower.toShape(),
+                    shape = MaterialShapes.Cookie4Sided.toShape(),
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     size = buttonSize,
@@ -775,7 +775,7 @@ private fun TimetableCardActionOverlay(
                 TimetableActionButton(
                     label = stringResource(R.string.action_delete),
                     icon = Icons.Rounded.Delete,
-                    shape = MaterialShapes.Burst.toShape(),
+                    shape = MaterialShapes.Ghostish.toShape(),
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     size = buttonSize,
