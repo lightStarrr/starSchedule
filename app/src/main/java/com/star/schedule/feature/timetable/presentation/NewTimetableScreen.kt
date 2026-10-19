@@ -11,6 +11,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,23 +33,25 @@ import com.star.schedule.feature.settings.presentation.SettingsSectionTitle
 fun NewTimetableRoute(
     onBack: () -> Unit,
     onManualCreate: () -> Unit,
+    onRecognizeScreenshotOrText: () -> Unit,
+    onImportFromWebsite: () -> Unit,
     onWakeUpImport: () -> Unit,
     onFileImport: () -> Unit,
-    onAiImport: () -> Unit,
 ) {
     NewTimetableScreen(
         onBack = onBack,
         onManualCreate = onManualCreate,
+        onRecognizeScreenshotOrText = onRecognizeScreenshotOrText,
+        onImportFromWebsite = onImportFromWebsite,
         onWakeUpImport = onWakeUpImport,
         onFileImport = onFileImport,
-        onAiImport = onAiImport,
     )
 }
 
 /**
  * 新建课表的入口：先定这张课表怎么来，再进入各自的流程。
  *
- * 手动创建是主干，导入是「快速把课填满」的三条捷径，所以两者分栏。
+ * 手动创建是主干，AI 识别与其他导入是两条「把已有课表搬过来」的路。
  * 三种方式的产物都是同一条 `TimetableEntity`，这里只做一次分流；
  * 名称、开学日期等最终确认交给各流程自己收集，避免在这一层重复出现表单。
  */
@@ -57,9 +60,10 @@ fun NewTimetableRoute(
 private fun NewTimetableScreen(
     onBack: () -> Unit,
     onManualCreate: () -> Unit,
+    onRecognizeScreenshotOrText: () -> Unit,
+    onImportFromWebsite: () -> Unit,
     onWakeUpImport: () -> Unit,
     onFileImport: () -> Unit,
-    onAiImport: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
@@ -94,6 +98,26 @@ private fun NewTimetableScreen(
                 )
             }
 
+            SettingsSectionTitle(R.string.new_timetable_section_ai)
+            SettingsGroup {
+                SettingsListItem(
+                    title = stringResource(R.string.new_timetable_ai_recognize_title),
+                    supporting = stringResource(R.string.new_timetable_ai_recognize_support),
+                    onClick = onRecognizeScreenshotOrText,
+                    shapeIndex = 0,
+                    shapeCount = 2,
+                    leading = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
+                )
+                SettingsListItem(
+                    title = stringResource(R.string.new_timetable_ai_web_title),
+                    supporting = stringResource(R.string.new_timetable_ai_web_support),
+                    onClick = onImportFromWebsite,
+                    shapeIndex = 1,
+                    shapeCount = 2,
+                    leading = { Icon(Icons.Rounded.Language, contentDescription = null) },
+                )
+            }
+
             SettingsSectionTitle(R.string.new_timetable_section_import)
             SettingsGroup {
                 SettingsListItem(
@@ -101,7 +125,7 @@ private fun NewTimetableScreen(
                     supporting = stringResource(R.string.new_timetable_wakeup_support),
                     onClick = onWakeUpImport,
                     shapeIndex = 0,
-                    shapeCount = 3,
+                    shapeCount = 2,
                     leading = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
                 )
                 SettingsListItem(
@@ -109,16 +133,8 @@ private fun NewTimetableScreen(
                     supporting = stringResource(R.string.new_timetable_file_support),
                     onClick = onFileImport,
                     shapeIndex = 1,
-                    shapeCount = 3,
+                    shapeCount = 2,
                     leading = { Icon(Icons.Rounded.Description, contentDescription = null) },
-                )
-                SettingsListItem(
-                    title = stringResource(R.string.new_timetable_ai_title),
-                    supporting = stringResource(R.string.new_timetable_ai_support),
-                    onClick = onAiImport,
-                    shapeIndex = 2,
-                    shapeCount = 3,
-                    leading = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
                 )
             }
         }

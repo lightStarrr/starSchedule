@@ -22,11 +22,12 @@ class NewTimetableActivity : ComponentActivity() {
             StarScheduleTheme(dynamicColor = true) {
                 NewTimetableRoute(
                     onBack = ::finish,
-                    // TODO(功能): 三条流程尚未实现，先只提供入口列表。
+                    // TODO(功能): 四条流程尚未实现，先只提供入口列表。
                     onManualCreate = {},
+                    onRecognizeScreenshotOrText = {},
+                    onImportFromWebsite = {},
                     onWakeUpImport = {},
                     onFileImport = {},
-                    onAiImport = {},
                 )
             }
         }

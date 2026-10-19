@@ -251,8 +251,11 @@
     <string name="new_timetable_wakeup_support">粘贴分享口令导入</string>
     <string name="new_timetable_file_title">本地文件</string>
     <string name="new_timetable_file_support">从 html、json 或 xlsx 文件导入</string>
-    <string name="new_timetable_ai_title">AI 导入</string>
-    <string name="new_timetable_ai_support">识别截图或文字里的课表</string>
+    <string name="new_timetable_section_ai">AI 导入</string>
+    <string name="new_timetable_ai_recognize_title">从截图或文字中识别</string>
+    <string name="new_timetable_ai_recognize_support">相册图片、截图或粘贴的文本</string>
+    <string name="new_timetable_ai_web_title">从网站中导入</string>
+    <string name="new_timetable_ai_web_support">在内置浏览器里打开课表页后识别</string>
     <string name="home_action_timetable_short">课表</string>
     <string name="home_action_settings">设置</string>
     <string name="home_action_more">更多操作</string>
