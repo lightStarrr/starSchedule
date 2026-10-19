@@ -39,6 +39,9 @@ class TimetableSettingsActivity : ComponentActivity() {
                     onOpenRowHeight = {
                         startActivity(Intent(this, RowHeightActivity::class.java))
                     },
+                    onCreateTimetable = {
+                        startActivity(Intent(this, NewTimetableActivity::class.java))
+                    },
                 )
             }
         }

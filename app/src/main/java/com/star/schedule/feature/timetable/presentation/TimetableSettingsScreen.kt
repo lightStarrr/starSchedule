@@ -125,6 +125,7 @@ fun TimetableSettingsRoute(
     viewModel: TimetableSettingsViewModel,
     onBack: () -> Unit,
     onOpenRowHeight: () -> Unit,
+    onCreateTimetable: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     TimetableSettingsScreen(
@@ -132,6 +133,7 @@ fun TimetableSettingsRoute(
         onBack = onBack,
         onApply = viewModel::apply,
         onRowHeightClick = onOpenRowHeight,
+        onCreateTimetable = onCreateTimetable,
         onRename = viewModel::rename,
         onDelete = viewModel::delete,
     )
@@ -144,6 +146,7 @@ private fun TimetableSettingsScreen(
     onBack: () -> Unit,
     onApply: (Long) -> Unit,
     onRowHeightClick: () -> Unit,
+    onCreateTimetable: () -> Unit,
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
 ) {
@@ -226,6 +229,7 @@ private fun TimetableSettingsScreen(
                         maxCardWidth = cardMaxWidth,
                         maxCardHeight = cardMaxWidth * screenAspect,
                         onApply = onApply,
+                        onCreateTimetable = onCreateTimetable,
                         scrimmedTimetableId = if (actionMenuOpen) actionMenu?.timetableId else null,
                         onLongPress = { id, bounds ->
                             actionMenu = TimetableActionMenu(id, bounds)
@@ -344,6 +348,7 @@ private fun TimetablePreviewPager(
     maxCardWidth: Dp,
     maxCardHeight: Dp,
     onApply: (Long) -> Unit,
+    onCreateTimetable: () -> Unit,
     scrimmedTimetableId: Long?,
     onLongPress: (Long, Rect) -> Unit,
 ) {
@@ -437,6 +442,7 @@ private fun TimetablePreviewPager(
                     corner = cardCorner,
                     scrimmed = scrimmedTimetableId != null && preview?.id == scrimmedTimetableId,
                     onSelect = onSelectPage,
+                    onCreateTimetable = onCreateTimetable,
                     onLongPress = onLongPress,
                 )
             }
@@ -478,6 +484,7 @@ private fun TimetablePreviewPage(
     corner: Dp,
     scrimmed: Boolean,
     onSelect: (Int) -> Unit,
+    onCreateTimetable: () -> Unit,
     onLongPress: (Long, Rect) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -506,6 +513,7 @@ private fun TimetablePreviewPage(
                 maxWidth = maxCardWidth,
                 maxHeight = maxCardHeight,
                 corner = corner,
+                onClick = onCreateTimetable,
             )
         } else {
             TimetablePreviewCard(
@@ -657,16 +665,21 @@ private fun NewTimetableCard(
     maxWidth: Dp,
     maxHeight: Dp,
     corner: Dp,
+    onClick: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.previewCardSize(progress, maxWidth, maxHeight),
+        modifier = Modifier
+            .previewCardSize(progress, maxWidth, maxHeight)
+            // clip 必须排在 clickable 前面：水波纹画在 clickable 那一层，
+            // 顺序反了就是矩形的按压反馈盖在圆角卡片上。
+            .clip(RoundedCornerShape(corner))
+            .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(corner),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            // TODO(设计): 新建课表的流程还没定，先只放占位，不挂点击。
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = stringResource(R.string.timetable_settings_new),
