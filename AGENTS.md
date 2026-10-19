@@ -118,6 +118,7 @@ fun TimetableSettingsRoute(viewModel: TimetableSettingsViewModel) {
 - 文案放入字符串资源，禁止在 Composable 中新增硬编码用户可见文本。
 - Material 组件的实验性或废弃 API 必须集中管理并记录原因，新增代码不得继续扩散已废弃 API。
 - 动画应复用统一规格，并尊重系统减少动态效果设置；避免为了视觉效果引入影响可读性或操作稳定性的动画。
+- 点击水波纹的裁剪：`Card(shape)` / `Surface(shape)` 的圆角只作用于自身内容，`Modifier.clickable`、`combinedClickable`、`toggleable` 挂在外层时，水波纹仍按矩形铺开。这类写法必须在点击修饰符**之前**补 `clip(shape)`，顺序为 `clip(shape) → clickable/toggleable`；反过来写四角的水波纹会溢出。使用带 `onClick` 参数的 `Card(onClick = ...)`、`Surface(onClick = ...)`、`Button`、`IconButton` 时组件内部已处理，不要重复 clip。
 - 每完成一个新页面并确认功能等价后，应删除对应旧 UI，避免长期维护两套实现。
 - UI 重写期间保持 Room 数据、偏好键、通知行为、Widget 数据和 Provider 协议兼容，除非当前任务明确要求迁移或破坏性调整。
 
