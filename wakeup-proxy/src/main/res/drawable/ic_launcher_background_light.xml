@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  浅色版背景：深色 #5F1220（tone 20）同色相的 tone 90。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFDADB"
+        android:pathData="M0,0H108V108H0Z" />
+</vector>
