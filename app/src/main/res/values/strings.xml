@@ -256,6 +256,8 @@
     <string name="new_timetable_file_support">Import from an html, json, or xlsx file</string>
     <string name="new_timetable_qiangzhi_title">Qiangzhi academic system</string>
     <string name="new_timetable_qiangzhi_support">Sign in with your account to fetch the timetable</string>
+    <string name="new_timetable_ai_title">AI import</string>
+    <string name="new_timetable_ai_support">Recognize a timetable from a screenshot or text</string>
     <string name="home_action_timetable_short">Schedule</string>
     <string name="home_action_settings">Settings</string>
     <string name="home_action_more">More actions</string>

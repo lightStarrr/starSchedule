@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
@@ -35,6 +36,7 @@ fun NewTimetableRoute(
     onWakeUpImport: () -> Unit,
     onFileImport: () -> Unit,
     onQiangzhiImport: () -> Unit,
+    onAiImport: () -> Unit,
 ) {
     NewTimetableScreen(
         onBack = onBack,
@@ -42,6 +44,7 @@ fun NewTimetableRoute(
         onWakeUpImport = onWakeUpImport,
         onFileImport = onFileImport,
         onQiangzhiImport = onQiangzhiImport,
+        onAiImport = onAiImport,
     )
 }
 
@@ -59,6 +62,7 @@ private fun NewTimetableScreen(
     onWakeUpImport: () -> Unit,
     onFileImport: () -> Unit,
     onQiangzhiImport: () -> Unit,
+    onAiImport: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
@@ -116,8 +120,16 @@ private fun NewTimetableScreen(
                     supporting = stringResource(R.string.new_timetable_qiangzhi_support),
                     onClick = onQiangzhiImport,
                     shapeIndex = 2,
-                    shapeCount = 3,
+                    shapeCount = 4,
                     leading = { Icon(Icons.Rounded.School, contentDescription = null) },
+                )
+                SettingsListItem(
+                    title = stringResource(R.string.new_timetable_ai_title),
+                    supporting = stringResource(R.string.new_timetable_ai_support),
+                    onClick = onAiImport,
+                    shapeIndex = 3,
+                    shapeCount = 4,
+                    leading = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
                 )
             }
         }
