@@ -1,5 +1,6 @@
 package com.star.schedule.feature.timetable.presentation
 
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.core.animateFloatAsState
@@ -265,9 +266,11 @@ private fun TimetableSettingsScreen(
         }
     }
 
+    // 外层只负责「内容什么时候被移除」：进场不淡入（按钮各自做），
+    // 退场保留 OUT 时长，否则一关就直接销毁，按钮的缩小动画来不及播。
     AnimatedVisibility(
         visible = actionMenuOpen,
-        enter = fadeIn(tween(TimetableActionMenuFadeInMillis)),
+        enter = fadeIn(tween(0)),
         exit = fadeOut(tween(TimetableActionMenuFadeOutMillis)),
     ) {
         actionMenu?.let { menu ->
@@ -769,6 +772,7 @@ private const val TimetableActionMenuFadeInMillis = 180
 private const val TimetableActionMenuFadeOutMillis = 140
 
 private const val TimetableActionButtonInitialScale = 0.6f
+private const val TimetableActionButtonStaggerMillis = 60
 
 private val TimetableActionButtonMinSize = 48.dp
 private val TimetableActionButtonMaxSize = 88.dp
@@ -814,46 +818,51 @@ private fun TimetableCardActionOverlay(
                 )
             },
         ) {
-            val buttons: @Composable () -> Unit = {
-                TimetableActionButton(
-                    label = stringResource(R.string.timetable_action_edit_name),
-                    icon = Icons.Rounded.Edit,
-                    shape = MaterialShapes.Cookie4Sided.toShape(),
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    size = buttonSize,
-                    onClick = onRename,
-                )
-                TimetableActionButton(
-                    label = stringResource(R.string.action_delete),
-                    icon = Icons.Rounded.Delete,
-                    shape = MaterialShapes.Ghostish.toShape(),
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    size = buttonSize,
-                    onClick = onDelete,
-                )
+            // 两个按钮各自做淡入 + 放大，第二个晚一点点，出场时同样分开缩回去。
+            val editButton: @Composable () -> Unit = {
+                AnimatedCardActionButton(visible = visible, delayMillis = 0) {
+                    TimetableActionButton(
+                        label = stringResource(R.string.timetable_action_edit_name),
+                        icon = Icons.Rounded.Edit,
+                        shape = MaterialShapes.Cookie4Sided.toShape(),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        size = buttonSize,
+                        onClick = onRename,
+                    )
+                }
             }
-            // 只缩放按钮组：外层那层是全屏点击层，跟着缩放会把可点区域一起缩掉。
-            AnimatedVisibility(
-                visible = visible,
-                enter = scaleIn(
-                    initialScale = TimetableActionButtonInitialScale,
-                    animationSpec = tween(TimetableActionMenuFadeInMillis),
-                ),
-                exit = scaleOut(
-                    targetScale = TimetableActionButtonInitialScale,
-                    animationSpec = tween(TimetableActionMenuFadeOutMillis),
-                ),
-            ) {
-                if (horizontal) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
-                        buttons()
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
-                        buttons()
-                    }
+            val deleteButton: @Composable () -> Unit = {
+                AnimatedCardActionButton(
+                    visible = visible,
+                    delayMillis = TimetableActionButtonStaggerMillis,
+                ) {
+                    TimetableActionButton(
+                        label = stringResource(R.string.action_delete),
+                        icon = Icons.Rounded.Delete,
+                        shape = MaterialShapes.Ghostish.toShape(),
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        size = buttonSize,
+                        onClick = onDelete,
+                    )
+                }
+            }
+            if (horizontal) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(TimetableActionButtonGap),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    editButton()
+                    deleteButton()
+                }
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(TimetableActionButtonGap),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    editButton()
+                    deleteButton()
                 }
             }
         }
@@ -920,4 +929,36 @@ private fun RenameTimetableDialog(
             }
         },
     )
+}
+
+
+/**
+ * 单个按钮的出场动画。
+ *
+ * 用 [MutableTransitionState] 从 false 起步：直接给 AnimatedVisibility 传 visible = true 时，
+ * 首次组合就已经是可见状态，进场动画会被整个跳过。
+ */
+@Composable
+private fun AnimatedCardActionButton(
+    visible: Boolean,
+    delayMillis: Int = 0,
+    content: @Composable () -> Unit,
+) {
+    val transitionState = remember { MutableTransitionState(false) }
+    transitionState.targetState = visible
+    AnimatedVisibility(
+        visibleState = transitionState,
+        enter = fadeIn(tween(TimetableActionMenuFadeInMillis, delayMillis = delayMillis)) +
+            scaleIn(
+                initialScale = TimetableActionButtonInitialScale,
+                animationSpec = tween(TimetableActionMenuFadeInMillis, delayMillis = delayMillis),
+            ),
+        exit = fadeOut(tween(TimetableActionMenuFadeOutMillis)) +
+            scaleOut(
+                targetScale = TimetableActionButtonInitialScale,
+                animationSpec = tween(TimetableActionMenuFadeOutMillis),
+            ),
+    ) {
+        content()
+    }
 }
