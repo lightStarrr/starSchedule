@@ -7,7 +7,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -510,24 +509,13 @@ private fun NewTimetableCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
-        // 图标 + 文案一起给：只有一个小十字时，卡片一大就只剩个小点，折叠后更是快看不见了。
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // TODO(设计): 新建课表的流程还没定，先只放占位，不挂点击。
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = stringResource(R.string.timetable_settings_new),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(56.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.timetable_settings_new),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(32.dp),
             )
         }
     }
