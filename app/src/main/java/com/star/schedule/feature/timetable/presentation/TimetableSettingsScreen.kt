@@ -1,5 +1,7 @@
 package com.star.schedule.feature.timetable.presentation
 
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
@@ -271,6 +273,7 @@ private fun TimetableSettingsScreen(
         actionMenu?.let { menu ->
             TimetableCardActionOverlay(
                 bounds = menu.bounds,
+                visible = actionMenuOpen,
                 onRename = {
                     renaming = state.previews.firstOrNull { it.id == menu.timetableId }
                     actionMenuOpen = false
@@ -765,6 +768,8 @@ private const val TimetableActionScrimAlpha = 0.12f
 private const val TimetableActionMenuFadeInMillis = 180
 private const val TimetableActionMenuFadeOutMillis = 140
 
+private const val TimetableActionButtonInitialScale = 0.6f
+
 private val TimetableActionButtonMinSize = 48.dp
 private val TimetableActionButtonMaxSize = 88.dp
 private val TimetableActionButtonGap = 12.dp
@@ -779,6 +784,7 @@ private val TimetableActionButtonGap = 12.dp
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun TimetableCardActionOverlay(
     bounds: Rect,
+    visible: Boolean,
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
@@ -828,13 +834,26 @@ private fun TimetableCardActionOverlay(
                     onClick = onDelete,
                 )
             }
-            if (horizontal) {
-                Row(horizontalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
-                    buttons()
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
-                    buttons()
+            // 只缩放按钮组：外层那层是全屏点击层，跟着缩放会把可点区域一起缩掉。
+            AnimatedVisibility(
+                visible = visible,
+                enter = scaleIn(
+                    initialScale = TimetableActionButtonInitialScale,
+                    animationSpec = tween(TimetableActionMenuFadeInMillis),
+                ),
+                exit = scaleOut(
+                    targetScale = TimetableActionButtonInitialScale,
+                    animationSpec = tween(TimetableActionMenuFadeOutMillis),
+                ),
+            ) {
+                if (horizontal) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
+                        buttons()
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(TimetableActionButtonGap)) {
+                        buttons()
+                    }
                 }
             }
         }
