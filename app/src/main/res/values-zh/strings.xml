@@ -243,6 +243,16 @@
     <string name="timetable_settings_row_height_decrease">减小行高</string>
     <string name="timetable_settings_row_height_increase">增大行高</string>
     <string name="timetable_settings_new">新建课表</string>
+    <string name="new_timetable_title">新建课表</string>
+    <string name="new_timetable_manual_title">手动创建</string>
+    <string name="new_timetable_manual_support">从空白课表开始排课</string>
+    <string name="new_timetable_section_import">导入现有课表</string>
+    <string name="new_timetable_wakeup_title">WakeUp 课程表</string>
+    <string name="new_timetable_wakeup_support">粘贴分享口令导入</string>
+    <string name="new_timetable_file_title">本地文件</string>
+    <string name="new_timetable_file_support">从 html、json 或 xlsx 文件导入</string>
+    <string name="new_timetable_qiangzhi_title">强智教务系统</string>
+    <string name="new_timetable_qiangzhi_support">用账号密码登录后抓取课表</string>
     <string name="home_action_timetable_short">课表</string>
     <string name="home_action_settings">设置</string>
     <string name="home_action_more">更多操作</string>
