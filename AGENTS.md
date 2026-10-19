@@ -222,17 +222,16 @@ fun TimetableSettingsRoute(viewModel: TimetableSettingsViewModel) {
 - Android Studio 的 Gradle JVM 使用项目配置的 `#GRADLE_LOCAL_JAVA_HOME`，当前实际指向 Android Studio 自带的 `C:\Program Files\Android\Android Studio\jbr`（JDK 25）。
 - Android Studio 默认使用用户级 `C:\Users\<用户名>\.gradle` 缓存；当前缓存包含 Gradle 9.8.0、AGP 9.4.1 及项目依赖。命令行若将 `GRADLE_USER_HOME` 指向仓库内 `.gradle`，两者会使用不同的发行包和依赖缓存，不能据此判断 Android Studio 构建结果。
 - 若需与 Android Studio 保持一致，命令行应使用同一个 JDK 和用户级 Gradle 缓存；若需使用仓库内可写的 `.gradle` 做隔离构建，必须先确保对应 Gradle 发行包和全部依赖已缓存。
-- `local.properties` 中的 Android SDK 路径仍以本机实际安装位置为准，不提交该文件；`.gradle/config.properties` 和 `.android` 只作为本机环境配置，不纳入提交。
+- `local.properties` 中的 Android SDK 路径仍以本机实际安装位置为准，不提交该文件；`.gradle/config.properties` 只作为本机环境配置，不纳入提交。
+- **不要把 `ANDROID_USER_HOME` 指向仓库内目录。** AGP 用 `<ANDROID_USER_HOME>/debug.keystore` 给 debug 包签名，仓库内没有该文件时会现场生成一份，签名与 Android Studio 使用的 `C:\Users\<用户名>\.android\debug.keystore` 不同，装到同一台设备上会报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。仓库内的 `.android/debug.keystore` 属于误生成，应删除。排查两边签名是否一致可用 `apksigner verify --print-certs` 对比证书 SHA-256。
 
 PowerShell 验证命令：
 
 ```powershell
-$projectRoot = (Get-Location).Path
 $studioJdk = "C:\Program Files\Android\Android Studio\jbr"
 $env:JAVA_HOME = $studioJdk
 $env:Path = "$studioJdk\bin;$env:Path"
 $env:GRADLE_USER_HOME = Join-Path $env:USERPROFILE ".gradle"
-$env:ANDROID_USER_HOME = Join-Path $projectRoot ".android"
 
 java -version
 .\gradlew :app:compileDebugKotlin --offline
