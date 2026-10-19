@@ -1,5 +1,6 @@
 package com.star.schedule.feature.timetable.presentation
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.fadeIn
@@ -222,8 +223,9 @@ private fun TimetableSettingsScreen(
                         maxCardWidth = cardMaxWidth,
                         maxCardHeight = cardMaxWidth * screenAspect,
                         onApply = onApply,
-                        onLongPress = { id, bounds, corner ->
-                            actionMenu = TimetableActionMenu(id, bounds, corner)
+                        scrimmedTimetableId = if (actionMenuOpen) actionMenu?.timetableId else null,
+                        onLongPress = { id, bounds ->
+                            actionMenu = TimetableActionMenu(id, bounds)
                             actionMenuOpen = true
                         },
                     )
@@ -269,7 +271,6 @@ private fun TimetableSettingsScreen(
         actionMenu?.let { menu ->
             TimetableCardActionOverlay(
                 bounds = menu.bounds,
-                corner = menu.corner,
                 onRename = {
                     renaming = state.previews.firstOrNull { it.id == menu.timetableId }
                     actionMenuOpen = false
@@ -337,7 +338,8 @@ private fun TimetablePreviewPager(
     maxCardWidth: Dp,
     maxCardHeight: Dp,
     onApply: (Long) -> Unit,
-    onLongPress: (Long, Rect, Dp) -> Unit,
+    scrimmedTimetableId: Long?,
+    onLongPress: (Long, Rect) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     // 折叠进度不直接照着滚，而是做指数平滑（一阶低通，Unity 里叫 SmoothDamp）：
@@ -427,6 +429,7 @@ private fun TimetablePreviewPager(
                     maxCardWidth = maxCardWidth,
                     maxCardHeight = maxCardHeight,
                     corner = cardCorner,
+                    scrimmed = scrimmedTimetableId != null && preview?.id == scrimmedTimetableId,
                     onSelect = onSelectPage,
                     onLongPress = onLongPress,
                 )
@@ -467,8 +470,9 @@ private fun TimetablePreviewPage(
     maxCardWidth: Dp,
     maxCardHeight: Dp,
     corner: Dp,
+    scrimmed: Boolean,
     onSelect: (Int) -> Unit,
-    onLongPress: (Long, Rect, Dp) -> Unit,
+    onLongPress: (Long, Rect) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -505,8 +509,9 @@ private fun TimetablePreviewPage(
                 maxWidth = maxCardWidth,
                 maxHeight = maxCardHeight,
                 corner = corner,
+                scrimmed = scrimmed,
                 onClick = { onSelect(page) },
-                onLongPress = { bounds -> onLongPress(preview.id, bounds, corner) },
+                onLongPress = { bounds -> onLongPress(preview.id, bounds) },
             )
         }
     }
@@ -551,6 +556,7 @@ private fun TimetablePreviewCard(
     maxWidth: Dp,
     maxHeight: Dp,
     corner: Dp,
+    scrimmed: Boolean,
     onClick: () -> Unit,
     onLongPress: (Rect) -> Unit,
 ) {
@@ -576,12 +582,29 @@ private fun TimetablePreviewCard(
             null
         },
     ) {
-        TimetableThumbnail(
-            preview = preview,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(PreviewCardContentInset),
+        // 长按菜单的遮罩就画在卡片里，圆角和裁剪由 Card 的 shape 负责。
+        val scrimAlpha by animateFloatAsState(
+            targetValue = if (scrimmed) TimetableActionScrimAlpha else 0f,
+            animationSpec = tween(
+                if (scrimmed) TimetableActionMenuFadeInMillis else TimetableActionMenuFadeOutMillis,
+            ),
+            label = "timetableCardScrim",
         )
+        Box(modifier = Modifier.fillMaxSize()) {
+            TimetableThumbnail(
+                preview = preview,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(PreviewCardContentInset),
+            )
+            if (scrimAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha)),
+                )
+            }
+        }
     }
 }
 
@@ -733,9 +756,9 @@ private const val THUMBNAIL_ROWS = 12
 private data class TimetableActionMenu(
     val timetableId: Long,
     val bounds: Rect,
-    val corner: Dp,
 )
 
+private const val TimetableActionScrimAlpha = 0.12f
 private const val TimetableActionMenuFadeInMillis = 180
 private const val TimetableActionMenuFadeOutMillis = 140
 
@@ -753,7 +776,6 @@ private val TimetableActionButtonGap = 12.dp
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun TimetableCardActionOverlay(
     bounds: Rect,
-    corner: Dp,
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
@@ -775,17 +797,6 @@ private fun TimetableCardActionOverlay(
             .fillMaxSize()
             .pointerInput(Unit) { detectTapGestures { onDismiss() } },
     ) {
-        // 遮罩只压住卡片本身，形状跟着卡片圆角走；淡入淡出由外层 AnimatedVisibility 统一处理。
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(bounds.left.roundToInt(), bounds.top.roundToInt()) }
-                .size(
-                    with(density) { bounds.width.toDp() },
-                    with(density) { bounds.height.toDp() },
-                )
-                .clip(RoundedCornerShape(corner))
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f)),
-        )
         Box(
             modifier = Modifier.offset {
                 IntOffset(
