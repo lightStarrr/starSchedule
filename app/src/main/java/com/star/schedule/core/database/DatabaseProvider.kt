@@ -41,15 +41,14 @@ object DatabaseProvider {
                     )
                     .build()
 
-                // 确保在初始化后就有“当前课表”，避免其他读取逻辑拿到空值
+                // 不再自动建「默认课表」：首次启动就是空的，由用户自己导入或新建。
+                // 读取方一律按「当前课表可能不存在」处理（PREF_CURRENT_TIMETABLE 为空字符串）。
                 runBlocking {
                     withContext(Dispatchers.IO) {
-                        db.scheduleDao().initializeDefaultTimetable(
-                            context.getString(R.string.default_timetable_name)
-                        )
+                        db.scheduleDao().ensureValidCurrentTimetable()
                     }
                 }
-                
+
                 android.util.Log.d("DatabaseProvider", "Database initialized successfully")
             } else {
                 android.util.Log.d("DatabaseProvider", "Database already initialized")
