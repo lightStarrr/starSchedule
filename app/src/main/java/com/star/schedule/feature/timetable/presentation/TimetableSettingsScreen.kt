@@ -566,6 +566,9 @@ private fun TimetablePreviewCard(
         modifier = Modifier
             .previewCardSize(progress, maxWidth, maxHeight)
             .onGloballyPositioned { boundsInRoot = it.boundsInRoot() }
+            // clip 必须排在 clickable 前面：水波纹画在 clickable 那一层，
+            // 顺序反了就是矩形的按压反馈盖在圆角卡片上。
+            .clip(RoundedCornerShape(corner))
             .combinedClickable(
                 role = Role.Button,
                 onClick = onClick,
