@@ -515,7 +515,17 @@ private fun NewTimetableCard(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = stringResource(R.string.timetable_settings_new),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(32.dp),
+                // 卡片折叠时整块内容会被 graphicsLayer 缩小，这里按 1/缩放 抵消，
+                // 让加号在屏幕上始终是同一个大小，不会越缩越小。
+                modifier = Modifier
+                    .size(32.dp)
+                    .graphicsLayer {
+                        val fraction = progress.value.coerceIn(0f, 1f)
+                        val cardScale =
+                            lerp(maxWidth, PreviewCardCollapsedWidth, fraction) / maxWidth
+                        scaleX = 1f / cardScale
+                        scaleY = 1f / cardScale
+                    },
             )
         }
     }
