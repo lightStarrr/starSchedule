@@ -11,7 +11,6 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
+import com.star.schedule.core.designsystem.icon.GlobeSparkleIcon
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.feature.settings.presentation.SettingsGroup
 import com.star.schedule.feature.settings.presentation.SettingsListItem
@@ -114,7 +114,7 @@ private fun NewTimetableScreen(
                     onClick = onImportFromWebsite,
                     shapeIndex = 1,
                     shapeCount = 2,
-                    leading = { Icon(Icons.Rounded.Language, contentDescription = null) },
+                    leading = { GlobeSparkleIcon() },
                 )
             }
 
