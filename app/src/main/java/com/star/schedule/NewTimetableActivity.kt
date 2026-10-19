@@ -27,6 +27,7 @@ class NewTimetableActivity : ComponentActivity() {
                     onWakeUpImport = {},
                     onFileImport = {},
                     onQiangzhiImport = {},
+                    onAiImport = {},
                 )
             }
         }
