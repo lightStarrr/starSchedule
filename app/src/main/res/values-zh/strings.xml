@@ -251,8 +251,6 @@
     <string name="new_timetable_wakeup_support">粘贴分享口令导入</string>
     <string name="new_timetable_file_title">本地文件</string>
     <string name="new_timetable_file_support">从 html、json 或 xlsx 文件导入</string>
-    <string name="new_timetable_qiangzhi_title">强智教务系统</string>
-    <string name="new_timetable_qiangzhi_support">用账号密码登录后抓取课表</string>
     <string name="new_timetable_ai_title">AI 导入</string>
     <string name="new_timetable_ai_support">识别截图或文字里的课表</string>
     <string name="home_action_timetable_short">课表</string>

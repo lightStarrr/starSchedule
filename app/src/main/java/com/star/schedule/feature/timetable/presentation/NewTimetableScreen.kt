@@ -11,7 +11,6 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.School
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +34,6 @@ fun NewTimetableRoute(
     onManualCreate: () -> Unit,
     onWakeUpImport: () -> Unit,
     onFileImport: () -> Unit,
-    onQiangzhiImport: () -> Unit,
     onAiImport: () -> Unit,
 ) {
     NewTimetableScreen(
@@ -43,7 +41,6 @@ fun NewTimetableRoute(
         onManualCreate = onManualCreate,
         onWakeUpImport = onWakeUpImport,
         onFileImport = onFileImport,
-        onQiangzhiImport = onQiangzhiImport,
         onAiImport = onAiImport,
     )
 }
@@ -51,7 +48,8 @@ fun NewTimetableRoute(
 /**
  * 新建课表的入口：先定这张课表怎么来，再进入各自的流程。
  *
- * 四种方式的产物都是同一条 `TimetableEntity`，所以这里只做一次分流；
+ * 手动创建是主干，导入是「快速把课填满」的三条捷径，所以两者分栏。
+ * 三种方式的产物都是同一条 `TimetableEntity`，这里只做一次分流；
  * 名称、开学日期等最终确认交给各流程自己收集，避免在这一层重复出现表单。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,7 +59,6 @@ private fun NewTimetableScreen(
     onManualCreate: () -> Unit,
     onWakeUpImport: () -> Unit,
     onFileImport: () -> Unit,
-    onQiangzhiImport: () -> Unit,
     onAiImport: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -116,19 +113,11 @@ private fun NewTimetableScreen(
                     leading = { Icon(Icons.Rounded.Description, contentDescription = null) },
                 )
                 SettingsListItem(
-                    title = stringResource(R.string.new_timetable_qiangzhi_title),
-                    supporting = stringResource(R.string.new_timetable_qiangzhi_support),
-                    onClick = onQiangzhiImport,
-                    shapeIndex = 2,
-                    shapeCount = 4,
-                    leading = { Icon(Icons.Rounded.School, contentDescription = null) },
-                )
-                SettingsListItem(
                     title = stringResource(R.string.new_timetable_ai_title),
                     supporting = stringResource(R.string.new_timetable_ai_support),
                     onClick = onAiImport,
-                    shapeIndex = 3,
-                    shapeCount = 4,
+                    shapeIndex = 2,
+                    shapeCount = 3,
                     leading = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
                 )
             }
