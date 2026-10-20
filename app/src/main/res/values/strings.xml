@@ -61,7 +61,6 @@
     <string name="wakeup_error_network">Network unavailable, try again later</string>
     <string name="wakeup_error_unsupported">This share format is not supported</string>
     <string name="wakeup_import_key_hint">The share code is valid for 30 minutes</string>
-    <string name="wakeup_import_key_detected">Code detected: %1$s</string>
     <string name="wakeup_import_fetching">Fetching timetable…</string>
     <string name="wakeup_default_timetable_name">Untitled WakeUp timetable</string>
     <string name="qiangzhi_import_title">Qiangzhi academic system import</string>

@@ -183,9 +183,8 @@ private fun StatusLine(
         phase is WakeUpImportPhase.Failed -> phase.error.message() to MaterialTheme.colorScheme.error
         phase is WakeUpImportPhase.Importing ->
             stringResource(R.string.wakeup_import_fetching) to MaterialTheme.colorScheme.onSurfaceVariant
-        state.shareKey.isNotEmpty() ->
-            stringResource(R.string.wakeup_import_key_detected, state.shareKey.preview()) to
-                MaterialTheme.colorScheme.primary
+        // 识别成功不吭声：按钮变实心已经是反馈，不必再写一行"已识别口令"。
+        state.shareKey.isNotEmpty() -> "" to MaterialTheme.colorScheme.onSurfaceVariant
         state.input.isNotBlank() ->
             stringResource(R.string.wakeup_error_invalid_code) to MaterialTheme.colorScheme.onSurfaceVariant
         else ->
@@ -211,9 +210,6 @@ private fun WakeUpImportError.message(): String = stringResource(
         WakeUpImportError.Unsupported -> R.string.wakeup_error_unsupported
     },
 )
-
-/** 口令一般 16 位，露前 8 位就够用户确认识别对了，不必让整串把状态行挤成两行。 */
-private fun String.preview(): String = if (length > 8) take(8) + "…" else this
 
 /**
  * 九瓣饼干形状的提交按钮，加载时在原地换成进度环，不额外弹任何遮罩。
