@@ -1,31 +1,32 @@
 package com.star.schedule.core.designsystem.icon
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
 /**
  * 地球 + 右下角一颗星星，表示「在网站上用 AI 识别课表」。
  *
- * Material Icons 没有现成的组合图标。地球按 24dp 画满，星星 10dp 叠在右下角。
+ * Material Icons 没有现成的组合图标。地球按 24dp 画满，星星 12dp 叠在右下角。
  *
- * 星星下面铺一层同形状、[background] 色的描边：两个同色实心图形直接重叠会糊成
- * 一团，只露出星星的尖角；用圆形挖空切口又太深。
- *
- * 描边不能简单放大一个同位图标的尺寸——`AutoAwesome` 的大星偏左下、两颗小星在
- * 右上，缩放中心落在盒子中心会一侧厚一侧薄，看着就是错位。这里两层用同一个
- * 10dp 图标，只给描边一层套 [graphicsLayer]，并把缩放原点定在大星中心。
+ * 星星底下要先垫一圈 [background] 色的边，否则同色实心图形叠在一起会糊成一块。
+ * 这里没有用"放大一个同位图标"来做这圈边——整体缩放会把两颗小星也朝外推，
+ * 上面那颗会被推到地球轮廓外，它和球之间就再也没有可对比的背景，看着像没有间隙。
+ * 改成给星星路径本身描边：路径位置不动，只把轮廓向外扩 [SparkleGap]，三颗星都在原位。
  *
  * 调用方必须传入所在容器的实际颜色，否则描边处会出现色块。
  */
@@ -34,7 +35,10 @@ fun GlobeSparkleIcon(
     background: Color,
     modifier: Modifier = Modifier,
     tint: Color = LocalContentColor.current,
+    sparkleTint: Color = tint,
 ) {
+    val starPath = remember { PathParser().parsePathString(AutoAwesomePath).toPath() }
+
     Box(modifier = modifier.size(IconSize)) {
         Icon(
             imageVector = Icons.Rounded.Public,
@@ -42,38 +46,33 @@ fun GlobeSparkleIcon(
             tint = tint,
             modifier = Modifier.size(IconSize),
         )
-        Box(
+        Canvas(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .size(SparkleSize),
         ) {
-            Icon(
-                imageVector = Icons.Rounded.AutoAwesome,
-                contentDescription = null,
-                tint = background,
-                modifier = Modifier
-                    .size(SparkleSize)
-                    .graphicsLayer {
-                        scaleX = SparkleOutlineScale
-                        scaleY = SparkleOutlineScale
-                        transformOrigin = SparkleOutlineOrigin
-                    },
+            val scale = size.width / StarViewport
+            val scaled = Path().apply { addPath(starPath) }
+            scaled.transform(Matrix().apply { scale(scale, scale) })
+            drawPath(
+                path = scaled,
+                color = background,
+                style = Stroke(width = SparkleGap.toPx() * 2),
             )
-            Icon(
-                imageVector = Icons.Rounded.AutoAwesome,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(SparkleSize),
-            )
+            drawPath(path = scaled, color = sparkleTint)
         }
     }
 }
 
 private val IconSize = 24.dp
-private val SparkleSize = 10.dp
+private val SparkleSize = 12.dp
+private val SparkleGap = 0.8.dp
 
-// 描边沿四周扩到星星的 1.45 倍，10dp 下大约留出 1.5dp 的缝。
-private const val SparkleOutlineScale = 1.45f
+// AutoAwesome 画在 24 的画布上，缩放到 12dp 只需要整体乘 0.5。
+private const val StarViewport = 24f
 
-// AutoAwesome 的 viewBox 里大星中心约在 (9.6, 13)，缩放到 0..1 就是这两个比例。
-private val SparkleOutlineOrigin = TransformOrigin(0.40f, 0.54f)
+// Material Icons `auto_awesome` 的标准路径：一颗大星 + 两颗小星。
+private const val AutoAwesomePath =
+    "M19,9l1.25,-2.75L23,5l-2.75,-1.25L19,1l-1.25,2.75L15,5l2.75,1.25L19,9z" +
+        "M11.5,9.5L9,4 6.5,9.5 1,12l5.5,2.5L9,20l2.5,-5.5L17,12l-5.5,-2.5z" +
+        "M19,15l-1.25,2.75L15,19l2.75,1.25L19,23l1.25,-2.75L23,19l-2.75,-1.25L19,15z"
