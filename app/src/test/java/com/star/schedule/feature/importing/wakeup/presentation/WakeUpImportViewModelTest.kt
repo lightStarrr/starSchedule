@@ -61,9 +61,9 @@ class WakeUpImportViewModelTest {
     fun `extracts share key while typing`() {
         val viewModel = viewModel()
 
-        viewModel.onInputChange("分享口令为「a1b2c3」")
+        viewModel.onInputChange("分享口令为「a1b2c3d4」")
 
-        assertEquals("a1b2c3", viewModel.uiState.value.shareKey)
+        assertEquals("a1b2c3d4", viewModel.uiState.value.shareKey)
         assertTrue(viewModel.uiState.value.canImport)
     }
 
@@ -85,11 +85,11 @@ class WakeUpImportViewModelTest {
     fun `selects the imported timetable on success`() = runTest(dispatcher) {
         val viewModel = viewModel()
 
-        viewModel.onInputChange("分享口令为「a1b2c3」")
+        viewModel.onInputChange("分享口令为「a1b2c3d4」")
         viewModel.import()
         advanceUntilIdle()
 
-        assertEquals(listOf("a1b2c3"), fetchedKeys)
+        assertEquals(listOf("a1b2c3d4"), fetchedKeys)
         assertEquals(listOf(7L), selectedTimetables)
         assertEquals(WakeUpImportPhase.Finished(7L), viewModel.uiState.value.phase)
         assertFalse(viewModel.uiState.value.canImport)
@@ -99,7 +99,7 @@ class WakeUpImportViewModelTest {
     fun `marks network failures separately from rejected codes`() = runTest(dispatcher) {
         val viewModel = viewModel(source = WakeUpShareSource { throw IOException("offline") })
 
-        viewModel.onInputChange("分享口令为「a1b2c3」")
+        viewModel.onInputChange("分享口令为「a1b2c3d4」")
         viewModel.import()
         advanceUntilIdle()
 

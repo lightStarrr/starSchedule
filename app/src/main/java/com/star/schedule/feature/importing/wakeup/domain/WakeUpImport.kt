@@ -42,6 +42,22 @@ sealed interface WakeUpImportResult {
     data class Failure(val cause: Throwable) : WakeUpImportResult
 }
 
+/**
+ * 协议本身对不上：常量过期、签名被拒、密文解不开。
+ *
+ * 这和「口令错了」是两件事，UI 上要给不同的提示，否则用户会以为是自己复制错了。
+ */
+class WakeUpProtocolException(
+    message: String,
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)
+
+/** 服务端明确拒了这个口令（无效或过期）。 */
+class WakeUpShareRejectedException(
+    message: String,
+) : IllegalArgumentException(message)
+
+
 class ImportWakeUpScheduleUseCase(
     private val source: WakeUpShareSource,
     private val parser: WakeUpImportParser,
