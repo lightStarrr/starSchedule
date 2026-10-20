@@ -114,7 +114,8 @@ private fun NewTimetableScreen(
                     onClick = onImportFromWebsite,
                     shapeIndex = 1,
                     shapeCount = 2,
-                    leading = { GlobeSparkleIcon() },
+                    // 列表项的底色是 surfaceBright，星星的挖空圆必须用同一个颜色。
+                    leading = { GlobeSparkleIcon(background = MaterialTheme.colorScheme.surfaceBright) },
                 )
             }
 
