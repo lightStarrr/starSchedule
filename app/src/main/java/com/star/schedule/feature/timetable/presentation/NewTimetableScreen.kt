@@ -8,7 +8,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.core.designsystem.icon.GlobeSparkleIcon
+import com.star.schedule.core.designsystem.icon.WakeUpLogoIcon
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.feature.settings.presentation.SettingsGroup
 import com.star.schedule.feature.settings.presentation.SettingsListItem
@@ -127,7 +127,7 @@ private fun NewTimetableScreen(
                     onClick = onWakeUpImport,
                     shapeIndex = 0,
                     shapeCount = 2,
-                    leading = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                    leading = { WakeUpLogoIcon() },
                 )
                 SettingsListItem(
                     title = stringResource(R.string.new_timetable_file_title),
