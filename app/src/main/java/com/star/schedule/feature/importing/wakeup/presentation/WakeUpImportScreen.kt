@@ -3,22 +3,24 @@ package com.star.schedule.feature.importing.wakeup.presentation
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -48,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleBackButton
-import com.star.schedule.core.designsystem.navigationBarBottomInset
 
 @Composable
 fun WakeUpImportRoute(
@@ -83,8 +84,6 @@ private fun WakeUpImportScreen(
     onInputChange: (String) -> Unit,
     onImport: () -> Unit,
 ) {
-    val navigationBarInset = navigationBarBottomInset()
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -93,11 +92,18 @@ private fun WakeUpImportScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .imePadding(),
+                // 底部只认一个内边距：键盘收起时是导航栏高度，弹出时是键盘高度。
+                // 分开写 imePadding() + 导航栏内边距的话，两者切换是离散的，动画中途会跳一下。
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+                ),
         ) {
-            // 键盘弹起后可用高度会掉到 400dp 上下（窗口先缩一次，ime 内边距又减一次），
-            // 这时候必须换成紧凑规格，否则按钮会被压成一条。
-            val compact = maxHeight < 560.dp
+            // 尺寸跟着可用高度连续变化，不能用阈值切换规格：一旦跨阈值，
+            // 键盘动画到一半时输入框会先冲过头再弹回来。
+            val roominess = ((maxHeight - 400.dp) / 140.dp).coerceIn(0f, 1f)
+            val fieldHeight = 88.dp + 44.dp * roominess
+            val topReserve = 48.dp + 24.dp * roominess
+            val bottomGap = 12.dp + 28.dp * roominess
 
             CircleBackButton(
                 onClick = onBack,
@@ -114,7 +120,7 @@ private fun WakeUpImportScreen(
                     .fillMaxSize()
                     .statusBarsPadding()
                     // 把顶栏那块让出来，输入框才不会顶到返回按钮上。
-                    .padding(top = if (compact) 56.dp else 72.dp),
+                    .padding(top = topReserve),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // 上方权重略大于下方：按钮占了自己的高度，等权重会让输入框整体偏上，
@@ -124,7 +130,7 @@ private fun WakeUpImportScreen(
                 ShareKeyField(
                     state = state,
                     onInputChange = onInputChange,
-                    minFieldHeight = if (compact) 88.dp else 132.dp,
+                    minFieldHeight = fieldHeight,
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 520.dp)
@@ -137,9 +143,7 @@ private fun WakeUpImportScreen(
                     enabled = state.canImport,
                     importing = state.isImporting,
                     onClick = onImport,
-                    modifier = Modifier.padding(
-                        bottom = if (compact) 12.dp else 40.dp + navigationBarInset,
-                    ),
+                    modifier = Modifier.padding(bottom = bottomGap),
                 )
             }
         }
