@@ -1,9 +1,5 @@
 package com.star.schedule.feature.importing.wakeup.presentation
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -21,8 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,17 +26,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -157,49 +149,18 @@ private fun ShareKeyField(
     minFieldHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val focused by interactionSource.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(28.dp)
-
     Column(modifier = modifier) {
-        Surface(
-            shape = shape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(
-                width = 1.dp,
-                color = when {
-                    focused -> MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-                    state.phase is WakeUpImportPhase.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
-                    else -> MaterialTheme.colorScheme.outlineVariant
-                },
-            ),
-        ) {
-            BasicTextField(
-                value = state.input,
-                onValueChange = onInputChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = minFieldHeight)
-                    .padding(20.dp),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                interactionSource = interactionSource,
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.TopStart) {
-                        if (state.input.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.wakeup_share_code_placeholder),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        innerTextField()
-                    }
-                },
-            )
-        }
+        OutlinedTextField(
+            value = state.input,
+            onValueChange = onInputChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = minFieldHeight),
+            textStyle = MaterialTheme.typography.bodyLarge,
+            // 用主题里的形状预设，不自己写圆角；extraLarge 在当前 M3 形状表里就是 28dp。
+            shape = MaterialTheme.shapes.extraLarge,
+            isError = state.phase is WakeUpImportPhase.Failed,
+        )
 
         Spacer(Modifier.height(16.dp))
 
