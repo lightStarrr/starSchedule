@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 /**
@@ -18,9 +20,13 @@ import androidx.compose.ui.unit.dp
  *
  * Material Icons 没有现成的组合图标。地球按 24dp 画满，星星 10dp 叠在右下角。
  *
- * 星星先铺一层同形状、用 [background] 色的放大版当描边。两个同色实心图形直接重叠
- * 会糊成一团，只露出星星的尖角，看起来像地球缺了一块；用圆形挖空切口又太深。
- * 让描边跟着星星的形状走，地球被切掉的轮廓才和星星对得上。
+ * 星星下面铺一层同形状、[background] 色的描边：两个同色实心图形直接重叠会糊成
+ * 一团，只露出星星的尖角；用圆形挖空切口又太深。
+ *
+ * 描边不能简单放大一个同位图标的尺寸——`AutoAwesome` 的大星偏左下、两颗小星在
+ * 右上，缩放中心落在盒子中心会一侧厚一侧薄，看着就是错位。这里两层用同一个
+ * 10dp 图标，只给描边一层套 [graphicsLayer]，并把缩放原点定在大星中心。
+ *
  * 调用方必须传入所在容器的实际颜色，否则描边处会出现色块。
  */
 @Composable
@@ -39,14 +45,19 @@ fun GlobeSparkleIcon(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .size(SparkleOutlineSize),
-            contentAlignment = Alignment.Center,
+                .size(SparkleSize),
         ) {
             Icon(
                 imageVector = Icons.Rounded.AutoAwesome,
                 contentDescription = null,
                 tint = background,
-                modifier = Modifier.size(SparkleOutlineSize),
+                modifier = Modifier
+                    .size(SparkleSize)
+                    .graphicsLayer {
+                        scaleX = SparkleOutlineScale
+                        scaleY = SparkleOutlineScale
+                        transformOrigin = SparkleOutlineOrigin
+                    },
             )
             Icon(
                 imageVector = Icons.Rounded.AutoAwesome,
@@ -61,5 +72,8 @@ fun GlobeSparkleIcon(
 private val IconSize = 24.dp
 private val SparkleSize = 10.dp
 
-// 描边比星星大一圈，间隙在 10dp 的尺寸下才不会糊成一条线。
-private val SparkleOutlineSize = 14.dp
+// 描边沿四周扩到星星的 1.45 倍，10dp 下大约留出 1.5dp 的缝。
+private const val SparkleOutlineScale = 1.45f
+
+// AutoAwesome 的 viewBox 里大星中心约在 (9.6, 13)，缩放到 0..1 就是这两个比例。
+private val SparkleOutlineOrigin = TransformOrigin(0.40f, 0.54f)
