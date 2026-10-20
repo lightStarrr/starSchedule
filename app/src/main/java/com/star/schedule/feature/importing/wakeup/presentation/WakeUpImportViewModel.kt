@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.star.schedule.feature.importing.wakeup.domain.ImportWakeUpScheduleUseCase
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportResult
+import com.star.schedule.feature.importing.wakeup.domain.WakeUpProtocolException
 import com.star.schedule.feature.importing.wakeup.domain.extractKeyFromShareText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -99,9 +100,11 @@ class WakeUpImportViewModel(
     private fun Throwable.toError(): WakeUpImportError = when (this) {
         // okhttp 连不上、超时都走 IOException。
         is IOException -> WakeUpImportError.Network
+        // 协议常量过期、签名被拒、密文解不开：跟用户输错口令无关，别让他反复重试。
+        is WakeUpProtocolException -> WakeUpImportError.Unsupported
         // 返回体不是预期的 JSON：WakeUp 改过分享格式，不是口令本身的问题。
         is SerializationException -> WakeUpImportError.Unsupported
-        // 剩下的是 HTTP 失败或 status != 1，服务端不区分「无效」和「过期」。
+        // 服务端明确拒绝，或 HTTP 失败：口令无效/过期。
         else -> WakeUpImportError.Rejected
     }
 }
