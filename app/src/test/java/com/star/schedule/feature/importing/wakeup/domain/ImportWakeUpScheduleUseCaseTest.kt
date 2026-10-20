@@ -29,12 +29,15 @@ class ImportWakeUpScheduleUseCaseTest {
                 parsedBody = body
                 plan
             },
-            writer = WakeUpScheduleWriter { value -> writtenPlan = value },
+            writer = WakeUpScheduleWriter { value ->
+                writtenPlan = value
+                42L
+            },
         )
 
         val result = useCase("share-key")
 
-        assertSame(WakeUpImportResult.Success, result)
+        assertEquals(WakeUpImportResult.Success(42L), result)
         assertEquals("share-key", fetchedKey)
         assertEquals("response", parsedBody)
         assertEquals(plan, writtenPlan)
@@ -47,7 +50,7 @@ class ImportWakeUpScheduleUseCaseTest {
         val useCase = ImportWakeUpScheduleUseCase(
             source = WakeUpShareSource { throw expected },
             parser = WakeUpImportParser { plan },
-            writer = WakeUpScheduleWriter { writeCount++ },
+            writer = WakeUpScheduleWriter { writeCount++; 0L },
         )
 
         val result = useCase("share-key")
