@@ -58,6 +58,11 @@
     <string name="wakeup_error_invalid_code">No valid share code found</string>
     <string name="wakeup_error_import_failed">Import failed; check if the share code is valid</string>
     <string name="wakeup_error_import_failed_reason">Import failed: %1$s</string>
+    <string name="wakeup_error_network">Network unavailable, try again later</string>
+    <string name="wakeup_error_unsupported">This share format is not supported</string>
+    <string name="wakeup_import_key_hint">The share code is valid for 30 minutes</string>
+    <string name="wakeup_import_key_detected">Code detected: %1$s</string>
+    <string name="wakeup_import_fetching">Fetching timetable…</string>
     <string name="wakeup_default_timetable_name">Untitled WakeUp timetable</string>
     <string name="qiangzhi_import_title">Qiangzhi academic system import</string>
     <string name="qiangzhi_info_text">Uses your credentials to sign into the Qiangzhi academic system and fetch the "Semester Theory Timetable".\nPlease enter the system URL, e.g. %1$s\nYour account and password will be stored in the timetable database for one–tap updates.</string>

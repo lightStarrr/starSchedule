@@ -32,11 +32,12 @@ fun interface WakeUpShareSource {
 }
 
 fun interface WakeUpScheduleWriter {
-    suspend fun write(plan: WakeUpImportPlan)
+    /** 写入后返回新课表的 id，调用方要靠它把新课表切成当前课表。 */
+    suspend fun write(plan: WakeUpImportPlan): Long
 }
 
 sealed interface WakeUpImportResult {
-    data object Success : WakeUpImportResult
+    data class Success(val timetableId: Long) : WakeUpImportResult
 
     data class Failure(val cause: Throwable) : WakeUpImportResult
 }
@@ -49,8 +50,7 @@ class ImportWakeUpScheduleUseCase(
     suspend operator fun invoke(key: String): WakeUpImportResult =
         try {
             val plan = parser.parse(source.fetch(key))
-            writer.write(plan)
-            WakeUpImportResult.Success
+            WakeUpImportResult.Success(writer.write(plan))
         } catch (exception: Exception) {
             WakeUpImportResult.Failure(exception)
         }

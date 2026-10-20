@@ -61,6 +61,10 @@
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
+            android:name=".WakeUpImportActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
             android:name=".RowHeightActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />

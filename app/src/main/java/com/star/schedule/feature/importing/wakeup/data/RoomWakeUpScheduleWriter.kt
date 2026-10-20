@@ -13,7 +13,7 @@ class RoomWakeUpScheduleWriter(
     private val defaultTimetableName: String,
     private val currentDate: () -> LocalDate = LocalDate::now,
 ) : WakeUpScheduleWriter {
-    override suspend fun write(plan: WakeUpImportPlan) {
+    override suspend fun write(plan: WakeUpImportPlan): Long {
         val timetableId = repository.insertTimetableWithReminders(
             TimetableEntity(
                 name = plan.timetableName ?: defaultTimetableName,
@@ -46,5 +46,7 @@ class RoomWakeUpScheduleWriter(
                 ),
             )
         }
+
+        return timetableId
     }
 }
