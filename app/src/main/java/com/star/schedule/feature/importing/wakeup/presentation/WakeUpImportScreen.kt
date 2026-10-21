@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,7 +26,6 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,10 +60,9 @@ fun WakeUpImportRoute(
 }
 
 /**
- * WakeUp 导入：整页只有一个输入框和一颗按钮。
+ * WakeUp 导入：顶栏、输入框、按钮，三者之外暂时不放任何内容。
  *
- * 这个流程的实质是把别处的分享口令搬过来，没有需要填的表单，所以不裱卡片、不做步骤条，
- * 空页面的注意力全部给输入框；底部那颗九瓣饼干形状的按钮是唯一动作。
+ * 视觉与文案都还在重做中，这里只保留结构与交互入口，不做加载态、错误态和提示语。
  */
 @Composable
 private fun WakeUpImportScreen(
@@ -120,8 +115,8 @@ private fun WakeUpImportScreen(
                 Spacer(Modifier.weight(1.2f))
 
                 ShareKeyField(
-                    state = state,
-                    onInputChange = onInputChange,
+                    value = state.input,
+                    onValueChange = onInputChange,
                     minFieldHeight = fieldHeight,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -132,8 +127,6 @@ private fun WakeUpImportScreen(
                 Spacer(Modifier.weight(1f))
 
                 CookieImportButton(
-                    enabled = state.canImport,
-                    importing = state.isImporting,
                     onClick = onImport,
                     modifier = Modifier.padding(bottom = bottomGap),
                 )
@@ -144,122 +137,48 @@ private fun WakeUpImportScreen(
 
 @Composable
 private fun ShareKeyField(
-    state: WakeUpImportUiState,
-    onInputChange: (String) -> Unit,
+    value: String,
+    onValueChange: (String) -> Unit,
     minFieldHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier) {
-        OutlinedTextField(
-            value = state.input,
-            onValueChange = onInputChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = minFieldHeight),
-            textStyle = MaterialTheme.typography.bodyLarge,
-            // 用主题里的形状预设，不自己写圆角；extraLarge 在当前 M3 形状表里就是 28dp。
-            shape = MaterialTheme.shapes.extraLarge,
-            isError = state.phase is WakeUpImportPhase.Failed,
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        StatusLine(
-            state = state,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 44.dp),
-        )
-    }
-}
-
-@Composable
-private fun StatusLine(
-    state: WakeUpImportUiState,
-    modifier: Modifier = Modifier,
-) {
-    val phase = state.phase
-    val (text, color) = when {
-        phase is WakeUpImportPhase.Failed -> phase.error.message() to MaterialTheme.colorScheme.error
-        phase is WakeUpImportPhase.Importing ->
-            stringResource(R.string.wakeup_import_fetching) to MaterialTheme.colorScheme.onSurfaceVariant
-        // 识别成功不吭声：按钮变实心已经是反馈，不必再写一行"已识别口令"。
-        state.shareKey.isNotEmpty() -> "" to MaterialTheme.colorScheme.onSurfaceVariant
-        state.input.isNotBlank() ->
-            stringResource(R.string.wakeup_error_invalid_code) to MaterialTheme.colorScheme.onSurfaceVariant
-        else ->
-            stringResource(R.string.wakeup_import_key_hint) to MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Text(
-        text = text,
-        modifier = modifier,
-        style = MaterialTheme.typography.bodyMedium,
-        color = color,
-        textAlign = TextAlign.Center,
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minFieldHeight),
+        textStyle = MaterialTheme.typography.bodyLarge,
+        // 用主题里的形状预设，不自己写圆角；extraLarge 在当前 M3 形状表里就是 28dp。
+        shape = MaterialTheme.shapes.extraLarge,
     )
 }
 
-@Composable
-private fun WakeUpImportError.message(): String = stringResource(
-    when (this) {
-        WakeUpImportError.EmptyCode -> R.string.wakeup_error_empty_code
-        WakeUpImportError.InvalidCode -> R.string.wakeup_error_invalid_code
-        WakeUpImportError.Network -> R.string.wakeup_error_network
-        WakeUpImportError.Rejected -> R.string.wakeup_error_import_failed
-        WakeUpImportError.Unsupported -> R.string.wakeup_error_unsupported
-    },
-)
-
 /**
- * 九瓣饼干形状的提交按钮，加载时在原地换成进度环，不额外弹任何遮罩。
+ * 九瓣饼干形状的提交按钮。当前只有一种外观，等视觉定稿再加回状态。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CookieImportButton(
-    enabled: Boolean,
-    importing: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val active = enabled || importing
     val cookieShape = MaterialShapes.Cookie9Sided.toShape()
-    val containerColor = if (active) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerHighest
-    }
-    val contentColor = if (active) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
 
     IconButton(
         onClick = onClick,
-        enabled = enabled,
         // requiredSize：形状按钮被父布局压扁时会更难看，宁可溢出也不变形。
         modifier = modifier.requiredSize(92.dp),
         shapes = IconButtonDefaults.shapes(shape = cookieShape),
         colors = IconButtonDefaults.iconButtonColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-            disabledContainerColor = containerColor,
-            disabledContentColor = contentColor,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
         ),
     ) {
-        if (importing) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(26.dp),
-                color = contentColor,
-                strokeWidth = 2.5.dp,
-            )
-        } else {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                contentDescription = stringResource(R.string.action_import),
-                modifier = Modifier.size(32.dp),
-            )
-        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+            contentDescription = stringResource(R.string.action_import),
+            modifier = Modifier.size(32.dp),
+        )
     }
 }
