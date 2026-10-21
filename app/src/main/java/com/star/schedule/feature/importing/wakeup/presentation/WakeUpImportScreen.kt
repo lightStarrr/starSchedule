@@ -1,5 +1,6 @@
 package com.star.schedule.feature.importing.wakeup.presentation
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -63,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -78,6 +80,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
@@ -113,8 +116,7 @@ fun WakeUpImportRoute(
 /**
  * WakeUp 导入：顶栏、输入框、按钮，三者之外暂时不放任何内容。
  *
- * 视觉与文案都还在重做中，这里只保留结构与交互入口，不做加载态、错误态和提示语。
- *
+ * 错误不单独占一行：它顶替输入框下面那句「口令 30 分钟内有效」，用户一改输入就换回原文案。
  * 整页套一层 WakeUp 自己的珊瑚粉配色，只影响这一页。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -213,6 +215,18 @@ private fun WakeUpImportContent(
     // 两段动画期间输入框都不接输入：去程它压着按钮，归位时它还没落稳。
     val frozen = submitting || returning
 
+    // 提示位上放什么：默认是「口令 30 分钟内有效」，失败时换成错误文案，用户一改输入就换回原文案。
+    //
+    // 换字的时机不是"状态一变就换"，而是等输入框飞回来、落稳了再换（[frozen] 期间按住不动）：
+    // 一是出场时输入框还在往上飞，在动的东西上再叠一次换字，两个动画会互相打架；
+    // 二是重试时 phase 会先回到 Idle，若立刻跟着换，提示会在淡出的前半段闪回原文案。
+    var message by remember { mutableStateOf<WakeUpImportError?>(null) }
+    val failure = (state.phase as? WakeUpImportPhase.Failed)?.error
+    LaunchedEffect(failure, frozen) {
+        if (!frozen) message = failure
+    }
+    val errorText = message?.let { stringResource(it.messageRes()) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -261,6 +275,7 @@ private fun WakeUpImportContent(
                     value = state.input,
                     onValueChange = onInputChange,
                     minFieldHeight = fieldHeight,
+                    errorText = errorText,
                     hintShift = hintShift,
                     hintAlpha = hintAlpha,
                     modifier = Modifier
@@ -367,10 +382,28 @@ private fun ShareKeyField(
     value: String,
     onValueChange: (String) -> Unit,
     minFieldHeight: Dp,
+    errorText: String?,
     hintShift: Float,
     hintAlpha: Float,
     modifier: Modifier = Modifier,
 ) {
+    val hint = stringResource(R.string.wakeup_import_key_hint)
+
+    // 0 = 提示，1 = 错误。一个值管住两个方向：进来时它在涨、退回去时它在落，
+    // 两条文案各取其中一段，来回用的都是同一套曲线，不会出现"进和出不一样"。
+    val swap = remember { Animatable(if (errorText != null) 1f else 0f) }
+    LaunchedEffect(errorText) {
+        swap.animateTo(
+            targetValue = if (errorText != null) 1f else 0f,
+            animationSpec = tween(durationMillis = MESSAGE_SWAP_MILLIS, easing = LinearEasing),
+        )
+    }
+    val weight = swap.value
+    // 老文案先糊掉（0.00–0.55），新文案后清晰（0.45–1.00），中间只重叠 10%。
+    // 完全重叠的话两行字在半透明时糊在一起看不清，像是画面脏了。
+    val hintVisible = 1f - weight.segment(0f, 0.55f)
+    val errorVisible = weight.segment(0.45f, 1f)
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -380,21 +413,61 @@ private fun ShareKeyField(
         textStyle = MaterialTheme.typography.bodyLarge,
         // 用主题里的形状预设，不自己写圆角；extraLarge 在当前 M3 形状表里就是 28dp。
         shape = MaterialTheme.shapes.extraLarge,
-        // 固定提示，不随输入、加载或失败变化；其余状态文案暂时都不做。
         supportingText = {
-            Text(
-                text = stringResource(R.string.wakeup_import_key_hint),
+            // 两条文案叠在同一个位置上互相替换，位置只由外面这层管：
+            // 出场时整块往上推、淡出，归位时从上方落回来。
+            // layout 尺寸不变，所以下面按钮不会跟着跳。
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 往上推的同时淡出，比原地淡出更像「收起来」；归位时反过来从上方落回原位。
-                    // layout 尺寸不变，所以下面按钮不会跟着跳。
                     .graphicsLayer {
                         translationY = -(HINT_LIFT.toPx() * hintShift)
                         alpha = hintAlpha
                     },
-                textAlign = TextAlign.Center,
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                if (hintVisible > 0f) {
+                    FieldMessage(
+                        text = hint,
+                        visible = hintVisible,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (errorText != null && errorVisible > 0f) {
+                    FieldMessage(
+                        text = errorText,
+                        visible = errorVisible,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
         },
+    )
+}
+
+/**
+ * 提示位上的一行字，按 [visible] 在「清晰」和「糊掉」之间连续过渡。
+ *
+ * 刻意收成一行（[TextOverflow.Ellipsis]）：两条文案叠在一起，谁更高谁就决定这块的高度。
+ * 若允许换行，错误文案一出现会把输入框整体顶高一行，而那时它还是半透明的——
+ * 看上去就是"字还没出来，框先跳了"。
+ */
+@Composable
+private fun FieldMessage(text: String, visible: Float, color: Color) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = visible }
+            // 模糊半径只能给具体 dp，必须参与重组；淡入淡出不参与。
+            .blur(
+                radius = MESSAGE_BLUR * (1f - visible),
+                edgeTreatment = BlurredEdgeTreatment.Unbounded,
+            ),
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
     )
 }
 
@@ -605,6 +678,26 @@ private class MorphingShape(
 }
 
 private const val PRESS_MORPH_MILLIS = 220
+
+/**
+ * 提示位换字的时长。
+ *
+ * 320ms 够让人看出是「一行字换成了另一行」，而不是硬切；再长就会拖到用户已经重新打字了还没换完。
+ */
+private const val MESSAGE_SWAP_MILLIS = 320
+
+/** 换字时糊到的最大半径。够看出是"化开"，又不至于让 12sp 的字糊成一团。 */
+private val MESSAGE_BLUR = 5.dp
+
+/** 每个失败类别对应一句文案；放 UI 层是因为 ViewModel 不持有 Context。 */
+@StringRes
+private fun WakeUpImportError.messageRes(): Int = when (this) {
+    WakeUpImportError.EmptyCode -> R.string.wakeup_import_error_empty
+    WakeUpImportError.InvalidCode -> R.string.wakeup_import_error_invalid
+    WakeUpImportError.Network -> R.string.wakeup_import_error_network
+    WakeUpImportError.Rejected -> R.string.wakeup_import_error_rejected
+    WakeUpImportError.Unsupported -> R.string.wakeup_import_error_unsupported
+}
 
 /** 可用状态切换时底色与图标色的过渡时长，和按下形变保持同一节奏。 */
 private const val ENABLE_COLOR_MILLIS = 200
