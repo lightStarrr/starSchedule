@@ -620,8 +620,8 @@ private fun CookieImportButton(
  * 不存在尺寸差、没有偏移，也就没有"跳一下"。
  *
  * 失败时不能就地消失：它此刻停在某个变形到一半的形状上，直接撤掉再让按钮落回来，
- * 中间没有连续的东西。所以 [settling] 一起来，就先把手头这一步走完，再从那个形状变回饼干，
- * 然后才回调 [onSettled] 让外面开始归位。
+ * 中间没有连续的东西。所以 [settling] 一起来，就先把手头这一步走完，再边转一步边从那个形状
+ * 变回饼干，然后才回调 [onSettled] 让外面开始归位。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -672,9 +672,18 @@ private fun CookieLoadingIndicator(
         val from = shapes[if (step.value >= 1f) (index + 1) % shapes.size else index]
         settleMorph = Morph(from, MaterialShapes.Cookie9Sided)
         step.snapTo(0f)
-        // 角度不用收：每步的终点落在 [COOKIE_SYMMETRY_DEGREES] 的整数倍上，画出来和按钮那颗
-        // "没转过的"饼干完全重合。所以这里只把形状变回饼干，不再多转一次。
-        step.animateTo(targetValue = 1f, animationSpec = SETTLE_SPRING)
+        // 回来的这一程也要转：原地把形状直接换成饼干太生硬，边走边转才和前面的节奏接得上。
+        // 转的是整整一个 [ROTATE_PER_STEP]，终点仍落在 [COOKIE_SYMMETRY_DEGREES] 的整数倍上，
+        // 所以收完那块饼干和按钮那颗"没转过的"完全重合。
+        coroutineScope {
+            launch { step.animateTo(targetValue = 1f, animationSpec = SETTLE_SPRING) }
+            launch {
+                turn.animateTo(
+                    targetValue = turn.value + ROTATE_PER_STEP,
+                    animationSpec = SETTLE_TURN_SPRING,
+                )
+            }
+        }
         notifySettled()
     }
 
@@ -850,6 +859,18 @@ private val SETTLE_SPRING = spring<Float>(
     dampingRatio = 0.85f,
     stiffness = 190f,
     visibilityThreshold = 0.01f,
+)
+
+/**
+ * 归位时那一步旋转的曲线。
+ *
+ * 同样不能回弹，而且要快：[TURN_SPRING] 转 80° 要 0.55s，归位前最多还会先走完手头一步
+ * （0.55s），加起来会顶到 [INDICATOR_SETTLE_TIMEOUT_MILLIS] 的兜底时间。
+ */
+private val SETTLE_TURN_SPRING = spring<Float>(
+    dampingRatio = 1f,
+    stiffness = 260f,
+    visibilityThreshold = 0.5f,
 )
 
 /**
