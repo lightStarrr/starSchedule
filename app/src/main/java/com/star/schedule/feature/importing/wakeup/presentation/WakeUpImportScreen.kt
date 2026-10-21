@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -106,15 +107,14 @@ fun WakeUpImportRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.phase) {
-        if (state.phase is WakeUpImportPhase.Finished) onImported()
-    }
-
     WakeUpImportScreen(
         state = state,
         onBack = onBack,
         onInputChange = viewModel::onInputChange,
         onImport = viewModel::import,
+        // 成功不再一到就把页面撤掉：先让指示器原地收回饼干、染成 success 色、弹一个勾，
+        // 停一下再交给外面（那个回调会 finish 这个 Activity）。
+        onImported = onImported,
     )
 }
 
@@ -131,6 +131,7 @@ private fun WakeUpImportScreen(
     onBack: () -> Unit,
     onInputChange: (String) -> Unit,
     onImport: () -> Unit,
+    onImported: () -> Unit,
 ) {
     // 用 MaterialExpressiveTheme 而不是 MaterialTheme：后者会把 motionScheme 重置成默认，
     // 这里的形状/颜色动画虽然是显式 tween，但没必要让整页的运动规格跟主题脱节。
@@ -140,6 +141,7 @@ private fun WakeUpImportScreen(
             onBack = onBack,
             onInputChange = onInputChange,
             onImport = onImport,
+            onImported = onImported,
         )
     }
 }
@@ -151,8 +153,11 @@ private fun WakeUpImportContent(
     onBack: () -> Unit,
     onInputChange: (String) -> Unit,
     onImport: () -> Unit,
+    onImported: () -> Unit,
 ) {
     val submitting = state.phase is WakeUpImportPhase.Importing
+    // 成功不走归位：按钮留在屏幕中间，就地收回饼干、染成 success 色、弹一个勾。
+    val succeeding = state.phase is WakeUpImportPhase.Finished
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -178,24 +183,49 @@ private fun WakeUpImportContent(
                 animationSpec = tween(durationMillis = SUBMIT_MILLIS, easing = LinearEasing),
             )
         } else if (timeline.value > 0f) {
-            returning = true
-            // 先让指示器把形状收回到饼干，再开始归位。
-            // 它此刻是"转到一半的某个形状"，如果直接撤掉、换一颗饼干落回来，再往下滑，
-            // 就是用户说的"太突兀"——两件事之间没有任何连续的东西。
-            // 这一步是它自己的时间轴（走完当前这一变形、再变回饼干、顺带把角度收回 40° 的倍数），
-            // 时长取决于失败落在哪一帧，所以只能等它通知，不能写死。
-            withTimeoutOrNull(INDICATOR_SETTLE_TIMEOUT_MILLIS) {
-                snapshotFlow { indicatorSettled }.first { it }
+            // 结果可能比出场编排还早到。这个 LaunchedEffect 是按 `submitting` 重启的，
+            // 一重启，上面那条 `timeline.animateTo(1f)` 就被取消，时间轴停在 0.93 附近：
+            // handoff 到不了 1 → 按钮没退干净、指示器只有七成不透明，画面里叠着两层形状，
+            // 收尾染的绿也被底下的粉冲成脏灰绿。所以先把编排补完，再谈收尾。
+            val remaining = (1f - timeline.value) * SUBMIT_MILLIS
+            if (remaining > 1f) {
+                timeline.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = remaining.toInt(), easing = LinearEasing),
+                )
             }
-            rewind.snapTo(0f)
-            rewind.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = RETURN_MILLIS, easing = LinearEasing),
-            )
-            // 收尾把两条轴都归零再切回去程映射：那一刻两套算出来都是静止态，不会跳。
-            rewind.snapTo(0f)
-            timeline.snapTo(0f)
-            returning = false
+            // 收尾一律先等指示器把形状收回饼干——它此刻是"转到一半的某个形状"，
+            // 直接撤掉再换一颗饼干回来，就是用户说的"太突兀"。
+            // 这一步是它自己的时间轴，时长取决于结果落在哪一帧，所以只能等它通知。
+            //
+            // 这里的 `succeeding` 是启动这个协程那一帧的值（phase 和 submitting 同时变），
+            // 之后用户改输入再把 phase 拨回 Idle 也不会影响已经选好的分支。
+            if (succeeding) {
+                // 成功：不归位、不往下飞。指示器原地收回饼干（顺带染成 success 色、弹一个勾），
+                // 停一下再离开这一页，让用户看清"成了"。
+                withTimeoutOrNull(INDICATOR_SETTLE_TIMEOUT_MILLIS) {
+                    snapshotFlow { indicatorSettled }.first { it }
+                }
+                delay(SUCCESS_HOLD_MILLIS)
+                onImported()
+            } else {
+                returning = true
+                withTimeoutOrNull(INDICATOR_SETTLE_TIMEOUT_MILLIS) {
+                    snapshotFlow { indicatorSettled }.first { it }
+                }
+                rewind.snapTo(0f)
+                rewind.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = RETURN_MILLIS, easing = LinearEasing),
+                )
+                // 收尾把两条轴都归零再切回去程映射：那一刻两套算出来都是静止态，不会跳。
+                rewind.snapTo(0f)
+                timeline.snapTo(0f)
+                returning = false
+            }
+        } else if (succeeding) {
+            // 没播过去程就已经是成功态（例如进程被回收后恢复）：别把用户卡在这一页。
+            onImported()
         }
     }
 
@@ -228,8 +258,8 @@ private fun WakeUpImportContent(
     val buttonMove = if (returning) 1f - buttonBack else buttonExit
     val handoff = if (returning) handoffBack else handoffExit
 
-    // 两段动画期间输入框都不接输入：去程它压着按钮，归位时它还没落稳。
-    val frozen = submitting || returning
+    // 三段动画期间输入框都不接输入：去程它压着按钮，归位时它还没落稳，成功时页面正要离开。
+    val frozen = submitting || returning || succeeding
 
     // 提示位上放什么：默认是「口令 30 分钟内有效」，失败时换成错误文案，用户一改输入就换回原文案。
     //
@@ -364,7 +394,8 @@ private fun WakeUpImportContent(
                     if (handoff > 0f) {
                         CookieLoadingIndicator(
                             progress = handoff,
-                            settling = returning,
+                            settling = returning || succeeding,
+                            success = succeeding,
                             onSettled = { indicatorSettled = true },
                             modifier = Modifier.requiredSize(BUTTON_SIZE),
                         )
@@ -622,12 +653,16 @@ private fun CookieImportButton(
  * 失败时不能就地消失：它此刻停在某个变形到一半的形状上，直接撤掉再让按钮落回来，
  * 中间没有连续的东西。所以 [settling] 一起来，就先把手头这一步走完，再边转一步边从那个形状
  * 变回饼干，然后才回调 [onSettled] 让外面开始归位。
+ *
+ * [success] 只影响收尾那一段：饼干变回原状的同时染成 success 色，收完之后再弹出一个勾。
+ * 页面不移动，因为成功后用户马上就要离开这一页，没有"归位"可言。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CookieLoadingIndicator(
     progress: Float,
     settling: Boolean,
+    success: Boolean,
     onSettled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -638,13 +673,28 @@ private fun CookieLoadingIndicator(
     val turn = remember { Animatable(0f) }
     var index by remember { mutableIntStateOf(0) }
     val path = remember { Path() }
-    val color = MaterialTheme.colorScheme.primary
+    val successColors = wakeUpSuccessColors()
+    // 只有"变回饼干"那一下才染绿。成功信号来时手头那一步还没走完（那一步变成的是序列里的下一个
+    // 形状，不是饼干），提前染色就会看到绿从一个中间形状上开始。
+    var becomingCookie by remember { mutableStateOf(false) }
+    val cookieColor by animateColorAsState(
+        targetValue = if (becomingCookie && success) {
+            successColors.container
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
+        animationSpec = tween(durationMillis = SUCCESS_COLOR_MILLIS, easing = LinearEasing),
+        label = "cookieColor",
+    )
+    // 勾的入场进度。0 = 还没出现，1 = 到位；弹簧带一点过冲，看起来是"弹"出来的。
+    val check = remember { Animatable(0f) }
 
     // 归位时改画这一段：从"当前形态"变回饼干。非空即表示正在收。
     var settleMorph by remember { mutableStateOf<Morph?>(null) }
 
     // 协程里读组合参数拿到的是启动那一刻的旧值，必须走 rememberUpdatedState。
     val settleNow by rememberUpdatedState(settling)
+    val successNow by rememberUpdatedState(success)
     val notifySettled by rememberUpdatedState(onSettled)
 
     LaunchedEffect(morphs) {
@@ -672,6 +722,8 @@ private fun CookieLoadingIndicator(
         val from = shapes[if (step.value >= 1f) (index + 1) % shapes.size else index]
         settleMorph = Morph(from, MaterialShapes.Cookie9Sided)
         step.snapTo(0f)
+        // 从这一帧起画的是"变回饼干"的形变，成功的话颜色也从这一刻开始染。
+        becomingCookie = true
         // 回来的这一程也要转：原地把形状直接换成饼干太生硬，边走边转才和前面的节奏接得上。
         // 转的是整整一个 [ROTATE_PER_STEP]，终点仍落在 [COOKIE_SYMMETRY_DEGREES] 的整数倍上，
         // 所以收完那块饼干和按钮那颗"没转过的"完全重合。
@@ -684,28 +736,51 @@ private fun CookieLoadingIndicator(
                 )
             }
         }
+        // 勾要等饼干彻底变回来才出现，否则会和形状变化抢注意力。
+        if (successNow) check.animateTo(targetValue = 1f, animationSpec = CHECK_SPRING)
         notifySettled()
     }
 
-    Canvas(
+    Box(
         modifier = modifier.graphicsLayer { alpha = progress },
+        contentAlignment = Alignment.Center,
     ) {
-        val morph = settleMorph ?: morphs[index]
-        // 旋转只在这一步的形变过程中发生，转完就停住等下一步，和 M3 的 LoadingIndicator 同一个节奏。
-        // 角度必须由 [turn] 这条单调曲线给，不能借用形变弹簧的 step——它低阻尼会回弹，
-        // 角度冲过终点再被下一步 snapTo 拽回来，看起来就是"转过去了又倒一点"。
-        // 不用持续自转：那样看起来只是"一直在转"，反而看不出形状在一步步换。
-        // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
-        val rotation = (index * ROTATE_PER_STEP) % 360f + turn.value
-        rotate(degrees = rotation) {
-            drawPath(
-                // 变形进度截断到 0..1：形变弹簧的回弹不应该把形状拉过目标。
-                path = morph.toFittedPath(
-                    progress = step.value.coerceIn(0f, 1f),
-                    size = size,
-                    out = path,
-                ),
-                color = color,
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val morph = settleMorph ?: morphs[index]
+            // 旋转只在这一步的形变过程中发生，转完就停住等下一步，和 M3 的 LoadingIndicator 同一个节奏。
+            // 角度必须由 [turn] 这条单调曲线给，不能借用形变弹簧的 step——它低阻尼会回弹，
+            // 角度冲过终点再被下一步 snapTo 拽回来，看起来就是"转过去了又倒一点"。
+            // 不用持续自转：那样看起来只是"一直在转"，反而看不出形状在一步步换。
+            // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
+            val rotation = (index * ROTATE_PER_STEP) % 360f + turn.value
+            rotate(degrees = rotation) {
+                drawPath(
+                    // 变形进度截断到 0..1：形变弹簧的回弹不应该把形状拉过目标。
+                    path = morph.toFittedPath(
+                        progress = step.value.coerceIn(0f, 1f),
+                        size = size,
+                        out = path,
+                    ),
+                    color = cookieColor,
+                )
+            }
+        }
+        // 勾不属于旋转的图形，所以画在 Canvas 外面，自己一条入场曲线。
+        if (success) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                tint = successColors.content,
+                modifier = Modifier
+                    .size(CHECK_SIZE)
+                    .graphicsLayer {
+                        val entered = check.value
+                        // 弹簧会冲过 1，透明度不能跟着过冲。
+                        alpha = entered.coerceIn(0f, 1f)
+                        val scale = CHECK_START_SCALE + (1f - CHECK_START_SCALE) * entered
+                        scaleX = scale
+                        scaleY = scale
+                    },
             )
         }
     }
@@ -874,12 +949,41 @@ private val SETTLE_TURN_SPRING = spring<Float>(
 )
 
 /**
+ * 成功后从品牌粉染到 success 绿用的时长。
+ *
+ * 和收尾的形变同时开始。比形变略短一点：粉和绿之间是插值出来的褐色，那一段越短越好，
+ * 但要能和形变对上，不能绿在形状还没收回来之前就到位。
+ */
+private const val SUCCESS_COLOR_MILLIS = 300
+
+/** 勾的大小。饼干是 92dp，勾占一半左右，四周还能看见一圈绿底。 */
+private val CHECK_SIZE = 46.dp
+
+/** 勾入场时的起始缩放。不用 0：从 0 弹出来会像凭空冒出来，0.6 才看得出是"长出来"的。 */
+private const val CHECK_START_SCALE = 0.6f
+
+/**
+ * 勾的入场弹簧。
+ *
+ * 阻尼 0.5 是刻意留一点过冲：这是整段流程里唯一一个"结果"信号，弹一下比匀速放大更像确认。
+ */
+private val CHECK_SPRING = spring<Float>(
+    dampingRatio = 0.5f,
+    stiffness = 420f,
+    visibilityThreshold = 0.01f,
+)
+
+/** 勾出来之后停一下再离开这一页，让人看清"成了"。 */
+private const val SUCCESS_HOLD_MILLIS = 420L
+
+/**
  * 等指示器收回饼干的兜底上限。
  *
- * 正常情况 700ms 内就回调了；万一因为重组、重新进入页面之类的原因没回调，
- * 也不能把归位永远卡住——宁可突兀一下，也不能让用户面对一颗永远转着的饼干。
+ * 正常情况 700ms 内就回调了；成功时还要多弹一个勾，最坏要 1.4s 左右（走完手头一步 0.55s、
+ * 收尾 0.5s、勾 0.35s）。万一因为重组、重新进入页面之类的原因没回调，也不能把流程永远卡住——
+ * 宁可突兀一下，也不能让用户面对一颗永远转着的饼干。
  */
-private const val INDICATOR_SETTLE_TIMEOUT_MILLIS = 1600L
+private const val INDICATOR_SETTLE_TIMEOUT_MILLIS = 2200L
 
 /** 箭头在按钮内部向右滑出的距离，滑到边界外就被 clip 裁掉。 */
 private val ARROW_FLY = 56.dp

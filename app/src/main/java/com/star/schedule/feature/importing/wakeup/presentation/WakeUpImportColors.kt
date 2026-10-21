@@ -83,3 +83,33 @@ private fun ColorScheme.wakeUpDark() = copy(
     outline = Color(0xFFA67C7C),
     outlineVariant = Color(0xFF4F3535),
 )
+
+/**
+ * 导入成功时用的颜色。
+ *
+ * Material 3 的 `ColorScheme` 里没有 success 角色（只有 primary/secondary/tertiary/error），
+ * 所以这里取官方 Green 色板的 40/80 两档，深浅色的取法和本页 primary 保持一致：
+ * 浅色用深绿底 + 白勾（6.5:1），深色用浅绿底 + 墨绿勾（10:1）。
+ */
+data class WakeUpSuccessColors(
+    val container: Color,
+    val content: Color,
+)
+
+private val SuccessLight = Color(0xFF146C2E)
+
+private val SuccessDark = Color(0xFF7FDA89)
+
+private val SuccessDarkContent = Color(0xFF002204)
+
+@Composable
+fun wakeUpSuccessColors(base: ColorScheme = MaterialTheme.colorScheme): WakeUpSuccessColors {
+    val dark = base.surface.luminance() < 0.5f
+    return remember(dark) {
+        if (dark) {
+            WakeUpSuccessColors(container = SuccessDark, content = SuccessDarkContent)
+        } else {
+            WakeUpSuccessColors(container = SuccessLight, content = Color(0xFFFFFFFF))
+        }
+    }
+}
