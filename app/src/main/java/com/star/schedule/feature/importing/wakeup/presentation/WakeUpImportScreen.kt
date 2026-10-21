@@ -27,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -80,9 +81,31 @@ fun WakeUpImportRoute(
  * WakeUp 导入：顶栏、输入框、按钮，三者之外暂时不放任何内容。
  *
  * 视觉与文案都还在重做中，这里只保留结构与交互入口，不做加载态、错误态和提示语。
+ *
+ * 整页套一层 WakeUp 自己的珊瑚粉配色，只影响这一页。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun WakeUpImportScreen(
+    state: WakeUpImportUiState,
+    onBack: () -> Unit,
+    onInputChange: (String) -> Unit,
+    onImport: () -> Unit,
+) {
+    // 用 MaterialExpressiveTheme 而不是 MaterialTheme：后者会把 motionScheme 重置成默认，
+    // 这里的形状/颜色动画虽然是显式 tween，但没必要让整页的运动规格跟主题脱节。
+    MaterialExpressiveTheme(colorScheme = wakeUpImportColorScheme()) {
+        WakeUpImportContent(
+            state = state,
+            onBack = onBack,
+            onInputChange = onInputChange,
+            onImport = onImport,
+        )
+    }
+}
+
+@Composable
+private fun WakeUpImportContent(
     state: WakeUpImportUiState,
     onBack: () -> Unit,
     onInputChange: (String) -> Unit,
