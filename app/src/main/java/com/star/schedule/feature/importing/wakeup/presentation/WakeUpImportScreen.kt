@@ -537,8 +537,13 @@ private const val PRESS_MORPH_MILLIS = 220
 /** 可用状态切换时底色与图标色的过渡时长，和按下形变保持同一节奏。 */
 private const val ENABLE_COLOR_MILLIS = 200
 
-/** 点击提交后整段出场动画的总时长。 */
-private const val SUBMIT_MILLIS = 900
+/**
+ * 点击提交后整段出场动画的总时长。
+ *
+ * ViewModel 用同一个常量来决定「什么时候才真的发请求」——编排播完、按钮已经变成加载指示器
+ * 之后才发，所以口令错误也不会把这段动画打断。
+ */
+private val SUBMIT_MILLIS = WAKEUP_SUBMIT_ANIMATION_MILLIS.toInt()
 
 private val BUTTON_SIZE = 92.dp
 

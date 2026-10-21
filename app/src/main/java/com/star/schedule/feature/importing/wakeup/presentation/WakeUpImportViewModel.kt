@@ -7,6 +7,7 @@ import com.star.schedule.feature.importing.wakeup.domain.ImportWakeUpScheduleUse
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportResult
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpProtocolException
 import com.star.schedule.feature.importing.wakeup.domain.extractKeyFromShareText
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +39,15 @@ sealed interface WakeUpImportPhase {
 
     data class Finished(val timetableId: Long) : WakeUpImportPhase
 }
+
+/**
+ * 点击到真正发请求之间的等待时长：等于整段出场编排的时长。
+ *
+ * 编排（箭头飞走 → 文案上移 → 输入框收进按钮 → 按钮落到屏幕中心 → 变成加载指示器）一共
+ * 900ms，界面那边用同一个值做时间轴总长。请求要等它走完再发，否则口令一错就立刻失败，
+ * 时间轴还没走到屏幕中心就被倒放，看起来像点了个空——那段"飞过去"的动画等于没播。
+ */
+internal const val WAKEUP_SUBMIT_ANIMATION_MILLIS = 900L
 
 /**
  * 导入失败的类别。文案在 UI 层映射，避免 ViewModel 持有 Context。
@@ -82,6 +92,9 @@ class WakeUpImportViewModel(
 
         _uiState.update { it.copy(phase = WakeUpImportPhase.Importing) }
         viewModelScope.launch {
+            // phase 一进 Importing 界面就开始播出场编排；编排播完、按钮已经变成加载指示器，
+            // 这里才真正去取课表。见 WAKEUP_SUBMIT_ANIMATION_MILLIS 的说明。
+            delay(WAKEUP_SUBMIT_ANIMATION_MILLIS)
             when (val result = importSchedule(state.shareKey)) {
                 is WakeUpImportResult.Success -> {
                     // 导入出来的课表就是用户接下来要看的那张，切过去再结束页面。
