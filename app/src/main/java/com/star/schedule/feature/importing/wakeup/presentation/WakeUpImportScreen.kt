@@ -6,11 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -612,7 +608,7 @@ private fun CookieImportButton(
 }
 
 /**
- * 提交中的加载指示器：九瓣饼干在原地开始变形、轮转、循环。
+ * 提交中的加载指示器：九瓣饼干在原地一步一步换形状，每换一步转 90°，转完就停住等下一步。
  *
  * 没有用现成的 `LoadingIndicator`，是因为它内部会把整组形状按一个公共比例缩进容器盒
  * （`scaleFactor = 各形状紧包围盒 / 旋转包围盒的最小比值 × ActiveIndicatorScale(38/48)`），
@@ -643,24 +639,13 @@ private fun CookieLoadingIndicator(
 
     // 归位时改画这一段：从"当前形态"变回饼干。非空即表示正在收。
     var settleMorph by remember { mutableStateOf<Morph?>(null) }
-    // 归位时的角度。自转在这里停住，换成一条收向 40° 整数倍的曲线。
+    // 归位时的角度：接管常态下按步累加的角度，换成一条收向 40° 整数倍的曲线。
     val settleAngle = remember { Animatable(0f) }
     var angleLocked by remember { mutableStateOf(false) }
 
     // 协程里读组合参数拿到的是启动那一刻的旧值，必须走 rememberUpdatedState。
     val settleNow by rememberUpdatedState(settling)
     val notifySettled by rememberUpdatedState(onSettled)
-
-    // 持续自转只做“底色动感”，慢一点更好：“忙”的感觉交给形状变化，不要交给转速。
-    val spin = rememberInfiniteTransition(label = "cookieSpin").animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = SPIN_MILLIS, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "cookieSpinAngle",
-    )
 
     LaunchedEffect(morphs) {
         // 交接有一小段重叠（按钮还在、指示器淡入）。这段时间形状必须锁死在饼干上，
@@ -680,10 +665,10 @@ private fun CookieLoadingIndicator(
         // 停在 step = 1 时形状是 shapes[index + 1]；在两步之间被叫停则是 shapes[index]。
         // 两种都从"当前正画着的那个形状"起步，所以切到 settleMorph 的那一帧没有变化。
         val from = shapes[if (step.value >= 1f) (index + 1) % shapes.size else index]
-        val angleNow = (index + step.value) * ROTATE_PER_STEP + spin.value
+        val angleNow = (index * ROTATE_PER_STEP) % 360f + step.value * ROTATE_PER_STEP
         settleMorph = Morph(from, MaterialShapes.Cookie9Sided)
         step.snapTo(0f)
-        // 自转停在这一刻，接管的是 settleAngle；先把当前角度塞进去，切换那一帧才不跳。
+        // 角度从这里交接给 settleAngle：先把当前这一帧的角度塞进去，切换那一帧才不跳。
         settleAngle.snapTo(angleNow)
         angleLocked = true
 
@@ -706,17 +691,18 @@ private fun CookieLoadingIndicator(
         modifier = modifier.graphicsLayer { alpha = progress },
     ) {
         val morph = settleMorph ?: morphs[index]
-        // 旋转比 M3 默认慢很多：M3 每步 90°、4.7s 一圈，但它的图形最多只占容器的 79%，
-        // 这里的饼干是满格的，同样角速度看着明显更急。这里改成每步 6°、36s 一圈。
+        // 旋转只在形变那一下发生，转完就停住等下一步，和 M3 的 LoadingIndicator 同一个节奏：
+        // 每步 90°，跟着形变的弹簧一起转（M3 是 `progress * 90 + 已转过的整步数`）。
+        // 不用持续自转——那样看起来只是"一直在转"，反而看不出形状在一步步换。
         // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
         val rotation = if (angleLocked) {
             settleAngle.value
         } else {
-            (index * ROTATE_PER_STEP) % 360f + step.value * ROTATE_PER_STEP + spin.value
+            (index * ROTATE_PER_STEP) % 360f + step.value * ROTATE_PER_STEP
         }
         rotate(degrees = rotation) {
             drawPath(
-                // 变形进度截断到 0..1：弹簧的过冲留给旋转，不要拿去把形状拉变形。
+                // 变形进度截断到 0..1：弹簧的过冲只体现在旋转上，不拿去把形状拉变形。
                 path = morph.toFittedPath(
                     progress = step.value.coerceIn(0f, 1f),
                     size = size,
@@ -807,11 +793,13 @@ private val BUTTON_SIZE = 92.dp
  */
 private const val HANDOFF_HOLD_MILLIS = 160L
 
-/** 指示器持续自转一圈的时长。M3 默认 4666ms 太急，放慢到 36s。 */
-private const val SPIN_MILLIS = 36000
-
-/** 每变形一步转过的角度；和 [SPIN_MILLIS] 一起决定整体转速，目前约 15°/s（24s 一圈）。 */
-private const val ROTATE_PER_STEP = 6f
+/**
+ * 每变形一步转过的角度。
+ *
+ * 只在这一步的形变过程中转，转完就停住，靠"转、换形、停一下"的节奏表达忙碌，
+ * 不做持续自转。90° 和 M3 的 LoadingIndicator 一致。
+ */
+private const val ROTATE_PER_STEP = 90f
 
 /** 每步变形之后停一下，和弹簧一起构成约 1.1s 一步的节奏。 */
 private const val MORPH_GAP_MILLIS = 260L
