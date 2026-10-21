@@ -55,7 +55,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -87,10 +89,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleBackButton
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -159,6 +166,8 @@ private fun WakeUpImportContent(
     val timeline = remember { Animatable(0f) }
     val rewind = remember { Animatable(0f) }
     var returning by remember { mutableStateOf(false) }
+    // 加载指示器有没有"收回饼干"。归位要等它点头才开演。
+    var indicatorSettled by remember { mutableStateOf(false) }
 
     LaunchedEffect(submitting) {
         if (submitting) {
@@ -167,12 +176,21 @@ private fun WakeUpImportContent(
             focusManager.clearFocus()
             keyboardController?.hide()
             returning = false
+            indicatorSettled = false
             timeline.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = SUBMIT_MILLIS, easing = LinearEasing),
             )
         } else if (timeline.value > 0f) {
             returning = true
+            // 先让指示器把形状收回到饼干，再开始归位。
+            // 它此刻是"转到一半的某个形状"，如果直接撤掉、换一颗饼干落回来，再往下滑，
+            // 就是用户说的"太突兀"——两件事之间没有任何连续的东西。
+            // 这一步是它自己的时间轴（走完当前这一变形、再变回饼干、顺带把角度收回 40° 的倍数），
+            // 时长取决于失败落在哪一帧，所以只能等它通知，不能写死。
+            withTimeoutOrNull(INDICATOR_SETTLE_TIMEOUT_MILLIS) {
+                snapshotFlow { indicatorSettled }.first { it }
+            }
             rewind.snapTo(0f)
             rewind.animateTo(
                 targetValue = 1f,
@@ -350,6 +368,8 @@ private fun WakeUpImportContent(
                     if (handoff > 0f) {
                         CookieLoadingIndicator(
                             progress = handoff,
+                            settling = returning,
+                            onSettled = { indicatorSettled = true },
                             modifier = Modifier.requiredSize(BUTTON_SIZE),
                         )
                     }
@@ -601,18 +621,35 @@ private fun CookieImportButton(
  *
  * 这里改成和按钮同一套画法（[toFittedPath]），于是交接那一帧画出来的就是同一块饼干，
  * 不存在尺寸差、没有偏移，也就没有"跳一下"。
+ *
+ * 失败时不能就地消失：它此刻停在某个变形到一半的形状上，直接撤掉再让按钮落回来，
+ * 中间没有连续的东西。所以 [settling] 一起来，就先把手头这一步走完，再从那个形状变回饼干、
+ * 角度收回 40° 的整数倍，然后才回调 [onSettled] 让外面开始归位。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CookieLoadingIndicator(
     progress: Float,
+    settling: Boolean,
+    onSettled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val shapes = remember { WakeUpIndicatorShapes }
     val morphs = remember { WakeUpIndicatorMorphs }
     val step = remember { Animatable(0f) }
     var index by remember { mutableIntStateOf(0) }
     val path = remember { Path() }
     val color = MaterialTheme.colorScheme.primary
+
+    // 归位时改画这一段：从"当前形态"变回饼干。非空即表示正在收。
+    var settleMorph by remember { mutableStateOf<Morph?>(null) }
+    // 归位时的角度。自转在这里停住，换成一条收向 40° 整数倍的曲线。
+    val settleAngle = remember { Animatable(0f) }
+    var angleLocked by remember { mutableStateOf(false) }
+
+    // 协程里读组合参数拿到的是启动那一刻的旧值，必须走 rememberUpdatedState。
+    val settleNow by rememberUpdatedState(settling)
+    val notifySettled by rememberUpdatedState(onSettled)
 
     // 持续自转只做“底色动感”，慢一点更好：“忙”的感觉交给形状变化，不要交给转速。
     val spin = rememberInfiniteTransition(label = "cookieSpin").animateFloat(
@@ -630,31 +667,53 @@ private fun CookieLoadingIndicator(
         // 否则两层各变形各的，叠起来会变成双影。
         delay(HANDOFF_HOLD_MILLIS)
         while (true) {
-            step.animateTo(
-                targetValue = 1f,
-                // 可见阈值放大到 0.1：低阻尼弹簧本该有点回弹，阈值太小会拖出一条尾巴。
-                // 刚度比 M3 默认（200）低：一步变形走得更缓，不容易看成“一直在切形状”。
-                animationSpec = spring(
-                    dampingRatio = 0.6f,
-                    stiffness = 110f,
-                    visibilityThreshold = 0.1f,
-                ),
-            )
+            // 手头这一步先走完再判断要不要收：在半途切开，形状会从中间硬换一次。
+            step.animateTo(targetValue = 1f, animationSpec = MORPH_SPRING)
+            if (settleNow) break
             index = (index + 1) % morphs.size
             // 序列首尾相接，所以这里从 1 归零不会看到形状跳变。
             step.snapTo(0f)
             delay(MORPH_GAP_MILLIS)
+            if (settleNow) break
         }
+
+        // 停在 step = 1 时形状是 shapes[index + 1]；在两步之间被叫停则是 shapes[index]。
+        // 两种都从"当前正画着的那个形状"起步，所以切到 settleMorph 的那一帧没有变化。
+        val from = shapes[if (step.value >= 1f) (index + 1) % shapes.size else index]
+        val angleNow = (index + step.value) * ROTATE_PER_STEP + spin.value
+        settleMorph = Morph(from, MaterialShapes.Cookie9Sided)
+        step.snapTo(0f)
+        // 自转停在这一刻，接管的是 settleAngle；先把当前角度塞进去，切换那一帧才不跳。
+        settleAngle.snapTo(angleNow)
+        angleLocked = true
+
+        coroutineScope {
+            launch {
+                // 收向最近的 40° 整数倍：饼干九瓣，转 40° 和没转一样，
+                // 这样停下时那块饼干和按钮那颗"没转过的"完全重合，交接看不出接缝。
+                settleAngle.animateTo(
+                    targetValue = (angleNow / COOKIE_SYMMETRY_DEGREES)
+                        .roundToInt() * COOKIE_SYMMETRY_DEGREES,
+                    animationSpec = tween(durationMillis = SETTLE_MILLIS, easing = FastOutSlowInEasing),
+                )
+            }
+            launch { step.animateTo(targetValue = 1f, animationSpec = SETTLE_SPRING) }
+        }
+        notifySettled()
     }
 
     Canvas(
         modifier = modifier.graphicsLayer { alpha = progress },
     ) {
-        val morph = morphs[index]
+        val morph = settleMorph ?: morphs[index]
         // 旋转比 M3 默认慢很多：M3 每步 90°、4.7s 一圈，但它的图形最多只占容器的 79%，
         // 这里的饼干是满格的，同样角速度看着明显更急。这里改成每步 6°、36s 一圈。
         // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
-        val rotation = (index * ROTATE_PER_STEP) % 360f + step.value * ROTATE_PER_STEP + spin.value
+        val rotation = if (angleLocked) {
+            settleAngle.value
+        } else {
+            (index * ROTATE_PER_STEP) % 360f + step.value * ROTATE_PER_STEP + spin.value
+        }
         rotate(degrees = rotation) {
             drawPath(
                 // 变形进度截断到 0..1：弹簧的过冲留给旋转，不要拿去把形状拉变形。
@@ -765,12 +824,51 @@ private const val MORPH_GAP_MILLIS = 260L
  * 末尾再补一次饼干，是为了让最后一跳也落在饼干上，循环首尾相接不跳变。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val WakeUpIndicatorShapes: List<RoundedPolygon> =
+    listOf(MaterialShapes.Cookie9Sided) +
+        LoadingIndicatorDefaults.IndeterminateIndicatorPolygons +
+        listOf(MaterialShapes.Cookie9Sided)
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private val WakeUpIndicatorMorphs: List<Morph> =
-    (
-        listOf(MaterialShapes.Cookie9Sided) +
-            LoadingIndicatorDefaults.IndeterminateIndicatorPolygons +
-            listOf(MaterialShapes.Cookie9Sided)
-        ).zipWithNext { from, to -> Morph(from, to) }
+    WakeUpIndicatorShapes.zipWithNext { from, to -> Morph(from, to) }
+
+/**
+ * 变形一步用的弹簧。
+ *
+ * 可见阈值放大到 0.1：低阻尼弹簧本该有点回弹，阈值太小会拖出一条尾巴。
+ * 刚度比 M3 默认（200）低：一步变形走得更缓，不容易看成“一直在切形状”。
+ */
+private val MORPH_SPRING = spring<Float>(
+    dampingRatio = 0.6f,
+    stiffness = 110f,
+    visibilityThreshold = 0.1f,
+)
+
+/**
+ * 归位时"收回饼干"那一步的弹簧。
+ *
+ * 比常规一步硬：用户已经等了一整轮失败，这里不宜再慢慢演，只要看起来是连续的就行。
+ */
+private val SETTLE_SPRING = spring<Float>(
+    dampingRatio = 0.85f,
+    stiffness = 190f,
+    visibilityThreshold = 0.01f,
+)
+
+/** 收回饼干＋角度回正的时长；这两件事同时跑，取长的那个。 */
+private const val SETTLE_MILLIS = 380
+
+/** 饼干九个瓣，转 40° 和没转看上去完全一样，所以角度只要收到它的整数倍。 */
+private const val COOKIE_SYMMETRY_DEGREES = 40f
+
+/**
+ * 等指示器收回饼干的兜底上限。
+ *
+ * 正常情况 700ms 内就回调了；万一因为重组、重新进入页面之类的原因没回调，
+ * 也不能把归位永远卡住——宁可突兀一下，也不能让用户面对一颗永远转着的饼干。
+ */
+private const val INDICATOR_SETTLE_TIMEOUT_MILLIS = 1600L
 
 /** 箭头在按钮内部向右滑出的距离，滑到边界外就被 clip 裁掉。 */
 private val ARROW_FLY = 56.dp
