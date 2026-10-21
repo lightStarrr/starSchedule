@@ -91,7 +91,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleBackButton
 import kotlinx.coroutines.delay
+import kotlin.math.PI
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun WakeUpImportRoute(
@@ -217,13 +219,15 @@ private fun WakeUpImportContent(
 
     // 提示位上放什么：默认是「口令 30 分钟内有效」，失败时换成错误文案，用户一改输入就换回原文案。
     //
-    // 换字的时机不是"状态一变就换"，而是等输入框飞回来、落稳了再换（[frozen] 期间按住不动）：
-    // 一是出场时输入框还在往上飞，在动的东西上再叠一次换字，两个动画会互相打架；
-    // 二是重试时 phase 会先回到 Idle，若立刻跟着换，提示会在淡出的前半段闪回原文案。
+    // 只卡"去程"（[submitting]），不卡归位：失败一发生就把文案换成错误，这样输入框飞回来的时候
+    // 里面已经写着错误了——用户看到的是"框带着错误回来"，而不是"先回提示、再换成错误"。
+    // 归位前半段整块文案的 alpha 还是 0，换这一下正好落在那段里，看不见。
+    //
+    // 去程必须卡住：重试时 phase 会先回到 Idle，若立刻跟着换，提示会在淡出的前半段闪回原文案。
     var message by remember { mutableStateOf<WakeUpImportError?>(null) }
     val failure = (state.phase as? WakeUpImportPhase.Failed)?.error
-    LaunchedEffect(failure, frozen) {
-        if (!frozen) message = failure
+    LaunchedEffect(failure, submitting) {
+        if (!submitting) message = failure
     }
     val errorText = message?.let { stringResource(it.messageRes()) }
 
@@ -389,20 +393,38 @@ private fun ShareKeyField(
 ) {
     val hint = stringResource(R.string.wakeup_import_key_hint)
 
-    // 0 = 提示，1 = 错误。一个值管住两个方向：进来时它在涨、退回去时它在落，
-    // 两条文案各取其中一段，来回用的都是同一套曲线，不会出现"进和出不一样"。
+    // 0 = 提示，1 = 错误。一个值管住两个方向：错的时候在 1，改输入后往 0 落。
     val swap = remember { Animatable(if (errorText != null) 1f else 0f) }
     LaunchedEffect(errorText) {
-        swap.animateTo(
-            targetValue = if (errorText != null) 1f else 0f,
-            animationSpec = tween(durationMillis = MESSAGE_SWAP_MILLIS, easing = LinearEasing),
-        )
+        if (errorText != null) {
+            // 错误一出现就顶上，不演"提示→错误"的换字：那句话只是过渡，用户不需要看到。
+            swap.snapTo(1f)
+        } else {
+            // 只有"改输入、提示回来"这一程是模糊过渡——那是用户主动操作，值得看清楚。
+            swap.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = MESSAGE_SWAP_MILLIS, easing = LinearEasing),
+            )
+        }
     }
     val weight = swap.value
-    // 老文案先糊掉（0.00–0.55），新文案后清晰（0.45–1.00），中间只重叠 10%。
-    // 完全重叠的话两行字在半透明时糊在一起看不清，像是画面脏了。
-    val hintVisible = 1f - weight.segment(0f, 0.55f)
-    val errorVisible = weight.segment(0.45f, 1f)
+    // 两句严格互补（和恒为 1）：任一刻至少有一句是"够看得见"的，不会出现中间那段空白。
+    // 之前是错开收尾（0.70 / 0.30），中途两句都掉到 0.24，看上去就是字"没了"一下。
+    val hintVisible = 1f - weight
+    val errorVisible = weight
+    // 糊的程度取一条中段最高的钟形曲线，和淡入淡出不同步：交叉的瞬间两句都是半透明，
+    // 若还都清清楚楚，叠在同一行里就是"两个字重影"。糊到最厉害正好盖住这一瞬。
+    val messageBlur = MESSAGE_BLUR * sin(PI.toFloat() * weight)
+
+    // 退场的那句要画完再走。`errorText` 一变 null 它就该消失了，但若这时直接从组合里撤掉，
+    // 这块 supportingText 的高度会当场掉成 0——外层 Column 的 weight 重新分配，输入框猛地往下
+    // 挪一截再挪回来，看起来就是「框往下扩了一下」。所以留住上一句，让它跟提示一起淡完。
+    var fadingError by remember { mutableStateOf(errorText) }
+    LaunchedEffect(errorText) {
+        if (errorText != null) fadingError = errorText
+    }
+    // 委派属性不能智能转换，取出来给下面用。
+    val shownError = fadingError
 
     OutlinedTextField(
         value = value,
@@ -416,7 +438,10 @@ private fun ShareKeyField(
         supportingText = {
             // 两条文案叠在同一个位置上互相替换，位置只由外面这层管：
             // 出场时整块往上推、淡出，归位时从上方落回来。
-            // layout 尺寸不变，所以下面按钮不会跟着跳。
+            //
+            // 两句都常驻，不写 `if (visible > 0f)`：谁被临时移出组合，这块的高度就变一次。
+            // 提示那句永远在（就算 alpha 是 0），所以这块的高度从头到尾是「一行」，
+            // 输入框不会因为换字而移动一分。
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -426,17 +451,17 @@ private fun ShareKeyField(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                if (hintVisible > 0f) {
+                FieldMessage(
+                    text = hint,
+                    visible = hintVisible,
+                    blur = messageBlur,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (shownError != null) {
                     FieldMessage(
-                        text = hint,
-                        visible = hintVisible,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (errorText != null && errorVisible > 0f) {
-                    FieldMessage(
-                        text = errorText,
+                        text = shownError,
                         visible = errorVisible,
+                        blur = messageBlur,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -446,24 +471,24 @@ private fun ShareKeyField(
 }
 
 /**
- * 提示位上的一行字，按 [visible] 在「清晰」和「糊掉」之间连续过渡。
+ * 提示位上的一行字：按 [visible] 淡入淡出，按 [blur] 糊开。
+ *
+ * 两者分开传，是因为换字那一段要的曲线不一样：透明度互补（和恒为 1）保证不空场，
+ * 模糊则在中段冲最高，正好把两句半透明的字糊成一团，而不是叠出重影。
  *
  * 刻意收成一行（[TextOverflow.Ellipsis]）：两条文案叠在一起，谁更高谁就决定这块的高度。
  * 若允许换行，错误文案一出现会把输入框整体顶高一行，而那时它还是半透明的——
  * 看上去就是"字还没出来，框先跳了"。
  */
 @Composable
-private fun FieldMessage(text: String, visible: Float, color: Color) {
+private fun FieldMessage(text: String, visible: Float, blur: Dp, color: Color) {
     Text(
         text = text,
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer { alpha = visible }
             // 模糊半径只能给具体 dp，必须参与重组；淡入淡出不参与。
-            .blur(
-                radius = MESSAGE_BLUR * (1f - visible),
-                edgeTreatment = BlurredEdgeTreatment.Unbounded,
-            ),
+            .blur(radius = blur, edgeTreatment = BlurredEdgeTreatment.Unbounded),
         color = color,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
