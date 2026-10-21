@@ -148,32 +148,65 @@ private fun WakeUpImportContent(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // 一条主时间轴驱动全部动作，每个元素只从中截一段，节奏要调就只动下面这几组区间。
+    // 去程和归位是两套编排，归位不是把去程倒放：箭头从左边滑进来、输入框从上方落下来。
+    // 两条时间轴各管一套，谁也不影响谁；`returning` 只是决定下游读哪一套。
     val timeline = remember { Animatable(0f) }
+    val rewind = remember { Animatable(0f) }
+    var returning by remember { mutableStateOf(false) }
+
     LaunchedEffect(submitting) {
         if (submitting) {
             // 先收键盘再动：输入法展开时可用高度少一截，布局是压缩过的，
             // 这时候起跳，飞出去的位置和落点都不对。
             focusManager.clearFocus()
             keyboardController?.hide()
+            returning = false
+            timeline.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = SUBMIT_MILLIS, easing = LinearEasing),
+            )
+        } else if (timeline.value > 0f) {
+            returning = true
+            rewind.snapTo(0f)
+            rewind.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = RETURN_MILLIS, easing = LinearEasing),
+            )
+            // 收尾把两条轴都归零再切回去程映射：那一刻两套算出来都是静止态，不会跳。
+            rewind.snapTo(0f)
+            timeline.snapTo(0f)
+            returning = false
         }
-        timeline.animateTo(
-            targetValue = if (submitting) 1f else 0f,
-            animationSpec = tween(
-                durationMillis = if (submitting) SUBMIT_MILLIS else SUBMIT_MILLIS / 2,
-                // 主时间轴必须线性，各段自己加缓动，否则每段都会被再压一次。
-                easing = LinearEasing,
-            ),
-        )
     }
 
     val elapsed = timeline.value
+    // 去程：全部从 0 涨到 1，元素依次"离开"。
     val arrowExit = elapsed.segment(0.00f, 0.20f).accelerate()
     val hintExit = elapsed.segment(0.08f, 0.30f).accelerate()
     val fieldExit = elapsed.segment(0.16f, 0.56f).accelerate()
-    val buttonMove = elapsed.segment(0.50f, 0.86f).decelerate()
-    // 按钮落位之后才交接：按钮淡出的同时加载指示器淡入，两者重叠很短的一段。
-    val handoff = elapsed.segment(0.86f, 0.96f)
+    val buttonExit = elapsed.segment(0.50f, 0.86f).decelerate()
+    // 按钮落位之后才交接：按钮让位的同时加载指示器盖上来，两者重叠很短的一段。
+    val handoffExit = elapsed.segment(0.86f, 0.96f)
+
+    // 归位：先把指示器化掉、按钮回到原位，输入框、提示、箭头再依次回来。
+    // 指示器必须化完（0.00–0.16）按钮才开始动：它和按钮在同一个 Box 里，跟着按钮走，
+    // 否则会看到那颗转着的东西一路滑到底部去。
+    val rewindProgress = rewind.value
+    val handoffBack = 1f - rewindProgress.segment(0.00f, 0.16f)
+    val buttonBack = rewindProgress.segment(0.16f, 0.74f).settle()
+    val fieldIn = rewindProgress.segment(0.50f, 0.86f).settle()
+    val hintIn = rewindProgress.segment(0.62f, 0.90f).settle()
+    val arrowIn = rewindProgress.segment(0.70f, 0.96f).settle()
+
+    // 两套编排收敛成同几个量，下游只认这些。
+    // 归位时箭头从左边滑进来（终点 0），去程时向右飞出去（终点 +ARROW_FLY）。
+    val arrowOffsetX = if (returning) -ARROW_FLY * (1f - arrowIn) else ARROW_FLY * arrowExit
+    val arrowAlpha = if (returning) arrowIn else 1f - arrowExit
+    // 0 = 原位，1 = 上移 HINT_LIFT；归位时从上方落回原位。
+    val hintShift = if (returning) 1f - hintIn else hintExit
+    val hintAlpha = if (returning) hintIn else 1f - hintExit
+    val buttonMove = if (returning) 1f - buttonBack else buttonExit
+    val handoff = if (returning) handoffBack else handoffExit
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -231,7 +264,8 @@ private fun WakeUpImportContent(
                     value = state.input,
                     onValueChange = onInputChange,
                     minFieldHeight = fieldHeight,
-                    hintExit = hintExit,
+                    hintShift = hintShift,
+                    hintAlpha = hintAlpha,
                     modifier = Modifier
                         .fillMaxWidth()
                         .widthIn(max = 520.dp)
@@ -241,17 +275,31 @@ private fun WakeUpImportContent(
                         // 离屏缓冲，位移若写在它里层，飞出原来那块矩形的内容就被这个缓冲裁掉了——
                         // 表现就是"没有真的移动，只是被切了一刀"。
                         .graphicsLayer {
-                            val delta = (buttonCenter - fieldCenter) * fieldExit
-                            translationX = delta.x
-                            translationY = delta.y
-                            val shrink = 1f - FIELD_SHRINK * fieldExit
-                            scaleX = shrink
-                            scaleY = shrink
-                            alpha = 1f - fieldExit
+                            if (returning) {
+                                // 归位：从上方微微落下来，不缩放、不向按钮收。
+                                translationX = 0f
+                                translationY = -(RETURN_DROP.toPx() * (1f - fieldIn))
+                                scaleX = 1f
+                                scaleY = 1f
+                                alpha = fieldIn
+                            } else {
+                                val delta = (buttonCenter - fieldCenter) * fieldExit
+                                translationX = delta.x
+                                translationY = delta.y
+                                val shrink = 1f - FIELD_SHRINK * fieldExit
+                                scaleX = shrink
+                                scaleY = shrink
+                                alpha = 1f - fieldExit
+                            }
                         }
                         // 模糊半径只能给具体 dp，必须参与重组；位移和缩放不重组。
+                        // 归位时从糊到清晰，配合淡入，像是"聚焦上来"。
                         .blur(
-                            radius = FIELD_BLUR * fieldExit,
+                            radius = if (returning) {
+                                RETURN_BLUR * (1f - fieldIn)
+                            } else {
+                                FIELD_BLUR * fieldExit
+                            },
                             edgeTreatment = BlurredEdgeTreatment.Unbounded,
                         ),
                 )
@@ -272,11 +320,13 @@ private fun WakeUpImportContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     CookieImportButton(
-                        onClick = onImport,
+                        // 归位途中按钮还在往下飞，这时候点它会把两套编排撞在一起，先不理。
+                        onClick = { if (!returning) onImport() },
                         // 输入框空着、或文本里认不出口令时按钮置灰，避免点了没反应又看不到错误提示。
                         enabled = state.canImport,
                         submitting = submitting,
-                        arrowExit = arrowExit,
+                        arrowOffsetX = arrowOffsetX,
+                        arrowAlpha = arrowAlpha,
                         handoff = handoff,
                     )
                     // 不是把指示器塞进按钮，而是按钮就地变成它：同一个位置、同样的尺寸、同样的颜色，
@@ -286,7 +336,8 @@ private fun WakeUpImportContent(
                             progress = handoff,
                             modifier = Modifier.requiredSize(BUTTON_SIZE),
                         )
-                    }                }
+                    }
+                }
             }
         }
     }
@@ -297,7 +348,8 @@ private fun ShareKeyField(
     value: String,
     onValueChange: (String) -> Unit,
     minFieldHeight: Dp,
-    hintExit: Float,
+    hintShift: Float,
+    hintAlpha: Float,
     modifier: Modifier = Modifier,
 ) {
     OutlinedTextField(
@@ -315,11 +367,11 @@ private fun ShareKeyField(
                 text = stringResource(R.string.wakeup_import_key_hint),
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 往上推的同时淡出，比原地淡出更像「收起来」；layout 尺寸不变，
-                    // 所以下面按钮不会跟着跳。
+                    // 往上推的同时淡出，比原地淡出更像「收起来」；归位时反过来从上方落回原位。
+                    // layout 尺寸不变，所以下面按钮不会跟着跳。
                     .graphicsLayer {
-                        translationY = -(HINT_LIFT.toPx() * hintExit)
-                        alpha = 1f - hintExit
+                        translationY = -(HINT_LIFT.toPx() * hintShift)
+                        alpha = hintAlpha
                     },
                 textAlign = TextAlign.Center,
             )
@@ -341,7 +393,8 @@ private fun CookieImportButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     submitting: Boolean = false,
-    arrowExit: Float = 0f,
+    arrowOffsetX: Dp = 0.dp,
+    arrowAlpha: Float = 1f,
     handoff: Float = 0f,
 ) {
     val morph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Circle) }
@@ -412,10 +465,10 @@ private fun CookieImportButton(
             modifier = Modifier
                 .size(32.dp)
                 .graphicsLayer {
-                    // 顺着箭头方向滑出去，滑到看不见为止；被上面的 clip 关在按钮内，
-                    // 所以是「从按钮内部飞走」，不是「从边缘冒出去」。
-                    translationX = ARROW_FLY.toPx() * arrowExit
-                    alpha = 1f - arrowExit
+                    // 去程向右滑出去、归位从左滑回来，都由外部算好偏移量传进来；
+                    // 被上面的 clip 关在按钮内，所以是「从按钮内部进出」，不是「从边缘冒出去」。
+                    translationX = arrowOffsetX.toPx()
+                    alpha = arrowAlpha
                 },
         )
     }
@@ -545,6 +598,9 @@ private const val ENABLE_COLOR_MILLIS = 200
  */
 private val SUBMIT_MILLIS = WAKEUP_SUBMIT_ANIMATION_MILLIS.toInt()
 
+/** 归位（失败回滚）整段编排的时长。比去程短一点：回来这件事不需要慢慢演。 */
+private const val RETURN_MILLIS = 720
+
 private val BUTTON_SIZE = 92.dp
 
 /**
@@ -588,6 +644,12 @@ private val HINT_LIFT = 14.dp
 /** 输入框淡出时糊到的最大半径。 */
 private val FIELD_BLUR = 18.dp
 
+/** 归位时输入框从上方落下的距离：只"微微"动一点，不要像掉下来。 */
+private val RETURN_DROP = 20.dp
+
+/** 归位时输入框起始的模糊半径，落位过程中收到 0。 */
+private val RETURN_BLUR = 12.dp
+
 /** 输入框飞到按钮时收缩到原尺寸的比例。 */
 private const val FIELD_SHRINK = 0.55f
 
@@ -602,8 +664,16 @@ private fun Float.segment(start: Float, end: Float): Float =
 /** 离场用加速曲线：起步慢、越走越快，像是被"抽走"。 */
 private fun Float.accelerate(): Float = FastOutLinearInEasing.transform(this)
 
-/** 位移用减速曲线：快速起步、稳稳停住。 */
+/** 位移用减速曲线：起步快、稳稳停住。 */
 private fun Float.decelerate(): Float = FastOutSlowInEasing.transform(this)
+
+/**
+ * 归位专用：二次 ease-out，一上来就有速度、越走越慢地贴到终点。
+ *
+ * 归位的元素是从"停住"的状态重新启动的，再用 ease-in-out（[decelerate]）会先慢一下再走，
+ * 观感上像"顿一下才动"，所以这里换成单调减速。
+ */
+private fun Float.settle(): Float = 1f - (1f - this) * (1f - this)
 
 /** 控件在 root 坐标系里的中心点。 */
 private fun LayoutCoordinates.centerInRoot(): Offset {
