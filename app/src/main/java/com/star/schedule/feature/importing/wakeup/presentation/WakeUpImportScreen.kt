@@ -1,5 +1,6 @@
 package com.star.schedule.feature.importing.wakeup.presentation
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -144,6 +145,8 @@ private fun WakeUpImportScreen(
 
                 CookieImportButton(
                     onClick = onImport,
+                    // 输入框空着、或文本里认不出口令时按钮置灰，避免点了没反应又看不到错误提示。
+                    enabled = state.canImport,
                     modifier = Modifier.padding(bottom = bottomGap),
                 )
             }
@@ -179,16 +182,18 @@ private fun ShareKeyField(
 }
 
 /**
- * 九瓣饼干的提交按钮：按下时收到正圆，抬起再散开。
+ * 九瓣饼干的提交按钮：按下时收到正圆，抬起再散开；不可用时底色与图标色淡出去。
  *
  * MaterialShapes 的 `toShape()` 返回的是匿名 `Shape`，不满足 `CornerBasedShape`，
  * 所以 IconButton 自带的形状动画永远不会参与——只能自己用 `Morph` 驱动进度。
+ * 颜色同理，`colors` 只接受静态值，可用性切换也要自己插值。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CookieImportButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val morph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Circle) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -200,16 +205,43 @@ private fun CookieImportButton(
     )
     val shape = remember(morph, progress) { MorphingShape(morph, progress) }
 
+    // 颜色自己插值：IconButton 的 colors 只吃静态值，直接给 disabledContainerColor
+    // 会在 enabled 翻转的那一帧硬切。插值结果同时喂给启用、禁用两组槽位，
+    // 于是真正的 enabled 翻转发生时颜色早已走到位，中间不会闪。
+    val containerColor by animateColorAsState(
+        targetValue = if (enabled) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        },
+        animationSpec = tween(durationMillis = ENABLE_COLOR_MILLIS),
+        label = "cookieContainerColor",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (enabled) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        },
+        animationSpec = tween(durationMillis = ENABLE_COLOR_MILLIS),
+        label = "cookieContentColor",
+    )
+
     IconButton(
         onClick = onClick,
         interactionSource = interactionSource,
+        enabled = enabled,
         // requiredSize：形状按钮被父布局压扁时会更难看，宁可溢出也不变形。
         modifier = modifier.requiredSize(92.dp),
         // 两个状态给同一个实例，IconButton 才会当静态形状直接画，不再自己切换。
         shapes = IconButtonDefaults.shapes(shape = shape, pressedShape = shape),
+        // 四个槽位都塞插值后的颜色：禁用态若留给默认值会退回「透明底 + 半透明图标」，
+        // 整颗按钮看着会直接消失。
         colors = IconButtonDefaults.iconButtonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            disabledContainerColor = containerColor,
+            disabledContentColor = contentColor,
         ),
     ) {
         Icon(
@@ -244,4 +276,7 @@ private class MorphingShape(
 }
 
 private const val PRESS_MORPH_MILLIS = 220
+
+/** 可用状态切换时底色与图标色的过渡时长，和按下形变保持同一节奏。 */
+private const val ENABLE_COLOR_MILLIS = 200
 
