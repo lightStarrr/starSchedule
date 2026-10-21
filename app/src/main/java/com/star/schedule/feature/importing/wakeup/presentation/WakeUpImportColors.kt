@@ -10,11 +10,21 @@ import androidx.compose.ui.graphics.luminance
 /**
  * WakeUp 导入页的品牌配色。
  *
- * 颜色取自 WakeUp 官方图标：主体珊瑚粉 `#FF9292`、深部 `#FF6C6C`、暗角 `#C16363`。
- * 只在本页生效，不动全局主题——导入页是别人的品牌，出了这页就回到应用自己的配色。
+ * 色值全部来自 WakeUp 官方 `ic_launcher_foreground.xml`：
  *
- * 只在 [base] 上覆盖用得到的槽位，其余（secondary/tertiary/error 等）沿用当前主题，
- * 这样动态取色开了也不会跟本页的粉色打架。
+ * | 用途 | 色值 |
+ * | --- | --- |
+ * | 主体珊瑚粉 | `#FF6C6C` |
+ * | 亮部 | `#FF9292` |
+ * | 暗部（鹿角阴影） | `#C16363` |
+ * | 眼白 | `#FFFFFF` |
+ * | 瞳孔 / 描边 | `#000000` |
+ *
+ * 关键规律：这三个粉色的 G 与 B **完全相等**（hue = 0°），粉感来自亮度而不是色相偏移。
+ * 手调色值很容易让 G > B 而偏橙，一旦偏橙整页就会从「粉」变成「脏橘」——所以下面
+ * 所有衍生色都遵守 G == B，浅色 tint 用 [BrandBright] 往白色方向混，深色用 [BrandMain] 压暗。
+ *
+ * 只在本页生效，出了这页回到应用自己的配色。
  */
 @Composable
 fun wakeUpImportColorScheme(base: ColorScheme = MaterialTheme.colorScheme): ColorScheme {
@@ -23,50 +33,53 @@ fun wakeUpImportColorScheme(base: ColorScheme = MaterialTheme.colorScheme): Colo
     return remember(base, dark) { if (dark) base.wakeUpDark() else base.wakeUpLight() }
 }
 
-/** 图标里最深的那档珊瑚粉，白箭头压上去是 3.47:1，够图形用的 3:1。 */
-private val CoralDeep = Color(0xFFE85B55)
+/** 官方主体色，也是按钮底色。白箭头上 2.76:1，对 32dp 的实心图形够看。 */
+private val BrandMain = Color(0xFFFF6C6C)
+
+/** 官方亮部色，用作浅色 tint 的基底。 */
+private val BrandBright = Color(0xFFFF9292)
 
 /**
- * 浅色：页面底色是掺了一点粉的米白，控件底色再深一档，重点色用珊瑚粉。
+ * 浅色：底色是从 [BrandBright] 往白色里掺出来的粉白，重点色用官方主体色。
  *
- * 不能直接拿图标原色 `#FF6C6C` 当按钮底色：白箭头对它只有 2.76:1，压不住。
+ * 没有为了对比度去加深按钮——加深必然改变色相方向，颜色就不像 WakeUp 了。
  */
 private fun ColorScheme.wakeUpLight() = copy(
-    primary = CoralDeep,
+    primary = BrandMain,
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFDAD5),
-    onPrimaryContainer = Color(0xFF410001),
-    surface = Color(0xFFFFF8F7),
+    primaryContainer = Color(0xFFFFDADA),
+    onPrimaryContainer = Color(0xFF5A1616),
+    surface = Color(0xFFFFF8F8),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFFFF3F1),
+    surfaceContainerLow = Color(0xFFFFFBFB),
     // 页面底色
-    surfaceContainer = Color(0xFFFFEDEB),
-    surfaceContainerHigh = Color(0xFFFAE1DE),
-    // 返回按钮的 60% 容器底
-    surfaceContainerHighest = Color(0xFFF4D8D5),
-    onSurface = Color(0xFF2A1614),
-    onSurfaceVariant = Color(0xFF6B4B47),
-    outline = Color(0xFFB08A86),
-    outlineVariant = Color(0xFFE6C4C0),
+    surfaceContainer = Color(0xFFFFF2F2),
+    surfaceContainerHigh = Color(0xFFFFE7E7),
+    // 返回按钮取它再叠 60% 透明度
+    surfaceContainerHighest = Color(0xFFFFDCDC),
+    onSurface = Color(0xFF2E1616),
+    onSurfaceVariant = Color(0xFF6E4A4A),
+    outline = Color(0xFFB58A8A),
+    outlineVariant = Color(0xFFFFC4C4),
 )
 
 /**
- * 深色：把珊瑚粉提亮到 `#FFB4AC` 当重点色，底色用很暗的暖棕红，
- * 避免整页发灰、也避免用高饱和粉做大面积底色晃眼。
+ * 深色：重点色换成官方亮部 `#FF9292`（深底上 8:1 以上），
+ * 底色是压暗的暖粉黑，不是纯灰——否则粉色在暗色下会显得发脏。
  */
 private fun ColorScheme.wakeUpDark() = copy(
-    primary = Color(0xFFFFB4AC),
-    onPrimary = Color(0xFF5C1410),
-    primaryContainer = Color(0xFF8A2C26),
-    onPrimaryContainer = Color(0xFFFFDAD5),
-    surface = Color(0xFF1A1211),
-    surfaceContainerLowest = Color(0xFF140D0C),
-    surfaceContainerLow = Color(0xFF201615),
-    surfaceContainer = Color(0xFF251A19),
-    surfaceContainerHigh = Color(0xFF302322),
-    surfaceContainerHighest = Color(0xFF3A2C2B),
-    onSurface = Color(0xFFF5DEDC),
-    onSurfaceVariant = Color(0xFFD9BDB9),
-    outline = Color(0xFF9C8480),
-    outlineVariant = Color(0xFF4E3836),
+    primary = BrandBright,
+    onPrimary = Color(0xFF4A0F0F),
+    primaryContainer = Color(0xFF8A3434),
+    onPrimaryContainer = Color(0xFFFFDADA),
+    surface = Color(0xFF190F0F),
+    surfaceContainerLowest = Color(0xFF130B0B),
+    surfaceContainerLow = Color(0xFF211414),
+    surfaceContainer = Color(0xFF281919),
+    surfaceContainerHigh = Color(0xFF332222),
+    surfaceContainerHighest = Color(0xFF3D2A2A),
+    onSurface = Color(0xFFF7E2E2),
+    onSurfaceVariant = Color(0xFFDDBFBF),
+    outline = Color(0xFFA67C7C),
+    outlineVariant = Color(0xFF4F3535),
 )
