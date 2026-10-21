@@ -1,5 +1,9 @@
 package com.star.schedule.feature.importing.wakeup.presentation
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -27,16 +31,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
+import androidx.compose.material3.toPath
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.Morph
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleBackButton
@@ -165,7 +179,10 @@ private fun ShareKeyField(
 }
 
 /**
- * 九瓣饼干形状的提交按钮。当前只有一种外观，等视觉定稿再加回状态。
+ * 九瓣饼干的提交按钮：按下时收到正圆，抬起再散开。
+ *
+ * MaterialShapes 的 `toShape()` 返回的是匿名 `Shape`，不满足 `CornerBasedShape`，
+ * 所以 IconButton 自带的形状动画永远不会参与——只能自己用 `Morph` 驱动进度。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -173,18 +190,23 @@ private fun CookieImportButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val cookieShape = MaterialShapes.Cookie9Sided.toShape()
-    val circleShape = MaterialShapes.Circle.toShape()
+    val morph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Circle) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val progress by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(durationMillis = PRESS_MORPH_MILLIS),
+        label = "cookiePressMorph",
+    )
+    val shape = remember(morph, progress) { MorphingShape(morph, progress) }
 
     IconButton(
         onClick = onClick,
+        interactionSource = interactionSource,
         // requiredSize：形状按钮被父布局压扁时会更难看，宁可溢出也不变形。
         modifier = modifier.requiredSize(92.dp),
-        // 按压态用正圆。IconButtonDefaults.shapes 不显式给 pressedShape 时会退回成圆角矩形。
-        shapes = IconButtonDefaults.shapes(
-            shape = cookieShape,
-            pressedShape = circleShape,
-        ),
+        // 两个状态给同一个实例，IconButton 才会当静态形状直接画，不再自己切换。
+        shapes = IconButtonDefaults.shapes(shape = shape, pressedShape = shape),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -197,3 +219,29 @@ private fun CookieImportButton(
         )
     }
 }
+
+/**
+ * 把 `Morph` 在某个进度上的轮廓当成 `Shape` 用。
+ *
+ * 缩放与居中的处理方式和 `RoundedPolygon.toShape()` 保持一致：先按控件尺寸缩放，
+ * 再把轮廓包围盒的中心对到控件中心。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private class MorphingShape(
+    private val morph: Morph,
+    private val progress: Float,
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val path = morph.toPath(progress, Path())
+        path.transform(Matrix().apply { scale(size.width, size.height) })
+        path.translate(size.center - path.getBounds().center)
+        return Outline.Generic(path)
+    }
+}
+
+private const val PRESS_MORPH_MILLIS = 220
+
