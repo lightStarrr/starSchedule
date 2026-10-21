@@ -13,6 +13,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -68,6 +69,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -208,6 +210,9 @@ private fun WakeUpImportContent(
     val buttonMove = if (returning) 1f - buttonBack else buttonExit
     val handoff = if (returning) handoffBack else handoffExit
 
+    // 两段动画期间输入框都不接输入：去程它压着按钮，归位时它还没落稳。
+    val frozen = submitting || returning
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -237,14 +242,6 @@ private fun WakeUpImportContent(
             // 后面的位移全部在 graphicsLayer / offset 里读，不触发重组。
             var fieldCenter by remember { mutableStateOf(Offset.Zero) }
             var buttonCenter by remember { mutableStateOf(Offset.Zero) }
-
-            CircleBackButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(12.dp),
-            )
 
             // 上下两段空白把输入框压在正中；按钮参与布局而不是浮在上面，
             // 这样键盘顶起页面时两者不会重叠。
@@ -339,6 +336,28 @@ private fun WakeUpImportContent(
                     }
                 }
             }
+
+            // 挡板：出场/归位期间盖在内容上，让事件根本到不了输入框。
+            //
+            // 输入框飞出去时正好落在按钮身上，而 graphicsLayer 的位移连触摸区域一起搬过去，
+            // 所以那会儿点按钮等于点输入框——焦点一给出去键盘就弹回来，连点几下还会往输入框里打字。
+            // 这里不是"消费"事件，而是让它排在最上面：命中测试只看最上层，下面的输入框收不到。
+            if (frozen) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) { detectTapGestures(onTap = {}) },
+                )
+            }
+
+            // 返回按钮放在最后画：它在挡板之上，加载很久的时候也退得出去。
+            CircleBackButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(12.dp),
+            )
         }
     }
 }
