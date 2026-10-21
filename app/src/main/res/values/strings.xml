@@ -48,6 +48,7 @@
     <string name="import_qiangzhi_title">Qiangzhi academic system</string>
     <string name="import_qiangzhi_subtitle">Sign in with account and password to import from the academic system (URL required)</string>
     <string name="import_more_coming">More import methods coming soon…</string>
+    <string name="wakeup_import_key_hint">The share code is valid for 30 minutes</string>
     <string name="wakeup_default_timetable_name">Untitled WakeUp timetable</string>
     <string name="qiangzhi_import_title">Qiangzhi academic system import</string>
     <string name="qiangzhi_info_text">Uses your credentials to sign into the Qiangzhi academic system and fetch the "Semester Theory Timetable".\nPlease enter the system URL, e.g. %1$s\nYour account and password will be stored in the timetable database for one–tap updates.</string>

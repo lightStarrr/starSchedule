@@ -48,6 +48,7 @@
     <string name="import_qiangzhi_title">强智教务系统</string>
     <string name="import_qiangzhi_subtitle">账号密码登录教务系统导入（需填写网址）</string>
     <string name="import_more_coming">更多导入方式即将推出…</string>
+    <string name="wakeup_import_key_hint">口令 30 分钟内有效</string>
     <string name="wakeup_default_timetable_name">未命名WakeUp课程表</string>
     <string name="qiangzhi_import_title">强智教务系统导入</string>
     <string name="qiangzhi_info_text">将使用账号密码登录强智教务系统并抓取“学期理论课表”。\n请填写教务系统网址，例如：%1$s\n账号密码将保存在课程表数据库中，用于一键更新课程。</string>
