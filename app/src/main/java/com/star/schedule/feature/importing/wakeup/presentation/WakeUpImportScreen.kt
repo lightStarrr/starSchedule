@@ -174,17 +174,16 @@ private fun CookieImportButton(
     modifier: Modifier = Modifier,
 ) {
     val cookieShape = MaterialShapes.Cookie9Sided.toShape()
+    val circleShape = MaterialShapes.Circle.toShape()
 
     IconButton(
         onClick = onClick,
         // requiredSize：形状按钮被父布局压扁时会更难看，宁可溢出也不变形。
         modifier = modifier.requiredSize(92.dp),
-        // 按压态必须显式给同一个形状：IconButtonDefaults.shapes(pressedShape = null)
-        // 会退回成圆角矩形，而饼干是多边形、圆角矩形是 RoundRect，两者插值不出中间态，
-        // 于是按下瞬间直接跳成方的——看起来就像"无动画变了形"。
+        // 按压态用正圆。IconButtonDefaults.shapes 不显式给 pressedShape 时会退回成圆角矩形。
         shapes = IconButtonDefaults.shapes(
             shape = cookieShape,
-            pressedShape = cookieShape,
+            pressedShape = circleShape,
         ),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = MaterialTheme.colorScheme.primary,
