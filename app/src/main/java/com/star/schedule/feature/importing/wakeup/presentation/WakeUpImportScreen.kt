@@ -5,10 +5,17 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +39,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LoadingIndicatorDefaults
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +50,7 @@ import androidx.compose.material3.toPath
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,6 +66,7 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -75,6 +85,7 @@ import androidx.graphics.shapes.Morph
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleBackButton
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 @Composable
@@ -124,6 +135,7 @@ private fun WakeUpImportScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun WakeUpImportContent(
     state: WakeUpImportUiState,
@@ -159,7 +171,9 @@ private fun WakeUpImportContent(
     val arrowExit = elapsed.segment(0.00f, 0.20f).accelerate()
     val hintExit = elapsed.segment(0.08f, 0.30f).accelerate()
     val fieldExit = elapsed.segment(0.16f, 0.56f).accelerate()
-    val buttonMove = elapsed.segment(0.52f, 0.92f).decelerate()
+    val buttonMove = elapsed.segment(0.50f, 0.86f).decelerate()
+    // 按钮落位之后才交接：按钮淡出的同时加载指示器淡入，两者重叠很短的一段。
+    val handoff = elapsed.segment(0.86f, 0.96f)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -244,12 +258,7 @@ private fun WakeUpImportContent(
 
                 Spacer(Modifier.weight(1f))
 
-                CookieImportButton(
-                    onClick = onImport,
-                    // 输入框空着、或文本里认不出口令时按钮置灰，避免点了没反应又看不到错误提示。
-                    enabled = state.canImport,
-                    submitting = submitting,
-                    arrowExit = arrowExit,
+                Box(
                     modifier = Modifier
                         .padding(bottom = bottomGap)
                         .onGloballyPositioned { buttonCenter = it.centerInRoot() }
@@ -260,7 +269,24 @@ private fun WakeUpImportContent(
                                 y = ((screenCenter.y - buttonCenter.y) * buttonMove).roundToInt(),
                             )
                         },
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CookieImportButton(
+                        onClick = onImport,
+                        // 输入框空着、或文本里认不出口令时按钮置灰，避免点了没反应又看不到错误提示。
+                        enabled = state.canImport,
+                        submitting = submitting,
+                        arrowExit = arrowExit,
+                        handoff = handoff,
+                    )
+                    // 不是把指示器塞进按钮，而是按钮就地变成它：同一个位置、同样的尺寸、同样的颜色，
+                    // 而且第一帧就是同一块饼干，所以交接那一瞬间画面上没有任何变化。
+                    if (handoff > 0f) {
+                        CookieLoadingIndicator(
+                            progress = handoff,
+                            modifier = Modifier.requiredSize(BUTTON_SIZE),
+                        )
+                    }                }
             }
         }
     }
@@ -316,11 +342,14 @@ private fun CookieImportButton(
     enabled: Boolean = true,
     submitting: Boolean = false,
     arrowExit: Float = 0f,
+    handoff: Float = 0f,
 ) {
     val morph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Circle) }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val progress by animateFloatAsState(
+        // 提交中保持饼干，不要提前收成圆：交接给 LoadingIndicator 的瞬间两边必须都是饼干，
+        // 否则会在那一下跳一个形状。
         targetValue = if (pressed) 1f else 0f,
         animationSpec = tween(durationMillis = PRESS_MORPH_MILLIS),
         label = "cookiePressMorph",
@@ -361,6 +390,10 @@ private fun CookieImportButton(
         // clip：让飞出去的箭头被裁在按钮形状里——形状每帧都在变，clip 跟着重组。
         modifier = modifier
             .requiredSize(BUTTON_SIZE)
+            // 交接不做渐变，只做「一层盖一层」：指示器从同一块饼干的位置淡入、盖在按钮上，
+            // 等它完全铺满（handoff = 1）再把按钮整个撤掉。
+            // 反过来写（按钮 1-handoff、指示器 handoff）会在中途叠出两成半透明，颜色发浅、闪一下。
+            .graphicsLayer { alpha = if (handoff >= 1f) 0f else 1f }
             .clip(shape),
         // 两个状态给同一个实例，IconButton 才会当静态形状直接画，不再自己切换。
         shapes = IconButtonDefaults.shapes(shape = shape, pressedShape = shape),
@@ -389,6 +422,99 @@ private fun CookieImportButton(
 }
 
 /**
+ * 提交中的加载指示器：九瓣饼干在原地开始变形、轮转、循环。
+ *
+ * 没有用现成的 `LoadingIndicator`，是因为它内部会把整组形状按一个公共比例缩进容器盒
+ * （`scaleFactor = 各形状紧包围盒 / 旋转包围盒的最小比值 × ActiveIndicatorScale(38/48)`），
+ * 而它的缩放基准是 `normalized()` 之后的单位盒；按钮那边用的是 [MorphingShape] 的画法。
+ * 两套约定凑不出像素级重合——只能靠一个"放大一点点"的经验常数硬凑，凑多久都是"差一点点"。
+ *
+ * 这里改成和按钮同一套画法（[toFittedPath]），于是交接那一帧画出来的就是同一块饼干，
+ * 不存在尺寸差、没有偏移，也就没有"跳一下"。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CookieLoadingIndicator(
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
+    val morphs = remember { WakeUpIndicatorMorphs }
+    val step = remember { Animatable(0f) }
+    var index by remember { mutableIntStateOf(0) }
+    val path = remember { Path() }
+    val color = MaterialTheme.colorScheme.primary
+
+    // 持续自转只做“底色动感”，慢一点更好：“忙”的感觉交给形状变化，不要交给转速。
+    val spin = rememberInfiniteTransition(label = "cookieSpin").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = SPIN_MILLIS, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "cookieSpinAngle",
+    )
+
+    LaunchedEffect(morphs) {
+        // 交接有一小段重叠（按钮还在、指示器淡入）。这段时间形状必须锁死在饼干上，
+        // 否则两层各变形各的，叠起来会变成双影。
+        delay(HANDOFF_HOLD_MILLIS)
+        while (true) {
+            step.animateTo(
+                targetValue = 1f,
+                // 可见阈值放大到 0.1：低阻尼弹簧本该有点回弹，阈值太小会拖出一条尾巴。
+                // 刚度比 M3 默认（200）低：一步变形走得更缓，不容易看成“一直在切形状”。
+                animationSpec = spring(
+                    dampingRatio = 0.6f,
+                    stiffness = 110f,
+                    visibilityThreshold = 0.1f,
+                ),
+            )
+            index = (index + 1) % morphs.size
+            // 序列首尾相接，所以这里从 1 归零不会看到形状跳变。
+            step.snapTo(0f)
+            delay(MORPH_GAP_MILLIS)
+        }
+    }
+
+    Canvas(
+        modifier = modifier.graphicsLayer { alpha = progress },
+    ) {
+        val morph = morphs[index]
+        // 旋转比 M3 默认慢很多：M3 每步 90°、4.7s 一圈，但它的图形最多只占容器的 79%，
+        // 这里的饼干是满格的，同样角速度看着明显更急。这里改成每步 6°、36s 一圈。
+        // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
+        val rotation = (index * ROTATE_PER_STEP) % 360f + step.value * ROTATE_PER_STEP + spin.value
+        rotate(degrees = rotation) {
+            drawPath(
+                // 变形进度截断到 0..1：弹簧的过冲留给旋转，不要拿去把形状拉变形。
+                path = morph.toFittedPath(
+                    progress = step.value.coerceIn(0f, 1f),
+                    size = size,
+                    out = path,
+                ),
+                color = color,
+            )
+        }
+    }
+}
+
+/**
+ * 把 `Morph` 在某个进度上的轮廓画成控件大小的形状。
+ *
+ * 缩放与居中的处理方式和 `RoundedPolygon.toShape()` 一致：先按控件尺寸缩放，再把轮廓包围盒的
+ * 中心对到控件中心。按钮和加载指示器都走这一条，两边画出来的几何形状完全一致。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun Morph.toFittedPath(progress: Float, size: Size, out: Path = Path()): Path {
+    out.reset()
+    toPath(progress, out)
+    out.transform(Matrix().apply { scale(size.width, size.height) })
+    out.translate(size.center - out.getBounds().center)
+    return out
+}
+
+/**
  * 把 `Morph` 在某个进度上的轮廓当成 `Shape` 用。
  *
  * 缩放与居中的处理方式和 `RoundedPolygon.toShape()` 保持一致：先按控件尺寸缩放，
@@ -403,12 +529,7 @@ private class MorphingShape(
         size: Size,
         layoutDirection: LayoutDirection,
         density: Density,
-    ): Outline {
-        val path = morph.toPath(progress, Path())
-        path.transform(Matrix().apply { scale(size.width, size.height) })
-        path.translate(size.center - path.getBounds().center)
-        return Outline.Generic(path)
-    }
+    ): Outline = Outline.Generic(morph.toFittedPath(progress, size))
 }
 
 private const val PRESS_MORPH_MILLIS = 220
@@ -420,6 +541,38 @@ private const val ENABLE_COLOR_MILLIS = 200
 private const val SUBMIT_MILLIS = 900
 
 private val BUTTON_SIZE = 92.dp
+
+/**
+ * 交接后先定住一小会儿再开始变形。
+ *
+ * 交接本身是一段交叉淡化（[SUBMIT_MILLIS] 的 0.86~0.96，约 90ms）。淡化期间两边的形状必须是
+ * 同一块饼干，否则半透明的两层各变形各的，看起来就是重影。所以变形要等淡化结束再启动。
+ */
+private const val HANDOFF_HOLD_MILLIS = 160L
+
+/** 指示器持续自转一圈的时长。M3 默认 4666ms 太急，放慢到 36s。 */
+private const val SPIN_MILLIS = 36000
+
+/** 每变形一步转过的角度；和 [SPIN_MILLIS] 一起决定整体转速，目前约 15°/s（24s 一圈）。 */
+private const val ROTATE_PER_STEP = 6f
+
+/** 每步变形之后停一下，和弹簧一起构成约 1.1s 一步的节奏。 */
+private const val MORPH_GAP_MILLIS = 260L
+
+/**
+ * 加载指示器的形状序列：饼干打头，绕一圈回到饼干。
+ *
+ * 各形状的曲线数不要求一致——`Morph.match()` 在数量不等时会补占位曲线。
+ * 打头放饼干是为了接住按钮：进度 0 的那一帧和按钮画的完全一样。
+ * 末尾再补一次饼干，是为了让最后一跳也落在饼干上，循环首尾相接不跳变。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val WakeUpIndicatorMorphs: List<Morph> =
+    (
+        listOf(MaterialShapes.Cookie9Sided) +
+            LoadingIndicatorDefaults.IndeterminateIndicatorPolygons +
+            listOf(MaterialShapes.Cookie9Sided)
+        ).zipWithNext { from, to -> Morph(from, to) }
 
 /** 箭头在按钮内部向右滑出的距离，滑到边界外就被 clip 裁掉。 */
 private val ARROW_FLY = 56.dp
