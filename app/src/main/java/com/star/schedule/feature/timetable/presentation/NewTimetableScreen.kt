@@ -21,7 +21,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
-import com.star.schedule.core.designsystem.component.CompactPageTopBar
+import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.icon.GlobeSparkleIcon
 import com.star.schedule.core.designsystem.icon.WakeUpLogoIcon
 import com.star.schedule.core.designsystem.navigationBarBottomInset
@@ -65,7 +65,8 @@ private fun NewTimetableScreen(
     onWakeUpImport: () -> Unit,
     onFileImport: () -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    // 与课表设置、提醒设置保持一致：二级页面用会折叠的大标题，不用紧凑单行标题。
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
 
     Scaffold(
@@ -73,7 +74,7 @@ private fun NewTimetableScreen(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            CompactPageTopBar(
+            PageTopBar(
                 title = stringResource(R.string.new_timetable_title),
                 onBack = onBack,
                 scrollBehavior = scrollBehavior,
