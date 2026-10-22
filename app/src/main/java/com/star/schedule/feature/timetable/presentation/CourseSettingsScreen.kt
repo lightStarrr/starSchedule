@@ -65,14 +65,17 @@ private fun CourseSettingsScreen(
             )
         },
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
+        // 提示按整个屏幕居中，不按「顶栏之下剩下的那块」居中：
+        // Scaffold 的 innerPadding 会把可视区域压到顶栏以下，照它居中会整体偏下半个顶栏高度。
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 state.isLoading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         LoadingIndicator()
                     }
                 }
