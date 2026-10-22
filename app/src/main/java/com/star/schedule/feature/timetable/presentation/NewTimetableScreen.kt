@@ -21,6 +21,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.icon.GlobeSparkleIcon
 import com.star.schedule.core.designsystem.icon.WakeUpLogoIcon
@@ -86,7 +87,11 @@ private fun NewTimetableScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(top = 8.dp, bottom = 24.dp + navigationBarInset),
+                .padding(
+                    // 顶栏与内容之间的留白 + 列表自己的上边距，和别的页面第一行位置一致。
+                    top = PageContentTopSpacing + 8.dp,
+                    bottom = 24.dp + navigationBarInset,
+                ),
         ) {
             SettingsGroup {
                 SettingsListItem(

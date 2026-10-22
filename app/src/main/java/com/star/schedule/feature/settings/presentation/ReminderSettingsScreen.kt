@@ -74,6 +74,7 @@ import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.core.designsystem.component.MainSwitchBar
+import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.feature.settings.domain.TimetableSummary
 import com.star.schedule.notification.FlymeLiveTemplate
@@ -196,7 +197,10 @@ private fun ReminderSettingsScreen(
                         .fillMaxWidth()
                         .widthIn(max = 720.dp)
                         .align(Alignment.TopCenter),
-                    contentPadding = PaddingValues(bottom = 24.dp + navigationBarInset),
+                    contentPadding = PaddingValues(
+                        top = PageContentTopSpacing,
+                        bottom = 24.dp + navigationBarInset,
+                    ),
                 ) {
                     item {
                         Column(

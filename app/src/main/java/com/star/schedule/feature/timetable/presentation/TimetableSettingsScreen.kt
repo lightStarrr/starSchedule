@@ -112,6 +112,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.CourseBlockCornerRadius
 import com.star.schedule.core.designsystem.navigationBarBottomInset
@@ -215,7 +216,8 @@ private fun TimetableSettingsScreen(
                 ) { maxHeight }
                 // 尺寸受两个方向同时约束：不能超出剩余高度，也不能横向超出窗口。
                 // 先由可用高度反推宽度，再用窗口宽度收一次，最后按比例得到高度。
-                val availableHeight = (viewportHeight - PreviewCardBelowSpace)
+                // 顶栏与内容之间的留白也要从可用高度里扣掉，否则卡片会把下面的「行高」行顶出去。
+                val availableHeight = (viewportHeight - PreviewCardBelowSpace - PageContentTopSpacing)
                     .coerceAtLeast(0.dp)
                 val cardMaxWidth = (availableHeight / screenAspect)
                     .coerceAtMost(maxWidth * PreviewCardWidthMaxFraction)
@@ -224,7 +226,8 @@ private fun TimetableSettingsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = PageContentTopSpacing),
                 ) {
                     TimetablePreviewPager(
                         pagerState = pagerState,
