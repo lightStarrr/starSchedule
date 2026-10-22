@@ -255,6 +255,7 @@
     <string name="action_undo">Undo</string>
     <string name="error_lesson_time_invalid">Invalid time; use HH:mm</string>
     <string name="lesson_time_empty_hint">Set up class times first</string>
+    <string name="lesson_time_add">Add period</string>
     <string name="new_timetable_title">New timetable</string>
     <string name="new_timetable_manual_title">Create manually</string>
     <string name="new_timetable_manual_support">Start from an empty timetable</string>
