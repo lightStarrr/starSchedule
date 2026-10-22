@@ -55,12 +55,15 @@ internal fun determineTimetableEmptyState(
  * 空状态/错误提示：形状底 + 图标 + 一句标题。
  *
  * [action] 用于需要引导下一步的页面（比如课程设置要先有节次时间），主页不传就是纯提示。
+ * [titleResId] 用来换成更具体的说法：同样是「没有节次时间」，
+ * 在课程设置里应该说「请先设置节次时间」，主页那条沿用旧文案。
  */
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 internal fun EmptyTimetableState(
     state: TimetableEmptyState,
     modifier: Modifier = Modifier,
+    titleResId: Int? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
     val shape = when (state) {
@@ -73,7 +76,7 @@ internal fun EmptyTimetableState(
         TimetableEmptyState.NO_LESSON_TIMES -> Icons.Rounded.AccessTime
         TimetableEmptyState.NO_COURSES -> Icons.Rounded.EventBusy
     }
-    val title = when (state) {
+    val title = titleResId ?: when (state) {
         TimetableEmptyState.NO_TIMETABLE -> R.string.timetable_empty_title
         TimetableEmptyState.NO_LESSON_TIMES -> R.string.label_no_lesson_time
         TimetableEmptyState.NO_COURSES -> R.string.label_no_course

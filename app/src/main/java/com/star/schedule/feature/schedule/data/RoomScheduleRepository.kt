@@ -26,6 +26,19 @@ class RoomScheduleRepository(
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =
         dao.getLessonTimesFlow(timetableId)
 
+    // 写入统一走 DAO 的 AutoSort 事务：节次号永远等于按开始时间排序后的位置，
+    // 时间列从上到下才不会出现「第 3 节比第 2 节还早」。
+    override suspend fun insertLessonTime(lessonTime: LessonTimeEntity): Long =
+        dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = true)
+
+    override suspend fun updateLessonTime(lessonTime: LessonTimeEntity) {
+        dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = false)
+    }
+
+    override suspend fun deleteLessonTime(lessonTime: LessonTimeEntity) {
+        dao.deleteLessonTimeAutoSort(lessonTime)
+    }
+
     override fun observeDayNotes(timetableId: Long): Flow<List<DayNoteEntity>> =
         dao.getDayNotesFlow(timetableId)
 

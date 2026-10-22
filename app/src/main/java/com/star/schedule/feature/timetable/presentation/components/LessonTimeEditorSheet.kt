@@ -33,9 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
-
-/** 浮层当前在改开始还是结束。 */
-enum class LessonTimeField { Start, End }
+import com.star.schedule.feature.timetable.presentation.LessonTimeField
 
 /**
  * 「新建 / 编辑课程时间」浮层：上面两张卡片选开始或结束，下面的时钟改选中的那一端。
