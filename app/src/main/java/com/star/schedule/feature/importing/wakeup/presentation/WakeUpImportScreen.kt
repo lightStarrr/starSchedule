@@ -379,6 +379,8 @@ private fun WakeUpImportContent(
                         onClick = { if (!returning) onImport() },
                         // 输入框空着、或文本里认不出口令时按钮置灰，避免点了没反应又看不到错误提示。
                         enabled = state.canImport,
+                        // 提交期间按钮已经点不动了（scrim 也挡着），但颜色要保住品牌色。
+                        busy = submitting,
                         loading = loading,
                         settling = returning || succeeding,
                         success = succeeding,
@@ -543,7 +545,8 @@ private fun FieldMessage(text: String, visible: Float, blur: Dp, color: Color) {
  * `colors` 也只吃静态值，颜色同样要自己插值。
  *
  * [loading] 一起，形状进入"饼干 → 指示器序列 → 饼干"；[settling] 表示要收尾，手头这一步走完
- * 就边转一步边变回饼干；[success] 让收回的那一步染成 success 色并弹出一个勾。
+ * 就边转一步边变回饼干；[success] 让收回的那一步染成 success 色并弹出一个勾；
+ * [busy] 表示出场编排正在播——此时虽然点不动，颜色必须保持品牌色，不能淡成禁用态的灰。
  * 收回完成（成功时连勾也算）才回调 [onSettled]。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -555,6 +558,7 @@ private fun CookieButton(
     loading: Boolean = false,
     settling: Boolean = false,
     success: Boolean = false,
+    busy: Boolean = false,
     arrowOffsetX: Dp = 0.dp,
     arrowAlpha: Float = 1f,
     onSettled: () -> Unit = {},
@@ -656,8 +660,9 @@ private fun CookieButton(
     }
 
     val successColors = wakeUpSuccessColors()
-    // 加载期间就算点不动也不能淡成灰色——它正在往外飞，这时候掉色整段都脏。
-    val tinted = enabled || loading
+    // 提交/加载期间就算点不动也要一直是品牌色：按钮这会儿正在往外飞，掉成灰色整段出场就脏了。
+    // `enabled` 在 Importing / Finished 会变成 false，所以不能只看它。
+    val tinted = enabled || busy || loading
     val successTint = becomingCookie && success
     // 染绿和"能不能点"是两件事，时长也不同，所以规格按当下这一程取。
     val colorMillis = if (successTint) SUCCESS_COLOR_MILLIS else ENABLE_COLOR_MILLIS
