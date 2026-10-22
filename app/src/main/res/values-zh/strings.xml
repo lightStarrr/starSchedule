@@ -240,6 +240,10 @@
     <string name="timetable_settings_row_height_decrease">减小行高</string>
     <string name="timetable_settings_row_height_increase">增大行高</string>
     <string name="timetable_settings_new">新建课表</string>
+    <string name="timetable_settings_courses">课程设置</string>
+    <string name="timetable_settings_courses_support">管理当前课表里的课程</string>
+    <string name="timetable_settings_lesson_times">节次时间</string>
+    <string name="timetable_settings_lesson_times_support">设置时间列里每节课的开始与结束时间</string>
     <string name="new_timetable_title">新建课表</string>
     <string name="new_timetable_manual_title">手动创建</string>
     <string name="new_timetable_manual_support">从空白课表开始排课</string>

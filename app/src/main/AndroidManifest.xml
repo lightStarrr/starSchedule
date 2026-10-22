@@ -68,6 +68,14 @@
             android:name=".RowHeightActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".LessonTimeSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".CourseSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
         <!-- 崩溃页：独立进程，主进程崩掉后它还能正常显示 -->
         <activity
             android:name=".CrashActivity"

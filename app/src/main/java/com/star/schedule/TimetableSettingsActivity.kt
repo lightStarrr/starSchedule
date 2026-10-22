@@ -39,6 +39,12 @@ class TimetableSettingsActivity : ComponentActivity() {
                     onOpenRowHeight = {
                         startActivity(Intent(this, RowHeightActivity::class.java))
                     },
+                    onOpenCourses = {
+                        startActivity(Intent(this, CourseSettingsActivity::class.java))
+                    },
+                    onOpenLessonTimes = {
+                        startActivity(Intent(this, LessonTimeSettingsActivity::class.java))
+                    },
                     onCreateTimetable = {
                         startActivity(Intent(this, NewTimetableActivity::class.java))
                     },
