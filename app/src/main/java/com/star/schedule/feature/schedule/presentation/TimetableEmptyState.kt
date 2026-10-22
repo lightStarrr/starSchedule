@@ -51,11 +51,17 @@ internal fun determineTimetableEmptyState(
     else -> null
 }
 
+/**
+ * 空状态/错误提示：形状底 + 图标 + 一句标题。
+ *
+ * [action] 用于需要引导下一步的页面（比如课程设置要先有节次时间），主页不传就是纯提示。
+ */
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 internal fun EmptyTimetableState(
     state: TimetableEmptyState,
     modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
 ) {
     val shape = when (state) {
         TimetableEmptyState.NO_TIMETABLE -> MaterialShapes.Cookie4Sided.toShape()
@@ -102,5 +108,9 @@ internal fun EmptyTimetableState(
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         )
+        if (action != null) {
+            Spacer(modifier = Modifier.height(20.dp))
+            action()
+        }
     }
 }
