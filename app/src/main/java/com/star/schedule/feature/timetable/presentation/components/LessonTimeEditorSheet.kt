@@ -10,7 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -44,7 +46,7 @@ enum class LessonTimeField { Start, End }
  * 时钟取值发生在重组之外，所以用 [snapshotFlow] 把指针位置转成回调；
  * 切换卡片时 `key` 会用新的时间重建时钟，不会把上一条时间带过去。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LessonTimeEditorSheet(
     title: String,
@@ -131,11 +133,15 @@ fun LessonTimeEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(R.string.action_cancel))
                 }
                 Button(
                     onClick = onConfirm,
+                    shapes = ButtonDefaults.shapes(),
                     enabled = confirmEnabled,
                 ) {
                     Text(stringResource(R.string.action_save))
@@ -156,6 +162,8 @@ private fun LessonTimeFieldCard(
     Surface(
         onClick = onClick,
         modifier = modifier,
+        // 时间卡用普通圆角：Cookie 形状在小尺寸上把「08:00」挤得很怪，
+        // expressive 的形状语汇只留给下面的按钮。
         shape = RoundedCornerShape(20.dp),
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer
