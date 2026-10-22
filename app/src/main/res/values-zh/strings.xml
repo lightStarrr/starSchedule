@@ -252,6 +252,7 @@
     <string name="action_undo">撤销</string>
     <string name="error_lesson_time_invalid">时间格式不对，请用 HH:mm</string>
     <string name="lesson_time_empty_hint">请先设置节次时间</string>
+    <string name="lesson_time_add">新增节次</string>
     <string name="new_timetable_title">新建课表</string>
     <string name="new_timetable_manual_title">手动创建</string>
     <string name="new_timetable_manual_support">从空白课表开始排课</string>

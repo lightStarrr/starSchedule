@@ -170,7 +170,8 @@ private fun LessonTimeSettingsScreen(
                         titleResId = R.string.lesson_time_empty_hint,
                         action = {
                             Button(onClick = onAdd) {
-                                Text(stringResource(R.string.title_add_lesson_time))
+                                // 页面叫「节次时间」，这里也用「节次」的说法，不再叫课程时间。
+                                Text(stringResource(R.string.lesson_time_add))
                             }
                         },
                     )
