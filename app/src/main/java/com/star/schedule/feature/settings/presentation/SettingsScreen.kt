@@ -128,7 +128,13 @@ private fun SettingsScreen(
                         .align(Alignment.TopCenter),
                     contentPadding = PaddingValues(bottom = 24.dp + navigationBarInset),
                 ) {
-                    item { SettingsSectionTitle(R.string.settings_section_notifications) }
+                    item {
+                        SettingsSectionTitle(
+                            resId = R.string.settings_section_notifications,
+                            // 第一组标题直接接在顶栏留白下面，不再叠上边距。
+                            topPadding = 0.dp,
+                        )
+                    }
                     item {
                         val positions = notificationRows(state.wakeUpSimulationAvailable)
                             .positions()

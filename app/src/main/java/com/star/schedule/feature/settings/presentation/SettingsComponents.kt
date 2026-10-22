@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -39,13 +40,18 @@ import androidx.compose.ui.unit.dp
  *   两块点击区互不干扰（与 InstallerX-Revived 的 SwitchWidget 一致）。
  */
 @Composable
-internal fun SettingsSectionTitle(resId: Int) {
+internal fun SettingsSectionTitle(
+    resId: Int,
+    // 页面里第一组标题紧接在顶栏的留白之后，此时不需要再叠一层上边距，
+    // 否则会比其它页面（顶栏 → 第一张卡片）多出一截，看着很空。
+    topPadding: Dp = 24.dp,
+) {
     Text(
         text = stringResource(resId),
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 8.dp),
+        modifier = Modifier.padding(start = 24.dp, top = topPadding, end = 24.dp, bottom = 8.dp),
     )
 }
 

@@ -1,10 +1,12 @@
 package com.star.schedule.core.designsystem.component
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -37,29 +39,37 @@ fun PageTopBar(
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    LargeFlexibleTopAppBar(
-        title = { Text(title) },
-        modifier = modifier,
-        navigationIcon = {
-            Row {
-                CircleBackButton(onClick = onBack)
-                Spacer(Modifier.size(16.dp))
-            }
-        },
-        actions = actions,
-        // 顶栏自带的状态栏内边距之外，左右各留 12dp：
-        // 系统栏本身没有横向内边距，只留左边的话返回键离边缘 16dp、右侧操作只有 4dp，看起来是歪的。
-        windowInsets = TopAppBarDefaults.windowInsets.add(
-            WindowInsets(left = 12.dp, right = 12.dp),
-        ),
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            titleContentColor = MaterialTheme.colorScheme.onBackground,
-        ),
-        scrollBehavior = scrollBehavior,
-    )
+    Column(modifier = modifier) {
+        LargeFlexibleTopAppBar(
+            title = { Text(title) },
+            navigationIcon = {
+                Row {
+                    CircleBackButton(onClick = onBack)
+                    Spacer(Modifier.size(16.dp))
+                }
+            },
+            actions = actions,
+            // 顶栏自带的状态栏内边距之外，左右各留 12dp：
+            // 系统栏本身没有横向内边距，只留左边的话返回键离边缘 16dp、右侧操作只有 4dp，看起来是歪的。
+            windowInsets = TopAppBarDefaults.windowInsets.add(
+                WindowInsets(left = 12.dp, right = 12.dp),
+            ),
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                titleContentColor = MaterialTheme.colorScheme.onBackground,
+            ),
+            scrollBehavior = scrollBehavior,
+        )
+        // LargeFlexibleTopAppBar 把标题压在顶栏底边上，展开时和下面第一行内容只隔十来 dp，看着很挤。
+        // 留白补在顶栏这一侧而不是各页面内部：Scaffold 会把这里算进 innerPadding，
+        // 所有用 PageTopBar 的页面间距自然一致，页面自己不用再记一个上边距。
+        Spacer(Modifier.height(PageTopBarContentSpacing))
+    }
 }
+
+/** 大标题与页面内容之间的留白。 */
+private val PageTopBarContentSpacing = 16.dp
 
 /**
  * 不折叠的紧凑顶栏：只有一行小标题，右侧留给操作。
