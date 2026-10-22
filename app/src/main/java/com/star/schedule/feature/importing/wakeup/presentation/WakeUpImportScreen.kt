@@ -60,7 +60,6 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
@@ -643,6 +642,14 @@ private fun CookieButton(
                 )
             }
         }
+        // 弹簧按 visibilityThreshold 提前收（`Animatable` 不会把值吸附到 target），可能停在 0.995
+        // 这种地方。而下一帧就要把形状交还给"按钮自己的饼干"——`press` 那条 Morph 的 0 帧。
+        // 差这一点点就是"换过去时边缘挪一下"，所以收回本来就是"回到饼干"，直接吸附到终点。
+        step.snapTo(1f)
+        // 同理，角度收到最近的 40° 整数倍：饼干九瓣，转 40° 与没转等价，这样和按钮那颗完全重合。
+        turn.snapTo(
+            (turn.value / COOKIE_SYMMETRY_DEGREES).roundToInt() * COOKIE_SYMMETRY_DEGREES,
+        )
         // 勾要等饼干彻底变回来才出现，否则会和形状变化抢注意力。
         if (successNow) check.animateTo(targetValue = 1f, animationSpec = CHECK_SPRING)
         notifySettled()
@@ -748,23 +755,26 @@ private fun CookieButton(
 /**
  * 把 `Morph` 在某个进度上的轮廓画成控件大小的形状。
  *
- * 缩放与居中的处理方式和 `RoundedPolygon.toShape()` 一致：先按控件尺寸缩放，再把轮廓包围盒的
- * 中心对到控件中心。按钮和加载指示器都走这一条，两边画出来的几何形状完全一致。
+ * 这些形状都是 `normalized()` 过的：轮廓落在 [0,1] 单位盒里，按控件尺寸缩放后包围盒中心正好
+ * 就是控件中心。所以这里**只缩放、不再按包围盒重新居中**。
+ *
+ * 按包围盒逐帧居中是踩过的坑：形变中途的插值轮廓会略微外凸，"凸"出来的那一侧会把包围盒中心
+ * 拽偏，形状就被整体挪几像素；等形变收成饼干、包围盒回到正中，它又弹回原位。表现出来的正是
+ * 「转到最后、往下走之前错位一下」。不重新居中就没有这个漂移，首尾两帧也和按钮那颗完全重合。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun Morph.toFittedPath(progress: Float, size: Size, out: Path = Path()): Path {
     out.reset()
     toPath(progress, out)
     out.transform(Matrix().apply { scale(size.width, size.height) })
-    out.translate(size.center - out.getBounds().center)
     return out
 }
 
 /**
  * 把 `Morph` 在某个进度上的轮廓当成 `Shape` 用，并把这个形状转一个角度。
  *
- * 缩放与居中的处理方式和 `RoundedPolygon.toShape()` 保持一致：先按控件尺寸缩放，
- * 再把轮廓包围盒的中心对到控件中心。旋转在最后一步做，绕控件中心转——轮廓转、里面的图标不转。
+ * 几何处理和 [toFittedPath] 一致：只按控件尺寸缩放，不按包围盒重新居中（原因见那里）。
+ * 旋转在最后一步做，绕控件中心转——轮廓转、里面的图标不转。
  *
  * 旋转烘进轮廓而不是用 `graphicsLayer { rotationZ }`，是因为后者会把按钮内容一起转掉，
  * 而加载结束时那颗勾必须是正的。
