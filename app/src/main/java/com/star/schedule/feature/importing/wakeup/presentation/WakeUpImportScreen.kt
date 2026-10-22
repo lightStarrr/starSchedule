@@ -6,10 +6,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -68,7 +66,6 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -184,9 +181,9 @@ private fun WakeUpImportContent(
             )
         } else if (timeline.value > 0f) {
             // 结果可能比出场编排还早到。这个 LaunchedEffect 是按 `submitting` 重启的，
-            // 一重启，上面那条 `timeline.animateTo(1f)` 就被取消，时间轴停在 0.93 附近：
-            // handoff 到不了 1 → 按钮没退干净、指示器只有七成不透明，画面里叠着两层形状，
-            // 收尾染的绿也被底下的粉冲成脏灰绿。所以先把编排补完，再谈收尾。
+            // 一重启，上面那条 `timeline.animateTo(1f)` 就被取消，时间轴停在 0.9 附近。
+            // 后面的映射虽然都按 0..1 收口，停在半路也意味着箭头、输入框的离场值都没走完——
+            // 先把编排补完，再谈收尾。
             val remaining = (1f - timeline.value) * SUBMIT_MILLIS
             if (remaining > 1f) {
                 timeline.animateTo(
@@ -194,7 +191,7 @@ private fun WakeUpImportContent(
                     animationSpec = tween(durationMillis = remaining.toInt(), easing = LinearEasing),
                 )
             }
-            // 收尾一律先等指示器把形状收回饼干——它此刻是"转到一半的某个形状"，
+            // 收尾一律先等按钮把形状收回饼干——它此刻是"转到一半的某个形状"，
             // 直接撤掉再换一颗饼干回来，就是用户说的"太突兀"。
             // 这一步是它自己的时间轴，时长取决于结果落在哪一帧，所以只能等它通知。
             //
@@ -235,14 +232,10 @@ private fun WakeUpImportContent(
     val hintExit = elapsed.segment(0.08f, 0.30f).accelerate()
     val fieldExit = elapsed.segment(0.16f, 0.56f).accelerate()
     val buttonExit = elapsed.segment(0.50f, 0.86f).decelerate()
-    // 按钮落位之后才交接：按钮让位的同时加载指示器盖上来，两者重叠很短的一段。
-    val handoffExit = elapsed.segment(0.86f, 0.96f)
 
-    // 归位：先把指示器化掉、按钮回到原位，输入框、提示、箭头再依次回来。
-    // 指示器必须化完（0.00–0.16）按钮才开始动：它和按钮在同一个 Box 里，跟着按钮走，
-    // 否则会看到那颗转着的东西一路滑到底部去。
+    // 归位：按钮先回原位，输入框、提示、箭头再依次回来。
+    // 0.00~0.16 空着不动：那是收尾刚结束的一拍，让它停一下再往下走，别和归位黏在一起。
     val rewindProgress = rewind.value
-    val handoffBack = 1f - rewindProgress.segment(0.00f, 0.16f)
     val buttonBack = rewindProgress.segment(0.16f, 0.74f).settle()
     val fieldIn = rewindProgress.segment(0.50f, 0.86f).settle()
     val hintIn = rewindProgress.segment(0.62f, 0.90f).settle()
@@ -256,7 +249,10 @@ private fun WakeUpImportContent(
     val hintShift = if (returning) 1f - hintIn else hintExit
     val hintAlpha = if (returning) hintIn else 1f - hintExit
     val buttonMove = if (returning) 1f - buttonBack else buttonExit
-    val handoff = if (returning) handoffBack else handoffExit
+
+    // 按钮飞到屏幕中间之后才开始换形状。失败要等指示器收回饼干（indicatorSettled）才交回按钮，
+    // 否则会在序列走了一半的时候把形状直接换成饼干。
+    val loading = elapsed >= LOADING_START && !(returning && indicatorSettled)
 
     // 三段动画期间输入框都不接输入：去程它压着按钮，归位时它还没落稳，成功时页面正要离开。
     val frozen = submitting || returning || succeeding
@@ -379,27 +375,18 @@ private fun WakeUpImportContent(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    CookieImportButton(
+                    CookieButton(
                         // 归位途中按钮还在往下飞，这时候点它会把两套编排撞在一起，先不理。
                         onClick = { if (!returning) onImport() },
                         // 输入框空着、或文本里认不出口令时按钮置灰，避免点了没反应又看不到错误提示。
                         enabled = state.canImport,
-                        submitting = submitting,
+                        loading = loading,
+                        settling = returning || succeeding,
+                        success = succeeding,
                         arrowOffsetX = arrowOffsetX,
                         arrowAlpha = arrowAlpha,
-                        handoff = handoff,
+                        onSettled = { indicatorSettled = true },
                     )
-                    // 不是把指示器塞进按钮，而是按钮就地变成它：同一个位置、同样的尺寸、同样的颜色，
-                    // 而且第一帧就是同一块饼干，所以交接那一瞬间画面上没有任何变化。
-                    if (handoff > 0f) {
-                        CookieLoadingIndicator(
-                            progress = handoff,
-                            settling = returning || succeeding,
-                            success = succeeding,
-                            onSettled = { indicatorSettled = true },
-                            modifier = Modifier.requiredSize(BUTTON_SIZE),
-                        )
-                    }
                 }
             }
 
@@ -544,162 +531,83 @@ private fun FieldMessage(text: String, visible: Float, blur: Dp, color: Color) {
 }
 
 /**
- * 九瓣饼干的提交按钮：按下时收到正圆，抬起再散开；不可用时底色与图标色淡出去。
+ * 九瓣饼干按钮：按下的圆、提交时的逐帧换形、成功后的染绿和勾，全都在这一颗按钮里画。
  *
- * MaterialShapes 的 `toShape()` 返回的是匿名 `Shape`，不满足 `CornerBasedShape`，
- * 所以 IconButton 自带的形状动画永远不会参与——只能自己用 `Morph` 驱动进度。
- * 颜色同理，`colors` 只接受静态值，可用性切换也要自己插值。
+ * **为什么只有一颗**：以前按钮和加载指示器是两层——按钮给 `IconButton` 一个 `Shape`，
+ * 指示器用 `Canvas` 自己画，交接靠"一层盖一层"。两套画法哪怕都走 [toFittedPath]，
+ * 只要有一点差异（动画停在 0.99、角度差半度、透明度没铺满），叠起来就是错位。
+ * 现在形状只由 [CookieShape] 提供，旋转烘进轮廓（所以里面的图标不跟着转），颜色和图标各自插值：
+ * 任何时刻屏幕上只有一份几何，也就没有"两边对不齐"这回事。
+ *
+ * MaterialShapes 的 `toShape()` 返回匿名 `Shape`，不是 `CornerBasedShape`，
+ * IconButton 自带的形状动画永远不会参与——只能自己用 `Morph` 驱动进度；
+ * `colors` 也只吃静态值，颜色同样要自己插值。
+ *
+ * [loading] 一起，形状进入"饼干 → 指示器序列 → 饼干"；[settling] 表示要收尾，手头这一步走完
+ * 就边转一步边变回饼干；[success] 让收回的那一步染成 success 色并弹出一个勾。
+ * 收回完成（成功时连勾也算）才回调 [onSettled]。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun CookieImportButton(
+private fun CookieButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    submitting: Boolean = false,
+    loading: Boolean = false,
+    settling: Boolean = false,
+    success: Boolean = false,
     arrowOffsetX: Dp = 0.dp,
     arrowAlpha: Float = 1f,
-    handoff: Float = 0f,
+    onSettled: () -> Unit = {},
 ) {
-    val morph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Circle) }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val progress by animateFloatAsState(
-        // 提交中保持饼干，不要提前收成圆：交接给 LoadingIndicator 的瞬间两边必须都是饼干，
-        // 否则会在那一下跳一个形状。
-        targetValue = if (pressed) 1f else 0f,
-        animationSpec = tween(durationMillis = PRESS_MORPH_MILLIS),
-        label = "cookiePressMorph",
-    )
-    val shape = remember(morph, progress) { MorphingShape(morph, progress) }
+    val pressMorph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Circle) }
 
-    // 提交中虽然点不动了，但视觉上要一直是品牌色——此时它正在往外飞，
-    // 不能顺手淡成灰色，否则整段出场动画会脏掉。
-    val tinted = enabled || submitting
-
-    // 颜色自己插值：IconButton 的 colors 只吃静态值，直接给 disabledContainerColor
-    // 会在 enabled 翻转的那一帧硬切。插值结果同时喂给启用、禁用两组槽位，
-    // 于是真正的 enabled 翻转发生时颜色早已走到位，中间不会闪。
-    val containerColor by animateColorAsState(
-        targetValue = if (tinted) {
-            MaterialTheme.colorScheme.primary
+    // 按下收成圆；一旦进加载序列就锁回饼干：序列的第一帧必须是按钮此刻画的那块饼干，
+    // 否则换形状的第一帧会跳。长按不放时也不会把圆带进序列。
+    val press = remember { Animatable(0f) }
+    LaunchedEffect(pressed, loading) {
+        if (loading) {
+            press.snapTo(0f)
         } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-        },
-        animationSpec = tween(durationMillis = ENABLE_COLOR_MILLIS),
-        label = "cookieContainerColor",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (tinted) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        },
-        animationSpec = tween(durationMillis = ENABLE_COLOR_MILLIS),
-        label = "cookieContentColor",
-    )
-
-    IconButton(
-        onClick = onClick,
-        interactionSource = interactionSource,
-        enabled = enabled && !submitting,
-        // requiredSize：形状按钮被父布局压扁时会更难看，宁可溢出也不变形。
-        // clip：让飞出去的箭头被裁在按钮形状里——形状每帧都在变，clip 跟着重组。
-        modifier = modifier
-            .requiredSize(BUTTON_SIZE)
-            // 交接不做渐变，只做「一层盖一层」：指示器从同一块饼干的位置淡入、盖在按钮上，
-            // 等它完全铺满（handoff = 1）再把按钮整个撤掉。
-            // 反过来写（按钮 1-handoff、指示器 handoff）会在中途叠出两成半透明，颜色发浅、闪一下。
-            .graphicsLayer { alpha = if (handoff >= 1f) 0f else 1f }
-            .clip(shape),
-        // 两个状态给同一个实例，IconButton 才会当静态形状直接画，不再自己切换。
-        shapes = IconButtonDefaults.shapes(shape = shape, pressedShape = shape),
-        // 四个槽位都塞插值后的颜色：禁用态若留给默认值会退回「透明底 + 半透明图标」，
-        // 整颗按钮看着会直接消失。
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-            disabledContainerColor = containerColor,
-            disabledContentColor = contentColor,
-        ),
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-            contentDescription = stringResource(R.string.action_import),
-            modifier = Modifier
-                .size(32.dp)
-                .graphicsLayer {
-                    // 去程向右滑出去、归位从左滑回来，都由外部算好偏移量传进来；
-                    // 被上面的 clip 关在按钮内，所以是「从按钮内部进出」，不是「从边缘冒出去」。
-                    translationX = arrowOffsetX.toPx()
-                    alpha = arrowAlpha
-                },
-        )
+            press.animateTo(
+                targetValue = if (pressed) 1f else 0f,
+                animationSpec = tween(durationMillis = PRESS_MORPH_MILLIS),
+            )
+        }
     }
-}
 
-/**
- * 提交中的加载指示器：九瓣饼干在原地一步一步换形状，每换一步转 80°（见 [ROTATE_PER_STEP]），
- * 转完就停住等下一步。
- *
- * 没有用现成的 `LoadingIndicator`，是因为它内部会把整组形状按一个公共比例缩进容器盒
- * （`scaleFactor = 各形状紧包围盒 / 旋转包围盒的最小比值 × ActiveIndicatorScale(38/48)`），
- * 而它的缩放基准是 `normalized()` 之后的单位盒；按钮那边用的是 [MorphingShape] 的画法。
- * 两套约定凑不出像素级重合——只能靠一个"放大一点点"的经验常数硬凑，凑多久都是"差一点点"。
- *
- * 这里改成和按钮同一套画法（[toFittedPath]），于是交接那一帧画出来的就是同一块饼干，
- * 不存在尺寸差、没有偏移，也就没有"跳一下"。
- *
- * 失败时不能就地消失：它此刻停在某个变形到一半的形状上，直接撤掉再让按钮落回来，
- * 中间没有连续的东西。所以 [settling] 一起来，就先把手头这一步走完，再边转一步边从那个形状
- * 变回饼干，然后才回调 [onSettled] 让外面开始归位。
- *
- * [success] 只影响收尾那一段：饼干变回原状的同时染成 success 色，收完之后再弹出一个勾。
- * 页面不移动，因为成功后用户马上就要离开这一页，没有"归位"可言。
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun CookieLoadingIndicator(
-    progress: Float,
-    settling: Boolean,
-    success: Boolean,
-    onSettled: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+    // 加载序列：状态机和自绘版一样，只是把"画"换成了"给容器提供 Shape"。
     val shapes = remember { WakeUpIndicatorShapes }
     val morphs = remember { WakeUpIndicatorMorphs }
     // 形变和这一步的旋转各走一条曲线：形变可以回弹，旋转必须单调。见 [TURN_SPRING]。
     val step = remember { Animatable(0f) }
     val turn = remember { Animatable(0f) }
     var index by remember { mutableIntStateOf(0) }
-    val path = remember { Path() }
-    val successColors = wakeUpSuccessColors()
-    // 只有"变回饼干"那一下才染绿。成功信号来时手头那一步还没走完（那一步变成的是序列里的下一个
-    // 形状，不是饼干），提前染色就会看到绿从一个中间形状上开始。
+    // 收尾时改画这一段：从"当前形态"变回饼干。非空即表示正在收。
+    var settleMorph by remember { mutableStateOf<Morph?>(null) }
+    // 只有"变回饼干"那一下才染绿：成功信号来时手头那一步变成的是序列里的下一个形状，不是饼干。
     var becomingCookie by remember { mutableStateOf(false) }
-    val cookieColor by animateColorAsState(
-        targetValue = if (becomingCookie && success) {
-            successColors.container
-        } else {
-            MaterialTheme.colorScheme.primary
-        },
-        animationSpec = tween(durationMillis = SUCCESS_COLOR_MILLIS, easing = LinearEasing),
-        label = "cookieColor",
-    )
     // 勾的入场进度。0 = 还没出现，1 = 到位；弹簧带一点过冲，看起来是"弹"出来的。
     val check = remember { Animatable(0f) }
-
-    // 归位时改画这一段：从"当前形态"变回饼干。非空即表示正在收。
-    var settleMorph by remember { mutableStateOf<Morph?>(null) }
 
     // 协程里读组合参数拿到的是启动那一刻的旧值，必须走 rememberUpdatedState。
     val settleNow by rememberUpdatedState(settling)
     val successNow by rememberUpdatedState(success)
     val notifySettled by rememberUpdatedState(onSettled)
 
-    LaunchedEffect(morphs) {
-        // 交接有一小段重叠（按钮还在、指示器淡入）。这段时间形状必须锁死在饼干上，
-        // 否则两层各变形各的，叠起来会变成双影。
+    LaunchedEffect(loading, morphs) {
+        if (!loading) return@LaunchedEffect
+        // 每一轮都从饼干重新开始：上一轮停在哪个形状、转到哪个角度、勾有没有出来，都不该继承。
+        index = 0
+        step.snapTo(0f)
+        turn.snapTo(0f)
+        settleMorph = null
+        becomingCookie = false
+        check.snapTo(0f)
+
+        // 按钮刚飞到位，先让它当一帧饼干再开始变形，节奏上有个喘气。
         delay(HANDOFF_HOLD_MILLIS)
         while (true) {
             // 手头这一步先走完再判断要不要收：在半途切开，形状会从中间硬换一次。
@@ -725,8 +633,7 @@ private fun CookieLoadingIndicator(
         // 从这一帧起画的是"变回饼干"的形变，成功的话颜色也从这一刻开始染。
         becomingCookie = true
         // 回来的这一程也要转：原地把形状直接换成饼干太生硬，边走边转才和前面的节奏接得上。
-        // 转的是整整一个 [ROTATE_PER_STEP]，终点仍落在 [COOKIE_SYMMETRY_DEGREES] 的整数倍上，
-        // 所以收完那块饼干和按钮那颗"没转过的"完全重合。
+        // 转的是整整一个 [ROTATE_PER_STEP]，终点仍落在 [COOKIE_SYMMETRY_DEGREES] 的整数倍上。
         coroutineScope {
             launch { step.animateTo(targetValue = 1f, animationSpec = SETTLE_SPRING) }
             launch {
@@ -741,36 +648,76 @@ private fun CookieLoadingIndicator(
         notifySettled()
     }
 
-    Box(
-        modifier = modifier.graphicsLayer { alpha = progress },
-        contentAlignment = Alignment.Center,
+    val successColors = wakeUpSuccessColors()
+    // 加载期间就算点不动也不能淡成灰色——它正在往外飞，这时候掉色整段都脏。
+    val tinted = enabled || loading
+    val successTint = becomingCookie && success
+    // 染绿和"能不能点"是两件事，时长也不同，所以规格按当下这一程取。
+    val colorMillis = if (successTint) SUCCESS_COLOR_MILLIS else ENABLE_COLOR_MILLIS
+    // 颜色自己插值：IconButton 的 colors 只吃静态值，直接给 disabledContainerColor
+    // 会在 enabled 翻转的那一帧硬切。插值结果同时喂给启用、禁用两组槽位，
+    // 于是真正的 enabled 翻转发生时颜色早已走到位，中间不会闪。
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            successTint -> successColors.container
+            tinted -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        },
+        animationSpec = tween(durationMillis = colorMillis),
+        label = "cookieContainerColor",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = when {
+            successTint -> successColors.content
+            tinted -> MaterialTheme.colorScheme.onPrimary
+            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        },
+        animationSpec = tween(durationMillis = colorMillis),
+        label = "cookieContentColor",
+    )
+
+    // 形状就这三样：哪一对 Morph、走到哪、转了多少。三者任一变化都换一个新实例，
+    // IconButton 每帧按新轮廓重画（形状实例不变的话它不会重新解算轮廓）。
+    val morph = if (loading) settleMorph ?: morphs[index] else pressMorph
+    val morphProgress = if (loading) step.value.coerceIn(0f, 1f) else press.value
+    // 旋转只在形变那一下发生，转完就停住等下一步，和 M3 的 LoadingIndicator 同一个节奏。
+    // 角度必须由 [turn] 这条单调曲线给，不能借用形变弹簧的 step——它低阻尼会回弹，
+    // 角度冲过终点再被下一步 snapTo 拽回来，看起来就是"转过去了又倒一点"。
+    // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
+    val rotation = if (loading) (index * ROTATE_PER_STEP) % 360f + turn.value else 0f
+    val shape = remember(morph, morphProgress, rotation) {
+        CookieShape(morph, morphProgress, rotation)
+    }
+
+    IconButton(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        enabled = enabled && !loading,
+        // requiredSize：形状按钮被父布局压扁时会更难看，宁可溢出也不变形。
+        // clip：让飞出去的箭头被裁在按钮形状里——形状每帧都在变，clip 跟着重组。
+        modifier = modifier
+            .requiredSize(BUTTON_SIZE)
+            .clip(shape),
+        // 两个槽位给同一个实例，IconButton 才会当静态形状直接画，不再自己切换。
+        shapes = IconButtonDefaults.shapes(shape = shape, pressedShape = shape),
+        // 四个槽位都塞插值后的颜色：禁用态若留给默认值会退回「透明底 + 半透明图标」，
+        // 整颗按钮看着会直接消失。
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+            disabledContainerColor = containerColor,
+            disabledContentColor = contentColor,
+        ),
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val morph = settleMorph ?: morphs[index]
-            // 旋转只在这一步的形变过程中发生，转完就停住等下一步，和 M3 的 LoadingIndicator 同一个节奏。
-            // 角度必须由 [turn] 这条单调曲线给，不能借用形变弹簧的 step——它低阻尼会回弹，
-            // 角度冲过终点再被下一步 snapTo 拽回来，看起来就是"转过去了又倒一点"。
-            // 不用持续自转：那样看起来只是"一直在转"，反而看不出形状在一步步换。
-            // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
-            val rotation = (index * ROTATE_PER_STEP) % 360f + turn.value
-            rotate(degrees = rotation) {
-                drawPath(
-                    // 变形进度截断到 0..1：形变弹簧的回弹不应该把形状拉过目标。
-                    path = morph.toFittedPath(
-                        progress = step.value.coerceIn(0f, 1f),
-                        size = size,
-                        out = path,
-                    ),
-                    color = cookieColor,
-                )
-            }
-        }
-        // 勾不属于旋转的图形，所以画在 Canvas 外面，自己一条入场曲线。
-        if (success) {
+        Box(
+            modifier = Modifier.requiredSize(BUTTON_SIZE),
+            contentAlignment = Alignment.Center,
+        ) {
+            // 勾和箭头都不在旋转的轮廓里，所以它们不会被形状转着走。
             Icon(
                 imageVector = Icons.Rounded.Check,
                 contentDescription = null,
-                tint = successColors.content,
+                tint = contentColor,
                 modifier = Modifier
                     .size(CHECK_SIZE)
                     .graphicsLayer {
@@ -780,6 +727,18 @@ private fun CookieLoadingIndicator(
                         val scale = CHECK_START_SCALE + (1f - CHECK_START_SCALE) * entered
                         scaleX = scale
                         scaleY = scale
+                    },
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = stringResource(R.string.action_import),
+                modifier = Modifier
+                    .size(32.dp)
+                    .graphicsLayer {
+                        // 去程向右滑出去、归位从左滑回来，都由外部算好偏移量传进来；
+                        // 被上面的 clip 关在按钮内，所以是「从按钮内部进出」，不是「从边缘冒出去」。
+                        translationX = arrowOffsetX.toPx()
+                        alpha = arrowAlpha * (1f - check.value.coerceIn(0f, 1f))
                     },
             )
         }
@@ -802,21 +761,37 @@ private fun Morph.toFittedPath(progress: Float, size: Size, out: Path = Path()):
 }
 
 /**
- * 把 `Morph` 在某个进度上的轮廓当成 `Shape` 用。
+ * 把 `Morph` 在某个进度上的轮廓当成 `Shape` 用，并把这个形状转一个角度。
  *
  * 缩放与居中的处理方式和 `RoundedPolygon.toShape()` 保持一致：先按控件尺寸缩放，
- * 再把轮廓包围盒的中心对到控件中心。
+ * 再把轮廓包围盒的中心对到控件中心。旋转在最后一步做，绕控件中心转——轮廓转、里面的图标不转。
+ *
+ * 旋转烘进轮廓而不是用 `graphicsLayer { rotationZ }`，是因为后者会把按钮内容一起转掉，
+ * 而加载结束时那颗勾必须是正的。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private class MorphingShape(
+private class CookieShape(
     private val morph: Morph,
     private val progress: Float,
+    private val rotationDegrees: Float,
 ) : Shape {
     override fun createOutline(
         size: Size,
         layoutDirection: LayoutDirection,
         density: Density,
-    ): Outline = Outline.Generic(morph.toFittedPath(progress, size))
+    ): Outline {
+        val path = morph.toFittedPath(progress, size)
+        if (rotationDegrees != 0f) {
+            path.transform(
+                Matrix().apply {
+                    translate(size.width / 2f, size.height / 2f)
+                    rotateZ(rotationDegrees)
+                    translate(-size.width / 2f, -size.height / 2f)
+                },
+            )
+        }
+        return Outline.Generic(path)
+    }
 }
 
 private const val PRESS_MORPH_MILLIS = 220
@@ -858,10 +833,18 @@ private const val RETURN_MILLIS = 720
 private val BUTTON_SIZE = 92.dp
 
 /**
- * 交接后先定住一小会儿再开始变形。
+ * 去程时间轴上「按钮已经到位」的位置，从这里起按钮开始换形状。
  *
- * 交接本身是一段交叉淡化（[SUBMIT_MILLIS] 的 0.86~0.96，约 90ms）。淡化期间两边的形状必须是
- * 同一块饼干，否则半透明的两层各变形各的，看起来就是重影。所以变形要等淡化结束再启动。
+ * 时间轴名义上到 1.0 才走完，但按钮的位移在 0.86 就结束了；早一点进，按钮还在收尾的那几帧
+ * 就已经开始变形。真正的第一帧形变还有 [HANDOFF_HOLD_MILLIS] 的停顿兜着，不会抢。
+ */
+private const val LOADING_START = 0.86f
+
+/**
+ * 到位之后先当一帧饼干再开始变形。
+ *
+ * 按钮落地的减速还没完全停下就换形状，看起来像"没停稳就转起来了"；留 160ms 的呼吸，
+ * 也让「按下松手变回饼干」这一步先收干净。
  */
 private const val HANDOFF_HOLD_MILLIS = 160L
 
