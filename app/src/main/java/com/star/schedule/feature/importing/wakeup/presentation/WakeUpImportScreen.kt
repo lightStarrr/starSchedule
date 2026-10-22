@@ -8,6 +8,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -73,6 +74,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -404,6 +406,19 @@ private fun WakeUpImportContent(
                         .pointerInput(Unit) { detectTapGestures(onTap = {}) },
                 )
             }
+
+            // 顶栏中间放 WakeUp 自己的图标：这一页的配色也是从它取的，一眼能看出是从哪导入。
+            // 只有返回键时顶栏是空的，中间空着反而像是没画完。
+            Image(
+                painter = painterResource(R.drawable.ic_wakeup_brand),
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    // 和返回键（48dp 触摸区、12dp 外边距）中心对齐，不是简单贴同一个上边距。
+                    .padding(top = BRAND_LOGO_TOP_PADDING)
+                    .size(BRAND_LOGO_SIZE),
+            )
 
             // 返回按钮放在最后画：它在挡板之上，加载很久的时候也退得出去。
             CircleBackButton(
@@ -863,6 +878,17 @@ private val SUBMIT_MILLIS = WAKEUP_SUBMIT_ANIMATION_MILLIS.toInt()
 private const val RETURN_MILLIS = 720
 
 private val BUTTON_SIZE = 92.dp
+
+/** 顶栏中间的 WakeUp 图标大小。和返回键的 40dp 圆形容器接近，不会显得比它更重。 */
+private val BRAND_LOGO_SIZE = 32.dp
+
+/**
+ * 图标的顶边留白。
+ *
+ * 返回键是「12dp 外边距 + 48dp 触摸区」，图标只有 32dp，贴同一个 12dp 会让两者中心差 8dp；
+ * 补一半的差值（8dp）之后图标中心和返回键中心齐平。
+ */
+private val BRAND_LOGO_TOP_PADDING = 20.dp
 
 /**
  * 去程时间轴上「按钮已经到位」的位置，从这里起按钮开始换形状。
