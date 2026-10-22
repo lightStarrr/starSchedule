@@ -125,6 +125,8 @@ fun TimetableSettingsRoute(
     viewModel: TimetableSettingsViewModel,
     onBack: () -> Unit,
     onOpenRowHeight: () -> Unit,
+    onOpenCourses: () -> Unit,
+    onOpenLessonTimes: () -> Unit,
     onCreateTimetable: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -133,6 +135,8 @@ fun TimetableSettingsRoute(
         onBack = onBack,
         onApply = viewModel::apply,
         onRowHeightClick = onOpenRowHeight,
+        onCoursesClick = onOpenCourses,
+        onLessonTimesClick = onOpenLessonTimes,
         onCreateTimetable = onCreateTimetable,
         onRename = viewModel::rename,
         onDelete = viewModel::delete,
@@ -146,6 +150,8 @@ private fun TimetableSettingsScreen(
     onBack: () -> Unit,
     onApply: (Long) -> Unit,
     onRowHeightClick: () -> Unit,
+    onCoursesClick: () -> Unit,
+    onLessonTimesClick: () -> Unit,
     onCreateTimetable: () -> Unit,
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
@@ -244,7 +250,7 @@ private fun TimetableSettingsScreen(
                             supporting = stringResource(R.string.timetable_settings_row_height_support),
                             onClick = onRowHeightClick,
                             shapeIndex = 0,
-                            shapeCount = 1,
+                            shapeCount = 3,
                             trailing = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
@@ -261,6 +267,24 @@ private fun TimetableSettingsScreen(
                                     )
                                 }
                             },
+                        )
+                        SettingsListItem(
+                            title = stringResource(R.string.timetable_settings_courses),
+                            supporting = stringResource(R.string.timetable_settings_courses_support),
+                            onClick = onCoursesClick,
+                            shapeIndex = 1,
+                            shapeCount = 3,
+                            trailing = { SettingChevron() },
+                        )
+                        SettingsListItem(
+                            title = stringResource(R.string.timetable_settings_lesson_times),
+                            supporting = stringResource(
+                                R.string.timetable_settings_lesson_times_support,
+                            ),
+                            onClick = onLessonTimesClick,
+                            shapeIndex = 2,
+                            shapeCount = 3,
+                            trailing = { SettingChevron() },
                         )
                     }
                 }
@@ -333,6 +357,15 @@ private fun TimetableSettingsScreen(
             },
         )
     }
+}
+
+/** 可点进去的设置项右侧统一用这个箭头，两侧文案对齐。 */
+@Composable
+private fun SettingChevron() {
+    Icon(
+        imageVector = Icons.Rounded.ChevronRight,
+        contentDescription = null,
+    )
 }
 
 /**

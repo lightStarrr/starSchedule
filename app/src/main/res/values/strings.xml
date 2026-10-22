@@ -243,6 +243,10 @@
     <string name="timetable_settings_row_height_decrease">Decrease row height</string>
     <string name="timetable_settings_row_height_increase">Increase row height</string>
     <string name="timetable_settings_new">New timetable</string>
+    <string name="timetable_settings_courses">Courses</string>
+    <string name="timetable_settings_courses_support">Add, edit or delete the courses in this timetable</string>
+    <string name="timetable_settings_lesson_times">Class times</string>
+    <string name="timetable_settings_lesson_times_support">Start and end time of every period in the time column</string>
     <string name="new_timetable_title">New timetable</string>
     <string name="new_timetable_manual_title">Create manually</string>
     <string name="new_timetable_manual_support">Start from an empty timetable</string>
