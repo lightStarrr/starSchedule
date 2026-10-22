@@ -47,6 +47,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.BuildConfig
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import kotlinx.coroutines.launch
 
@@ -126,7 +127,10 @@ private fun SettingsScreen(
                         .fillMaxWidth()
                         .widthIn(max = 720.dp)
                         .align(Alignment.TopCenter),
-                    contentPadding = PaddingValues(bottom = 24.dp + navigationBarInset),
+                    contentPadding = PaddingValues(
+                        top = PageContentTopSpacing,
+                        bottom = 24.dp + navigationBarInset,
+                    ),
                 ) {
                     item {
                         SettingsSectionTitle(
