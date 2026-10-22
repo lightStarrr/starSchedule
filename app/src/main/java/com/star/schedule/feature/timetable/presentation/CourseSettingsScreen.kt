@@ -84,6 +84,7 @@ private fun CourseSettingsScreen(
                     EmptyTimetableState(
                         state = TimetableEmptyState.NO_LESSON_TIMES,
                         modifier = Modifier.fillMaxSize(),
+                        titleResId = R.string.lesson_time_empty_hint,
                         action = {
                             Button(onClick = onOpenLessonTimes) {
                                 Text(stringResource(R.string.courses_settings_go_lesson_times))

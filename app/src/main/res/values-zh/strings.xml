@@ -245,6 +245,13 @@
     <string name="timetable_settings_lesson_times">节次时间</string>
     <string name="timetable_settings_lesson_times_support">设置时间列里每节课的开始与结束时间</string>
     <string name="courses_settings_go_lesson_times">去设置节次时间</string>
+    <string name="lesson_time_period">第 %1$d 节</string>
+    <string name="lesson_time_period_with_gap">第 %1$d 节 · 距上一节 %2$d 分钟</string>
+    <string name="lesson_time_range">%1$s – %2$s</string>
+    <string name="lesson_time_deleted">已删除第 %1$d 节</string>
+    <string name="action_undo">撤销</string>
+    <string name="error_lesson_time_invalid">时间格式不对，请用 HH:mm</string>
+    <string name="lesson_time_empty_hint">请先设置节次时间</string>
     <string name="new_timetable_title">新建课表</string>
     <string name="new_timetable_manual_title">手动创建</string>
     <string name="new_timetable_manual_support">从空白课表开始排课</string>
