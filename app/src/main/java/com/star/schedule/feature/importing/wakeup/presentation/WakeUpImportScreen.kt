@@ -94,6 +94,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.random.Random
 
 @Composable
 fun WakeUpImportRoute(
@@ -544,7 +545,8 @@ private fun FieldMessage(text: String, visible: Float, blur: Dp, color: Color) {
  * IconButton 自带的形状动画永远不会参与——只能自己用 `Morph` 驱动进度；
  * `colors` 也只吃静态值，颜色同样要自己插值。
  *
- * [loading] 一起，形状进入"饼干 → 指示器序列 → 饼干"；[settling] 表示要收尾，手头这一步走完
+ * [loading] 一起，形状进入"饼干 → 随机换形 → 饼干"：每一步随机挑一个和当前不同的形状，
+ * 不按固定序列走；[settling] 表示要收尾，手头这一步走完
  * 就边转一步边变回饼干；[success] 让收回的那一步染成 success 色并弹出一个勾；
  * [busy] 表示出场编排正在播——此时虽然点不动，颜色必须保持品牌色，不能淡成禁用态的灰。
  * 收回完成（成功时连勾也算）才回调 [onSettled]。
@@ -582,15 +584,19 @@ private fun CookieButton(
     }
 
     // 加载序列：状态机和自绘版一样，只是把"画"换成了"给容器提供 Shape"。
-    val shapes = remember { WakeUpIndicatorShapes }
-    val morphs = remember { WakeUpIndicatorMorphs }
+    val random = remember { Random.Default }
     // 形变和这一步的旋转各走一条曲线：形变可以回弹，旋转必须单调。见 [TURN_SPRING]。
     val step = remember { Animatable(0f) }
     val turn = remember { Animatable(0f) }
-    var index by remember { mutableIntStateOf(0) }
+    // 这一步从哪个形状变到哪个形状。[COOKIE_SHAPE] 表示饼干本身；两步之间 `fromShape` 接着上一步的
+    // `toShape`，所以换步时形状不会跳。
+    var fromShape by remember { mutableIntStateOf(COOKIE_SHAPE) }
+    var toShape by remember { mutableIntStateOf(COOKIE_SHAPE) }
+    // 已经走过的步数，只用来算累计旋转角度。
+    var steps by remember { mutableIntStateOf(0) }
     // 收尾时改画这一段：从"当前形态"变回饼干。非空即表示正在收。
     var settleMorph by remember { mutableStateOf<Morph?>(null) }
-    // 只有"变回饼干"那一下才染绿：成功信号来时手头那一步变成的是序列里的下一个形状，不是饼干。
+    // 只有"变回饼干"那一下才染绿：成功信号来时手头那一步变成的是另一个形状，不是饼干。
     var becomingCookie by remember { mutableStateOf(false) }
     // 勾的入场进度。0 = 还没出现，1 = 到位；弹簧带一点过冲，看起来是"弹"出来的。
     val check = remember { Animatable(0f) }
@@ -600,10 +606,12 @@ private fun CookieButton(
     val successNow by rememberUpdatedState(success)
     val notifySettled by rememberUpdatedState(onSettled)
 
-    LaunchedEffect(loading, morphs) {
+    LaunchedEffect(loading) {
         if (!loading) return@LaunchedEffect
         // 每一轮都从饼干重新开始：上一轮停在哪个形状、转到哪个角度、勾有没有出来，都不该继承。
-        index = 0
+        fromShape = COOKIE_SHAPE
+        toShape = COOKIE_SHAPE
+        steps = 0
         step.snapTo(0f)
         turn.snapTo(0f)
         settleMorph = null
@@ -613,6 +621,9 @@ private fun CookieButton(
         // 按钮刚飞到位，先让它当一帧饼干再开始变形，节奏上有个喘气。
         delay(HANDOFF_HOLD_MILLIS)
         while (true) {
+            // 下一步是随机挑的，只要求"和当前这个不一样"：固定顺序看上几秒就能背出来，
+            // 会显得像一段录播而不是在干活。
+            toShape = pickDifferentShapeIndex(fromShape, WakeUpCycleShapes.size, random)
             // 手头这一步先走完再判断要不要收：在半途切开，形状会从中间硬换一次。
             // 两条动画并行跑，等慢的那条走完再进下一步。
             coroutineScope {
@@ -620,18 +631,20 @@ private fun CookieButton(
                 launch { turn.animateTo(targetValue = ROTATE_PER_STEP, animationSpec = TURN_SPRING) }
             }
             if (settleNow) break
-            index = (index + 1) % morphs.size
-            // 序列首尾相接，所以这里从 1 归零不会看到形状跳变。
+            fromShape = toShape
             step.snapTo(0f)
             turn.snapTo(0f)
+            steps++
             delay(MORPH_GAP_MILLIS)
             if (settleNow) break
         }
 
-        // 停在 step = 1 时形状是 shapes[index + 1]；在两步之间被叫停则是 shapes[index]。
+        // 停在一步走完时形状是 toShape；在两步之间被叫停则是 fromShape（这时两者已经相等）。
         // 两种都从"当前正画着的那个形状"起步，所以切到 settleMorph 的那一帧没有变化。
-        val from = shapes[if (step.value >= 1f) (index + 1) % shapes.size else index]
-        settleMorph = Morph(from, MaterialShapes.Cookie9Sided)
+        // 分界取 0.5 而不是 1：`MORPH_SPRING` 的可见阈值是 0.1，`Animatable` 可能停在 0.9x 就结束，
+        // 拿 1 当分界会把"已经快变完"误判成"还没开始变"，收尾时形状会顿一下。
+        val leaving = if (step.value >= 0.5f) toShape else fromShape
+        settleMorph = Morph(wakeUpShapeAt(leaving), MaterialShapes.Cookie9Sided)
         step.snapTo(0f)
         // 从这一帧起画的是"变回饼干"的形变，成功的话颜色也从这一刻开始染。
         becomingCookie = true
@@ -690,13 +703,17 @@ private fun CookieButton(
 
     // 形状就这三样：哪一对 Morph、走到哪、转了多少。三者任一变化都换一个新实例，
     // IconButton 每帧按新轮廓重画（形状实例不变的话它不会重新解算轮廓）。
-    val morph = if (loading) settleMorph ?: morphs[index] else pressMorph
+    // Morph 的构造要做曲线匹配，不算便宜，所以只在 from/to 变化（也就是每换一步）时重建。
+    val stepMorph = remember(fromShape, toShape) {
+        Morph(wakeUpShapeAt(fromShape), wakeUpShapeAt(toShape))
+    }
+    val morph = if (loading) settleMorph ?: stepMorph else pressMorph
     val morphProgress = if (loading) step.value.coerceIn(0f, 1f) else press.value
     // 旋转只在形变那一下发生，转完就停住等下一步，和 M3 的 LoadingIndicator 同一个节奏。
     // 角度必须由 [turn] 这条单调曲线给，不能借用形变弹簧的 step——它低阻尼会回弹，
     // 角度冲过终点再被下一步 snapTo 拽回来，看起来就是"转过去了又倒一点"。
-    // 每步的角度取模 360：序列绕回第一项时角度才不会倒着跳回去。
-    val rotation = if (loading) (index * ROTATE_PER_STEP) % 360f + turn.value else 0f
+    // 累计角取模 360：形状是随机挑的，只有"转过多少步"还能单调递增，转到一整圈时角度才不会倒跳。
+    val rotation = if (loading) (steps * ROTATE_PER_STEP) % 360f + turn.value else 0f
     val shape = remember(morph, morphProgress, rotation) {
         CookieShape(morph, morphProgress, rotation)
     }
@@ -880,21 +897,40 @@ private const val ROTATE_PER_STEP = 2f * COOKIE_SYMMETRY_DEGREES
 private const val MORPH_GAP_MILLIS = 260L
 
 /**
- * 加载指示器的形状序列：饼干打头，绕一圈回到饼干。
+ * 加载指示器的候选形状：每一步从这里面随机挑一个，只要求"和当前这个不一样"。
  *
+ * 饼干不参与随机，而且要从 M3 的默认序列里排掉：[LoadingIndicatorDefaults.IndeterminateIndicatorPolygons]
+ * 第二个就是 Cookie9Sided，留着会让某一步换成"看上去根本没变"的形状（白转一下）。
+ * 饼干只负责开场和收尾——进度 0 和最后一帧都必须落在饼干上，才能和按钮本身无缝接住。
  * 各形状的曲线数不要求一致——`Morph.match()` 在数量不等时会补占位曲线。
- * 打头放饼干是为了接住按钮：进度 0 的那一帧和按钮画的完全一样。
- * 末尾再补一次饼干，是为了让最后一跳也落在饼干上，循环首尾相接不跳变。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val WakeUpIndicatorShapes: List<RoundedPolygon> =
-    listOf(MaterialShapes.Cookie9Sided) +
-        LoadingIndicatorDefaults.IndeterminateIndicatorPolygons +
-        listOf(MaterialShapes.Cookie9Sided)
+internal val WakeUpCycleShapes: List<RoundedPolygon> =
+    LoadingIndicatorDefaults.IndeterminateIndicatorPolygons
+        .filter { it !== MaterialShapes.Cookie9Sided }
+
+/** 形状下标里 [-1, [WakeUpCycleShapes].size) 的取值；[COOKIE_SHAPE] 表示饼干本身。 */
+private const val COOKIE_SHAPE = -1
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val WakeUpIndicatorMorphs: List<Morph> =
-    WakeUpIndicatorShapes.zipWithNext { from, to -> Morph(from, to) }
+private fun wakeUpShapeAt(index: Int): RoundedPolygon =
+    if (index == COOKIE_SHAPE) MaterialShapes.Cookie9Sided else WakeUpCycleShapes[index]
+
+/**
+ * 从 `[0, shapeCount)` 里随机挑一个不等于 [current] 的下标。
+ *
+ * 只抽一次随机数：先在 `shapeCount - 1` 个位置里取，落在 [current] 及其之后就整体后移一位。
+ * "抽到重复再重抽"在形状只有五六个的池子里要多转几圈才凑巧避开，这个写法一次就成，
+ * 而且每个候选的概率仍然相同。
+ *
+ * [current] 不在区间内时不做排除——序列的第一步是从饼干出发的，饼干不在池子里。
+ */
+internal fun pickDifferentShapeIndex(current: Int, shapeCount: Int, random: Random): Int {
+    require(shapeCount >= 2) { "候选形状少于两个时无法保证前后不同" }
+    if (current !in 0 until shapeCount) return random.nextInt(shapeCount)
+    val raw = random.nextInt(shapeCount - 1)
+    return if (raw >= current) raw + 1 else raw
+}
 
 /**
  * 变形一步用的弹簧。
