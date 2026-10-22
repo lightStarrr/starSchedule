@@ -9,6 +9,7 @@ import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.schedule.domain.buildCourseBlocksByWeek
 import com.star.schedule.feature.settings.domain.SettingsRepository
+import com.star.schedule.feature.timetable.domain.RowHeightPreviewSample
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +50,9 @@ class RowHeightViewModel(
 ) : ViewModel() {
     private val draftRowHeight = MutableStateFlow<Int?>(null)
 
+    /** 没排课时的示例课表，整个页面生命周期里只随机一次。 */
+    private val previewTimetable = RowHeightPreviewSample.create()
+
     @OptIn(ExperimentalCoroutinesApi::class)
     private val currentTimetableId: Flow<Long?> = scheduleRepository.observeCurrentTimetableId()
 
@@ -74,7 +78,12 @@ class RowHeightViewModel(
         draftRowHeight,
     ) { timetable, courses, lessonTimes, draft ->
         val saved = timetable?.rowHeight ?: DEFAULT_ROW_HEIGHT
-        val busiestWeek = buildCourseBlocksByWeek(courses)
+        // 还没排课时用示例课表撑起整页，否则只剩一排表头，行高怎么拖都看不出变化。
+        // 示例在这里生成一次、存在属性上：拖动滑杆会让 combine 重新跑，不能在函数里重新随机。
+        val hasLessonTimes = lessonTimes.isNotEmpty()
+        val gridLessonTimes = if (hasLessonTimes) lessonTimes else previewTimetable.lessonTimes
+        val gridCourses = if (hasLessonTimes) courses else previewTimetable.courses
+        val busiestWeek = buildCourseBlocksByWeek(gridCourses)
             .maxByOrNull { (_, blocks) -> blocks.size }
             ?.key
             ?: 1
@@ -88,9 +97,9 @@ class RowHeightViewModel(
             savedRowHeight = saved,
             week = busiestWeek,
             weekStartDate = semesterStart.plusWeeks((busiestWeek - 1).toLong()),
-            lessonTimes = lessonTimes.sortedBy { it.period },
-            courses = courses,
-            showWeekend = courses.any { it.dayOfWeek > 5 },
+            lessonTimes = gridLessonTimes.sortedBy { it.period },
+            courses = gridCourses,
+            showWeekend = gridCourses.any { it.dayOfWeek > 5 },
         )
     }.stateIn(
         viewModelScope,
