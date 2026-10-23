@@ -300,20 +300,24 @@ private fun LessonTimeSwipeRow(
         state = dismissState,
         modifier = modifier,
         backgroundContent = {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(shapes.shape)
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                )
+            // 只在真的往左滑的时候才画红色底。常驻的话，列表项按下时会「缩一下」，
+            // 边缘就会漏出一条红边（分组列表的行间还有 2dp 间隙，更容易看出来）。
+            if (dismissState.dismissDirection != SwipeToDismissBoxValue.Settled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(shapes.shape)
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(horizontal = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
             }
         },
         enableDismissFromStartToEnd = false,
