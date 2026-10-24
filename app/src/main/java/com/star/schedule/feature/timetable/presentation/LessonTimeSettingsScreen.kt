@@ -3,7 +3,6 @@ package com.star.schedule.feature.timetable.presentation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,17 +18,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmarks
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -40,40 +39,51 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleIconButton
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
+import com.star.schedule.core.designsystem.component.ElasticSwipeRow
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.component.rememberElasticSwipeState
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.feature.schedule.presentation.EmptyTimetableState
 import com.star.schedule.feature.schedule.presentation.TimetableEmptyState
 import com.star.schedule.feature.settings.presentation.SettingsListItem
 import com.star.schedule.feature.timetable.domain.LessonTimeRules
 import com.star.schedule.feature.timetable.presentation.components.LessonTimeEditorSheet
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /** 相邻两节空档超过这个分钟数就在副标题里提示，正常的课间不提示。 */
 private const val LONG_GAP_MINUTES = 15
 
-/** 左滑到底的判定比例。 */
-private const val DISMISS_THRESHOLD_RATIO = 0.5f
 
 /** 与 SettingsGroup 的左右留白保持一致。 */
 private val LIST_HORIZONTAL_PADDING = 16.dp
@@ -128,6 +138,8 @@ private fun LessonTimeSettingsScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
     val snackbarHostState = remember { SnackbarHostState() }
+    // 滑动删除的共享状态：被拖的那行把进度写进去，相邻行据此被带着走一点。
+    val swipeState = rememberElasticSwipeState()
     val undoLabel = stringResource(R.string.action_undo)
     val deletedMessage = state.deletedPeriod
         ?.let { period -> stringResource(R.string.lesson_time_deleted, period) }
@@ -230,17 +242,39 @@ private fun LessonTimeSettingsScreen(
                             items = state.rows,
                             key = { _, row -> row.id },
                         ) { index, row ->
-                            LessonTimeSwipeRow(
-                                row = row,
-                                previous = state.rows.getOrNull(index - 1),
-                                shapeIndex = index,
-                                shapeCount = state.rows.size,
-                                onClick = { onEdit(row) },
+                            ElasticSwipeRow(
+                                index = index,
+                                state = swipeState,
                                 onDelete = { onDelete(row) },
                                 modifier = Modifier
                                     .padding(horizontal = LIST_HORIZONTAL_PADDING)
                                     .animateItem(),
-                            )
+                            ) { info ->
+                                // 朝向被拖走那一侧的圆角让开一点，另外两个角保持原样。
+                                val morph = abs(info.follow)
+                                val shapes = if (morph > 0.001f && info.morphSide != 0) {
+                                    morphedRowShapes(
+                                        shapeIndex = index,
+                                        shapeCount = state.rows.size,
+                                        topMorph = if (info.morphSide < 0) morph else 0f,
+                                        bottomMorph = if (info.morphSide > 0) morph else 0f,
+                                    )
+                                } else {
+                                    null
+                                }
+                                SettingsListItem(
+                                    title = stringResource(
+                                        R.string.lesson_time_range,
+                                        row.startTime,
+                                        row.endTime,
+                                    ),
+                                    supporting = lessonTimeSupportingText(row, state.rows.getOrNull(index - 1)),
+                                    onClick = { onEdit(row) },
+                                    shapeIndex = index,
+                                    shapeCount = state.rows.size,
+                                    shapes = shapes,
+                                )
+                            }
                         }
                     }
                 }
@@ -272,65 +306,52 @@ private fun LessonTimeSettingsScreen(
 }
 
 /**
- * 可左滑删除的一行。
+ * 拖动时的分段形状：只把朝向被拖走那一侧的两个圆角，从本行原本的半径渐变到「组首/组尾」的大半径。
  *
- * 左滑露出的底色要按这一行的分段形状裁一下，否则组首/组尾的圆角后面会补出一个方块。
- * 右滑（StartToEnd）不接动作：这一页没有需要右滑完成的操作，留着容易误触。
+ * 另外两个角原样保留——第一项的上角不会因为邻居被拖走而变小。
+ * 半径不是猜的：直接从 M3 原生形状的 Outline 里读出来。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LessonTimeSwipeRow(
-    row: LessonTimeRow,
-    previous: LessonTimeRow?,
+private fun morphedRowShapes(
     shapeIndex: Int,
     shapeCount: Int,
-    onClick: () -> Unit,
-    onDelete: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shapes = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount)
-    val dismissState = remember(row.id) {
-        SwipeToDismissBoxState(
-            initialValue = SwipeToDismissBoxValue.Settled,
-            positionalThreshold = { distance -> distance * DISMISS_THRESHOLD_RATIO },
-        )
-    }
+    topMorph: Float,
+    bottomMorph: Float,
+): ListItemShapes? {
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val native = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount).shape
+    // 组里只有一项时的形状：四个角都是「组首/组尾」的大圆角。
+    val outer = ListItemDefaults.segmentedShapes(0, 1).shape
 
-    SwipeToDismissBox(
-        state = dismissState,
-        modifier = modifier,
-        backgroundContent = {
-            // 只在真的往左滑的时候才画红色底。常驻的话，列表项按下时会「缩一下」，
-            // 边缘就会漏出一条红边（分组列表的行间还有 2dp 间隙，更容易看出来）。
-            if (dismissState.dismissDirection != SwipeToDismissBoxValue.Settled) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(shapes.shape)
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                        .padding(horizontal = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                }
-            }
-        },
-        enableDismissFromStartToEnd = false,
-        onDismiss = { onDelete() },
-    ) {
-        SettingsListItem(
-            title = stringResource(R.string.lesson_time_range, row.startTime, row.endTime),
-            supporting = lessonTimeSupportingText(row, previous),
-            onClick = onClick,
-            shapeIndex = shapeIndex,
-            shapeCount = shapeCount,
-        )
-    }
+    val nativeRadii = native.cornerRadiiPx(density, direction) ?: return null
+    val outerRadii = outer.cornerRadiiPx(density, direction) ?: return null
+    val outerRadiusDp = (outerRadii[0] / density.density).dp
+
+    fun lerpDp(fromPx: Float, fraction: Float) =
+        lerp((fromPx / density.density).dp, outerRadiusDp, fraction.coerceIn(0f, 1f))
+
+    val top = lerpDp(nativeRadii[0], topMorph)
+    val bottom = lerpDp(nativeRadii[2], bottomMorph)
+    val shape = RoundedCornerShape(
+        topStart = top,
+        topEnd = top,
+        bottomStart = bottom,
+        bottomEnd = bottom,
+    )
+    return ListItemShapes(shape, shape, shape, shape, shape, shape)
+}
+
+/** 从形状的 Outline 里读出四个角的半径（px）。圆角形状都是 Outline.Rounded。 */
+private fun Shape.cornerRadiiPx(density: Density, direction: LayoutDirection): FloatArray? {
+    val rounded = (createOutline(Size(400f, 200f), direction, density) as? Outline.Rounded)?.roundRect
+        ?: return null
+    return floatArrayOf(
+        rounded.topLeftCornerRadius.x,
+        rounded.topRightCornerRadius.x,
+        rounded.bottomRightCornerRadius.x,
+        rounded.bottomLeftCornerRadius.x,
+    )
 }
 
 /**

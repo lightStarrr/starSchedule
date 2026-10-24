@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
@@ -89,11 +90,15 @@ internal fun SettingsListItem(
     trailing: (@Composable () -> Unit)? = null,
     shapeIndex: Int,
     shapeCount: Int,
+    // 需要在滑动时临时改圆角（比如让相邻的角「让开」）就传一份自己的形状；
+    // 平时传 null，用 M3 分段列表的原生形状。
+    shapes: ListItemShapes? = null,
 ) {
     val colors = settingsItemColors()
+    val resolvedShapes = shapes ?: ListItemDefaults.segmentedShapes(shapeIndex, shapeCount)
     if (onClick == null) {
         SegmentedListItem(
-            shapes = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount),
+            shapes = resolvedShapes,
             enabled = enabled,
             colors = colors,
             leadingContent = leading,
@@ -105,7 +110,7 @@ internal fun SettingsListItem(
     } else {
         SegmentedListItem(
             onClick = onClick,
-            shapes = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount),
+            shapes = resolvedShapes,
             enabled = enabled,
             colors = colors,
             leadingContent = leading,
