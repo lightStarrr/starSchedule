@@ -99,7 +99,9 @@ retrace mapping-81bca3b-202610241840.txt stacktrace.txt
 
 **`./gradlew: Permission denied`**：`gradlew` 在 git 里必须是 755。仓库里已经用 `git update-index --chmod=+x gradlew` 修过；如果重新导入过文件导致又变回 644，再执行一次。
 
-**编译找不到 `android-37` 平台**：runner 上不一定预装了对应 API 的 SDK 平台，AGP 会自动下载，前提是许可证已被接受。`android-actions/setup-android` 负责这件事。
+**`配置 Android SDK` 步骤失败**：不要用 `android-actions/setup-android`。它内部会执行 `sdkmanager tools`，而新版 cmdline-tools 已经删掉这个包，会以退出码 1 结束整条流水线。runner 镜像本来就有 SDK 和已接受的许可证，工作流里只跑 `sdkmanager --licenses` 即可。
+
+**编译找不到 `android-37` 平台**：新版 SDK 的平台目录带小版本号（本机是 `platforms/android-37.0`），缺失时由 AGP 按自己的包名规则自动下载，不需要手工 `sdkmanager`。runner 上平台包不在本地缓存时，第一次构建会多花一两分钟。
 
 **快照间隔太密**：一次完整的 R8 + kapt 构建约几分钟。不想每次提交都出包，可以给提交信息加 `[skip ci]`，或者把 `paths-ignore` 放宽到只构建 `app/**` 的改动。
 
