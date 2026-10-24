@@ -19,6 +19,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -104,6 +107,11 @@ fun ElasticSwipeRow(
     // 免得回弹弹簧过冲穿过原点时把方向翻过来。
     var fingerDown by remember { mutableStateOf(false) }
     var releasedSign by remember { mutableFloatStateOf(0f) }
+    // 收尾动画放在组件自己的 scope 里，并且可以被新的按下打断：
+    // onDragStopped 里如果直接 await 动画，这个节点的 pointerInput 会一直挂着，
+    // 动画跑完之前新的一次拖动根本进不来。
+    val scope = rememberCoroutineScope()
+    var settleJob by remember { mutableStateOf<Job?>(null) }
 
     /** 本次拖动方向上的「朝外」位移：反方向的过冲不算，否则行会在回弹途中又淡一次。 */
     fun outwardPx(sign: Float): Float = when {
@@ -188,7 +196,11 @@ fun ElasticSwipeRow(
             .alpha(1f - progress)
             .draggable(
                 orientation = Orientation.Horizontal,
-                onDragStarted = { fingerDown = true },
+                onDragStarted = {
+                    settleJob?.cancel()
+                    settleJob = null
+                    fingerDown = true
+                },
                 state = rememberDraggableState { delta ->
                     // 左右都不设上限，想拖多远拖多远。
                     offset += delta
@@ -210,34 +222,38 @@ fun ElasticSwipeRow(
                     }
                     if (releasedProgress >= config.detachProgress) {
                         // 已经滑过阈值，松手就是删除：先顺着惯性滑出去（同时淡到 0）。
-                        animate(
-                            initialValue = offset,
-                            targetValue = if (offset < 0f) -width else width,
-                            animationSpec = tween(
-                                durationMillis = config.exitDurationMillis,
-                                easing = LinearEasing,
-                            ),
-                        ) { value, _ ->
-                            offset = value
-                            publish()
+                        settleJob = scope.launch {
+                            animate(
+                                initialValue = offset,
+                                targetValue = if (offset < 0f) -width else width,
+                                animationSpec = tween(
+                                    durationMillis = config.exitDurationMillis,
+                                    easing = LinearEasing,
+                                ),
+                            ) { value, _ ->
+                                offset = value
+                                publish()
+                            }
+                            onDelete()
                         }
-                        onDelete()
                     } else {
                         // 回弹的每一帧都要继续上报进度，相邻的行才会跟着一起回来。
-                        animate(
-                            initialValue = offset,
-                            targetValue = 0f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMediumLow,
-                            ),
-                        ) { value, _ ->
-                            offset = value
-                            publish()
+                        settleJob = scope.launch {
+                            animate(
+                                initialValue = offset,
+                                targetValue = 0f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                            ) { value, _ ->
+                                offset = value
+                                publish()
+                            }
+                            state.activeIndex = null
+                            state.progress = 0f
+                            releasedSign = 0f
                         }
-                        state.activeIndex = null
-                        state.progress = 0f
-                        releasedSign = 0f
                     }
                 },
             ),
