@@ -139,6 +139,20 @@ fun ElasticSwipeRow(
         state.progress = (outwardPx(sign) / width).coerceIn(0f, 1f)
     }
 
+    /**
+     * 一次拖动结束（弹回原位或删除）后把列表级状态交还干净。
+     *
+     * 两条收尾路径都必须做：`activeIndex` 停在旧下标时，删除导致列表重排后，
+     * 新列表里落在同一位置的那行会被当成「正在被拖」，邻居也会按上一次的进度定位。
+     * 回弹分支原本就清了大部分，删除分支漏了，这里统一。
+     */
+    fun releaseSharedState() {
+        state.activeIndex = null
+        state.progress = 0f
+        state.direction = 0f
+        releasedSign = 0f
+    }
+
     val dragging = state.activeIndex == index
     val progress = if (dragging && rowWidthPx > 0f) {
         (outwardPx(currentSign()) / rowWidthPx).coerceIn(0f, 1f)
@@ -234,7 +248,11 @@ fun ElasticSwipeRow(
                                 offset = value
                                 publish()
                             }
+                            // 行马上会从列表里消失，但 activeIndex / progress 是列表级的：
+                            // 交还给状态再删，列表重排后不会有行被误判成「正在被拖」。
+                            // 放在 onDelete 之后、同一帧内完成，避免消隐前再闪一下。
                             onDelete()
+                            releaseSharedState()
                         }
                     } else {
                         // 回弹的每一帧都要继续上报进度，相邻的行才会跟着一起回来。
@@ -250,9 +268,7 @@ fun ElasticSwipeRow(
                                 offset = value
                                 publish()
                             }
-                            state.activeIndex = null
-                            state.progress = 0f
-                            releasedSign = 0f
+                            releaseSharedState()
                         }
                     }
                 },
