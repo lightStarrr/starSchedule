@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** 时间列里的一行。节次号由数据库按开始时间排好，界面只负责显示。 */
 data class LessonTimeRow(
@@ -49,13 +51,25 @@ data class LessonTimeEditor(
     val isSaving: Boolean = false,
 )
 
+/**
+ * 一次可撤销的删除。
+ *
+ * [token] 单调递增：删掉某一节后，剩下的节次会被 AutoSort 重新编号，
+ * 于是「删第 3 节、再把变成第 3 节的下一节删掉」两次的节次号完全一样。
+ * 界面只靠 token 才能区分这是两次不同的删除。
+ */
+data class LessonTimeUndo(
+    val token: Long,
+    val period: Int,
+)
+
 data class LessonTimeSettingsUiState(
     val isLoading: Boolean = true,
     val timetableId: Long? = null,
     val rows: List<LessonTimeRow> = emptyList(),
     val editor: LessonTimeEditor? = null,
-    /** 刚删掉的节次号，用来出「已删除 + 撤销」提示；null 表示没有待撤销的删除。 */
-    val deletedPeriod: Int? = null,
+    /** 待撤销的删除；null 表示没有。新的删除会整个替换掉它，token 一定变。 */
+    val undo: LessonTimeUndo? = null,
 )
 
 /**
@@ -69,7 +83,21 @@ class LessonTimeSettingsViewModel(
     private val repository: ScheduleRepository,
 ) : ViewModel() {
     private val editor = MutableStateFlow<LessonTimeEditor?>(null)
-    private val lastDeleted = MutableStateFlow<LessonTimeEntity?>(null)
+
+    /** 完整实体只留在 ViewModel 里，UiState 只暴露 token 和节次号。 */
+    private val pendingUndo = MutableStateFlow<PendingUndo?>(null)
+
+    /**
+     * 串行化写操作。
+     *
+     * 删除必须「先落库、再发布可撤销状态」作为一个整体按调用顺序发生：
+     * 两次快速删除各起一个 launch 时，谁先写完库谁后写状态，单槽状态就可能指向
+     * 先删的那一条。Mutex 是 FIFO 公平的，加锁顺序即调用顺序。
+     */
+    private val writeLock = Mutex()
+
+    /** 只在 [writeLock] 内递增，保证单调且与落库顺序一致。 */
+    private var nextUndoToken = 0L
 
     private val timetableId: Flow<Long?> = repository.observeCurrentTimetableId()
 
@@ -82,8 +110,8 @@ class LessonTimeSettingsViewModel(
         timetableId,
         lessonTimes,
         editor,
-        lastDeleted,
-    ) { id, lessonTimes, draft, deleted ->
+        pendingUndo,
+    ) { id, lessonTimes, draft, pending ->
         LessonTimeSettingsUiState(
             isLoading = false,
             timetableId = id,
@@ -96,7 +124,7 @@ class LessonTimeSettingsViewModel(
                 )
             },
             editor = draft,
-            deletedPeriod = deleted?.period,
+            undo = pending?.let { LessonTimeUndo(token = it.token, period = it.entity.period) },
         )
     }.stateIn(
         viewModelScope,
@@ -203,23 +231,50 @@ class LessonTimeSettingsViewModel(
             endTime = row.endTime,
         )
         viewModelScope.launch {
-            repository.deleteLessonTime(entity)
-            lastDeleted.value = entity
+            writeLock.withLock {
+                repository.deleteLessonTime(entity)
+                // 提示里的节次号取 entity 里用户划掉那一刻看到的值：删除后剩下的会被
+                // 重新编号，回读回来的是别的行的号，反而对不上用户的操作。
+                nextUndoToken += 1
+                pendingUndo.value = PendingUndo(token = nextUndoToken, entity = entity)
+            }
         }
     }
 
-    fun undoDelete() {
-        val entity = lastDeleted.value ?: return
-        lastDeleted.value = null
+    /**
+     * [token] 必须是产生当前提示那次删除的 token。
+     *
+     * 倒计时期间又删了一节时，旧提示的回调可能迟到（旧提示被取消、用户点击与状态
+     * 更新之间存在窗口）。带着 token 回来，只处理自己那一条，不会误撤销新删除。
+     */
+    fun undoDelete(token: Long) {
         viewModelScope.launch {
-            // 原样插回去：节次号会被 AutoSort 重新排，不用关心删除期间空出的位置。
-            repository.insertLessonTime(entity)
+            writeLock.withLock {
+                val pending = pendingUndo.value ?: return@withLock
+                if (pending.token != token) return@withLock
+                // 先清状态再插库：提示立刻收起，重复点击也会因 token 不匹配而变成空操作。
+                pendingUndo.value = null
+                // 原样插回去：节次号会被 AutoSort 重新排，不用关心删除期间空出的位置。
+                repository.insertLessonTime(pending.entity)
+            }
         }
     }
 
-    fun dismissUndo() {
-        lastDeleted.value = null
+    /** 倒计时走完或用户划掉提示；同样只清掉自己那一条。 */
+    fun dismissUndo(token: Long) {
+        viewModelScope.launch {
+            writeLock.withLock {
+                if (pendingUndo.value?.token != token) return@withLock
+                pendingUndo.value = null
+            }
+        }
     }
+
+    /** 待撤销的删除：给界面的是 [LessonTimeUndo]，撤销需要的完整实体留在内部。 */
+    private data class PendingUndo(
+        val token: Long,
+        val entity: LessonTimeEntity,
+    )
 
     companion object {
         private const val DEFAULT_START_MINUTES = 8 * 60
