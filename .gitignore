@@ -25,3 +25,8 @@ app/src/androidTest
 .workbuddy/
 .android
 /mappings
+
+# 签名材料一律不入库：本地写在 keystore.properties 里，CI 用仓库 Secrets 注入
+keystore.properties
+*.jks
+*.keystore

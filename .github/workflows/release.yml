@@ -1,0 +1,143 @@
+name: Release
+
+# 打 v* 标签即出正式版：签名包 + mapping.txt + 校验和，三者挂在同一个 Release 上。
+on:
+  push:
+    tags:
+      - "v*"
+
+# 正式发布不允许中途被新提交打断。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 构建并发布正式版
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          # 生成发布说明要读历史提交和已有标签，浅克隆拿不到。
+          fetch-depth: 0
+
+      - name: 配置 JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: 配置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: 准备签名密钥
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          chmod +x gradlew
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error title=缺少签名密钥::正式版必须用 release 密钥签名，请配置 ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD。"
+            exit 1
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+          echo "keystore=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: 单元测试
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: 构建正式包
+        env:
+          STAR_KEYSTORE_FILE: ${{ steps.signing.outputs.keystore }}
+          STAR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          STAR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STAR_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8"
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: 校验产物
+        id: verify
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+
+          APK=$(ls app/build/outputs/apk/release/*.apk | grep -v -- -unsigned | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "::error::没有产出已签名的 release APK，检查签名配置"
+            exit 1
+          fi
+
+          MAPPING=$(ls -t mappings/mapping-*.txt 2>/dev/null | head -n 1 || true)
+          if [ -z "$MAPPING" ]; then
+            MAPPING=app/build/outputs/mapping/release/mapping.txt
+          fi
+          if [ ! -s "$MAPPING" ]; then
+            echo "::error::mapping.txt 为空，R8 没有产出混淆映射"
+            exit 1
+          fi
+
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -n 1)
+          BADGING=$("$AAPT2" dump badging "$APK" | head -n 1)
+          VERSION=$(echo "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+          VERSION_CODE=$(echo "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+          echo "tag=$TAG versionName=$VERSION versionCode=$VERSION_CODE"
+
+          # Tag 和 APK 里的版本号必须一致，否则用户看到的版本和实际装的包对不上。
+          if [ "$VERSION" != "${TAG#v}" ]; then
+            echo "::error title=版本号与标签不一致::标签是 $TAG，但 APK 里 versionName 是 $VERSION。请先更新 app/build.gradle.kts 里的 baseVersionName/baseVersionCode 再打标签。"
+            exit 1
+          fi
+
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          if ! "$APKSIGNER" verify --print-certs "$APK" > "$RUNNER_TEMP/apksigner.txt"; then
+            echo "::error::APK 签名校验失败，可能没有签名或签名不完整"
+            exit 1
+          fi
+          if grep -q "CN=Android Debug" "$RUNNER_TEMP/apksigner.txt"; then
+            echo "::error::发布包被调试签名，检查签名配置"
+            exit 1
+          fi
+          grep "certificate SHA-256 digest" "$RUNNER_TEMP/apksigner.txt" | head -n 1 || true
+
+          mkdir -p dist
+          cp "$APK" "dist/starSchedule-$TAG.apk"
+          cp "$MAPPING" "dist/mapping-$TAG.txt"
+          (cd dist && sha256sum "starSchedule-$TAG.apk" "mapping-$TAG.txt" > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          ls -lh dist
+
+      - name: 归档 mapping
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-mapping-${{ github.ref_name }}
+          path: dist/mapping-*.txt
+          # Release 附件通常能长期保留，这里再留 90 天兜底。
+          retention-days: 90
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          make_latest: "true"
+          fail_on_unmatched_files: true
+          files: |
+            dist/starSchedule-*.apk
+            dist/mapping-*.txt
+            dist/SHA256SUMS.txt
