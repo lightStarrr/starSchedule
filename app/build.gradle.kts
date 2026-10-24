@@ -1,5 +1,6 @@
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -7,6 +8,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// 版本号只在这里写一份。CI 用 -PversionCode / -PversionNameSuffix 追加覆盖，不修改文件，
+// 这样快照包的 versionName 能带上提交哈希，而正式版本的版本号依旧由人工推进。
+val baseVersionCode = 120
+val baseVersionName = "1.2.0"
+val versionCodeValue = providers.gradleProperty("versionCode").orNull?.toIntOrNull() ?: baseVersionCode
+val versionNameValue = baseVersionName + providers.gradleProperty("versionNameSuffix").orNull.orEmpty()
 
 // 每次构建生成一个可追溯的标识：git 短哈希 + 构建时间，配合 versionCode 唯一定位一次打包。
 val gitShortSha: String = runCatching {
@@ -17,6 +25,28 @@ val buildTime: String = LocalDateTime.now()
     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 val buildId: String = "$gitShortSha-${buildTime.replace("-", "").replace(" ", "").replace(":", "")}"
 
+/**
+ * 签名信息按「keystore.properties → 环境变量」的顺序读取。
+ * 本地把 storeFile 写进仓库外的 keystore.properties 即可，CI 从 Secrets 注入环境变量，
+ * 两边共用同一份构建脚本；两者都没有时 release 仍产出未签名包，保持原来的行为。
+ */
+val signingProperties: Properties? = rootProject.file("keystore.properties")
+    .takeIf { it.exists() }
+    ?.let { file -> Properties().apply { file.inputStream().use { stream -> load(stream) } } }
+
+fun signingValue(propertyKey: String, envKey: String) =
+    signingProperties?.getProperty(propertyKey)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: providers.environmentVariable(envKey).orNull?.trim()?.takeIf { it.isNotEmpty() }
+
+val storeFilePath = signingValue("storeFile", "STAR_KEYSTORE_FILE")
+val storePasswordValue = signingValue("storePassword", "STAR_KEYSTORE_PASSWORD")
+val keyAliasValue = signingValue("keyAlias", "STAR_KEY_ALIAS")
+val keyPasswordValue = signingValue("keyPassword", "STAR_KEY_PASSWORD")
+val releaseSigningReady =
+    listOf(storeFilePath, storePasswordValue, keyAliasValue, keyPasswordValue).all { it != null }
+// 快照流水线在仓库还没配好密钥时要能出包，用调试签名顶上；正式发布不允许走这条路。
+val fallbackDebugSigning = providers.gradleProperty("fallbackDebugSigning").orNull.toBoolean()
+
 android {
     namespace = "com.star.schedule"
     compileSdk = 37
@@ -25,8 +55,8 @@ android {
         applicationId = "com.star.schedule"
         minSdk = 33
         targetSdk = 36
-        versionCode = 120
-        versionName = "1.2.0"
+        versionCode = versionCodeValue
+        versionName = versionNameValue
 
         buildConfigField("String", "BUILD_ID", "\"$buildId\"")
         buildConfigField(
@@ -42,6 +72,17 @@ android {
 //        }
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = rootProject.file(storeFilePath!!)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -49,6 +90,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 拿不到正式签名时保持未签名；显式传 fallbackDebugSigning 才用调试签名兜底。
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug").takeIf { fallbackDebugSigning }
         }
     }
     compileOptions {

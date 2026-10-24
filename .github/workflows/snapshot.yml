@@ -1,0 +1,193 @@
+name: Snapshot
+
+# 每次向 master 提交都出一个签名包，挂到固定的 snapshot 标签上。
+# 发布页地址永远不变：/releases/tag/snapshot，测试同学收藏一次就够。
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "mappings/**"
+      - "LICENSE"
+  workflow_dispatch:
+
+# 同一分支只保留最新一次构建：连续提交时旧任务直接取消，省得排队跑到天亮。
+concurrency:
+  group: snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    name: 构建并发布快照
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 配置 JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: 配置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: 读取提交信息
+        id: info
+        run: |
+          echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')" >> "$GITHUB_OUTPUT"
+
+      - name: 准备签名密钥
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          chmod +x gradlew
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error title=缺少签名密钥::快照包必须用正式 release 密钥签名，否则测试机无法覆盖安装。请在 Settings → Secrets and variables → Actions 配置 ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD。"
+            exit 1
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+          echo "keystore=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: 构建签名包
+        env:
+          STAR_KEYSTORE_FILE: ${{ steps.signing.outputs.keystore }}
+          STAR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          STAR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STAR_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          SHORT_SHA: ${{ steps.info.outputs.short_sha }}
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8"
+        run: |
+          ./gradlew :app:assembleRelease \
+            -PversionNameSuffix="-snapshot.$SHORT_SHA" \
+            --stacktrace
+
+      - name: 收集产物
+        id: dist
+        env:
+          SHORT_SHA: ${{ steps.info.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          APK=$(ls app/build/outputs/apk/release/*.apk | grep -v -- -unsigned | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "::error::没有产出已签名的 release APK，检查签名配置"
+            exit 1
+          fi
+
+          # 优先用 archiveMapping 归档出来的带 buildId 的文件，它和应用内 BUILD_ID 同源。
+          MAPPING=$(ls -t mappings/mapping-*.txt 2>/dev/null | head -n 1 || true)
+          if [ -z "$MAPPING" ]; then
+            MAPPING=app/build/outputs/mapping/release/mapping.txt
+          fi
+          if [ ! -s "$MAPPING" ]; then
+            echo "::error::mapping.txt 为空，R8 没有产出混淆映射"
+            exit 1
+          fi
+          BUILD_ID=$(basename "$MAPPING" .txt)
+          BUILD_ID=${BUILD_ID#mapping-}
+          if [ "$BUILD_ID" = "mapping" ]; then
+            BUILD_ID=$SHORT_SHA
+          fi
+
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -n 1)
+          BADGING=$("$AAPT2" dump badging "$APK" | head -n 1)
+          VERSION=$(echo "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+          VERSION_CODE=$(echo "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+
+          cp "$APK" "dist/starSchedule-snapshot-$SHORT_SHA.apk"
+          gzip -9 -c "$MAPPING" > "dist/mapping-$BUILD_ID.txt.gz"
+          (cd dist && sha256sum starSchedule-snapshot-*.apk > SHA256SUMS.txt)
+
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          ls -lh dist
+
+      - name: 写发布说明
+        env:
+          SHORT_SHA: ${{ steps.info.outputs.short_sha }}
+          BUILD_ID: ${{ steps.dist.outputs.build_id }}
+          VERSION: ${{ steps.dist.outputs.version }}
+          VERSION_CODE: ${{ steps.dist.outputs.version_code }}
+          BUILD_TIME: ${{ steps.info.outputs.build_time }}
+        run: |
+          {
+            echo "> 本页每次向 \`master\` 推送后重建，始终指向最新一次构建；需要稳定版本请到 [最新正式版](../../releases/latest)。"
+            echo
+            echo "| 项目 | 值 |"
+            echo "| --- | --- |"
+            echo "| 提交 | \`$SHORT_SHA\` $(git log -1 --pretty=format:'%s') |"
+            echo "| 版本 | \`$VERSION\` ($VERSION_CODE) |"
+            echo "| 构建标识 | \`$BUILD_ID\` |"
+            echo "| 构建时间 | $BUILD_TIME |"
+            echo
+            echo "### 安装"
+            echo "使用与正式版相同的签名，已装过正式版可以直接覆盖安装；降低 versionCode 才会被系统拒绝，这里两者一致，不涉及降级。"
+            echo
+            echo "### 崩溃还原"
+            echo "快照包同样经过 R8 混淆。应用崩溃页里的「应用版本」就是上面的 \`$VERSION\`，对应下面这份 mapping："
+            echo
+            echo '```bash'
+            echo "gunzip -k mapping-$BUILD_ID.txt.gz"
+            echo "# Android SDK 自带，路径在 cmdline-tools/<版本>/bin/retrace"
+            echo "retrace mapping-$BUILD_ID.txt stacktrace.txt"
+            echo '```'
+          } > dist/notes.md
+
+      - name: 归档快照包
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-apk-${{ steps.info.outputs.short_sha }}
+          path: |
+            dist/starSchedule-snapshot-*.apk
+            dist/SHA256SUMS.txt
+          retention-days: 14
+
+      - name: 归档快照 mapping
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-mapping-${{ steps.dist.outputs.build_id }}
+          path: dist/mapping-*.txt.gz
+          retention-days: 90
+
+      - name: 清理旧的快照发布
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Release 和 tag 都必须删掉，否则新 release 会挂在上一次的提交上。
+          gh release delete snapshot --yes --cleanup-tag 2>/dev/null || true
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/snapshot" 2>/dev/null || true
+
+      - name: 发布快照
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: snapshot
+          target_commitish: ${{ github.sha }}
+          name: 快照 · ${{ steps.info.outputs.short_sha }}
+          body_path: dist/notes.md
+          prerelease: true
+          make_latest: "false"
+          overwrite_files: true
+          files: |
+            dist/starSchedule-snapshot-*.apk
+            dist/SHA256SUMS.txt
+            dist/mapping-*.txt.gz
