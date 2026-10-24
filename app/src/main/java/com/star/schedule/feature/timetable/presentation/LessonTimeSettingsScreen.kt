@@ -128,8 +128,8 @@ private fun LessonTimeSettingsScreen(
     onAdd: () -> Unit,
     onEdit: (LessonTimeRow) -> Unit,
     onDelete: (LessonTimeRow) -> Unit,
-    onUndoDelete: () -> Unit,
-    onDismissUndo: () -> Unit,
+    onUndoDelete: (Long) -> Unit,
+    onDismissUndo: (Long) -> Unit,
     onSelectField: (LessonTimeField) -> Unit,
     onSetTime: (LessonTimeField, Int) -> Unit,
     onDismissEditor: () -> Unit,
@@ -141,19 +141,31 @@ private fun LessonTimeSettingsScreen(
     // 滑动删除的共享状态：被拖的那行把进度写进去，相邻行据此被带着走一点。
     val swipeState = rememberElasticSwipeState()
     val undoLabel = stringResource(R.string.action_undo)
-    val deletedMessage = state.deletedPeriod
-        ?.let { period -> stringResource(R.string.lesson_time_deleted, period) }
+    val undo = state.undo
+    val undoMessage = undo?.let { stringResource(R.string.lesson_time_deleted, it.period) }
 
     // 提示只负责展示和撤销：删除已经落库，撤销就是把那条原样插回去。
     // 用 Indefinite + 自己的倒计时，而不是 Duration.Short 的 4 秒：撤销要留出看得见的时间。
-    LaunchedEffect(deletedMessage) {
-        if (deletedMessage == null) return@LaunchedEffect
+    //
+    // key 必须是 token，不能是文案：删掉第 3 节后剩下的会被 AutoSort 重新编号，
+    // 列表里紧接着的第 3 节再被删掉时文案和上一次一模一样，用文案做 key 则 effect 不重启——
+    // 既不重开倒计时，旧协程走完时还会把这次删除的撤销数据清掉。
+    // key 变化会取消旧协程：SnackbarHostState.showSnackbar 的 finally 会清空
+    // currentSnackbarData 并释放内部 FIFO mutex，新提示立刻接上；被取消的协程也走不到
+    // 下面的回调，不会误清新状态。
+    LaunchedEffect(undo?.token) {
+        if (undo == null || undoMessage == null) return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
-            message = deletedMessage,
+            message = undoMessage,
             actionLabel = undoLabel,
             duration = SnackbarDuration.Indefinite,
         )
-        if (result == SnackbarResult.ActionPerformed) onUndoDelete() else onDismissUndo()
+        // 带上去的是这次 effect 的 token：effect 不随重组更新闭包，读 state 会拿到过期值。
+        if (result == SnackbarResult.ActionPerformed) {
+            onUndoDelete(undo.token)
+        } else {
+            onDismissUndo(undo.token)
+        }
     }
 
     Scaffold(
@@ -397,7 +409,8 @@ private fun UndoSnackbar(
     onTimeout: () -> Unit,
 ) {
     val progress = remember { Animatable(1f) }
-    // data 每次 showSnackbar 都是新实例，连续删两节也会重新开始倒计时。
+    // data 每次 showSnackbar 都是新实例，连续删两节也会重新开始倒计时；
+    // 前提是外层的 LaunchedEffect 用 token 做 key，能真正再触发一次 showSnackbar。
     LaunchedEffect(data) {
         progress.snapTo(1f)
         progress.animateTo(
