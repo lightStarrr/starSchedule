@@ -57,6 +57,8 @@ import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberOverscrollEffect
+import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -81,6 +83,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -159,6 +162,15 @@ private fun TimetableSettingsScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
+    // 折叠过程中整页和预览卡都在缩放，这时再叠一层系统拉伸回弹，卡片会被一起拉变形；
+    // 所以只在顶栏完全收起之后才把回弹交回系统，之前这段页面不显示超出回弹。
+    // 折叠进度用 derivedStateOf 收成布尔值：每帧都会变的状态在这里只有越过阈值时才重组，
+    // 不会把卡片「不因滚动而重组」的优化破坏掉。
+    val systemOverscrollEffect = rememberOverscrollEffect()
+    val topBarFullyCollapsed by remember(scrollBehavior) {
+        derivedStateOf { scrollBehavior.state.collapsedFraction >= 1f }
+    }
+    val overscrollEffect = if (topBarFullyCollapsed) systemOverscrollEffect else null
     // pager 状态提到这一层：下面的设置列表要跟着「居中那张」走，而不是已经应用的那张。
     val pagerState = rememberPagerState(pageCount = { state.previews.size + 1 })
     val previewed = state.previews.getOrNull(pagerState.currentPage)
@@ -226,7 +238,10 @@ private fun TimetableSettingsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(
+                            state = rememberScrollState(),
+                            overscrollEffect = overscrollEffect,
+                        )
                         .padding(top = PageContentTopSpacing),
                 ) {
                     TimetablePreviewPager(
@@ -235,6 +250,7 @@ private fun TimetableSettingsScreen(
                         currentId = state.currentId,
                         // 直接传 state：折叠进度在 layout / draw 阶段读，避免每帧重组卡片内容。
                         topBarState = scrollBehavior.state,
+                        overscrollEffect = overscrollEffect,
                         maxCardWidth = cardMaxWidth,
                         maxCardHeight = cardMaxWidth * screenAspect,
                         onApply = onApply,
@@ -381,6 +397,7 @@ private fun TimetablePreviewPager(
     previews: List<TimetablePreview>,
     currentId: Long?,
     topBarState: TopAppBarState,
+    overscrollEffect: OverscrollEffect?,
     maxCardWidth: Dp,
     maxCardHeight: Dp,
     onApply: (Long) -> Unit,
@@ -466,6 +483,7 @@ private fun TimetablePreviewPager(
                 contentPadding = contentPadding,
                 pageSpacing = 12.dp,
                 pageSize = pageSize,
+                overscrollEffect = overscrollEffect,
             ) { page ->
                 val preview = previews.getOrNull(page)
                 TimetablePreviewPage(
