@@ -32,8 +32,15 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: 配置 Android SDK
-        uses: android-actions/setup-android@v3
+      - name: 准备 Android SDK
+        run: |
+          # 同 snapshot：runner 自带 SDK，跳过会调用已下线 `sdkmanager tools` 的官方 action。
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMGR=$(ls "$SDK"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)
+          yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+          echo "SDK=$SDK"
+          ls "$SDK/platforms" 2>/dev/null || true
+          ls "$SDK/build-tools" 2>/dev/null || true
 
       - name: 配置 Gradle 缓存
         uses: gradle/actions/setup-gradle@v4
