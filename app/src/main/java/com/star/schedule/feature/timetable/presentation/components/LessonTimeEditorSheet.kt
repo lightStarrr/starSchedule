@@ -1,15 +1,9 @@
 package com.star.schedule.feature.timetable.presentation.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,16 +35,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.feature.timetable.presentation.LessonTimeField
+import kotlin.math.roundToInt
 
 /** 错误提示进出的时长：进得慢一点（要让用户看清是什么错），收回时快一点，别挡着继续改时间。 */
-private const val ERROR_ENTER_MILLIS = 260
+private const val ERROR_ENTER_MILLIS = 280
 private const val ERROR_EXIT_MILLIS = 160
+
+/** 出现时从下方浮起的距离，只要「轻微上浮」。 */
+private val ERROR_LIFT = 12.dp
+
+/** 出现时的起始模糊半径：配合透明度从糊到清楚，比单纯淡入更能看出「浮出来」。 */
+private val ERROR_BLUR_RADIUS = 10.dp
 
 /**
  * 「新建 / 编辑课程时间」浮层：上面两张卡片选开始或结束，下面的时钟改选中的那一端。
@@ -142,57 +148,49 @@ fun LessonTimeEditorSheet(
             // 提示和按钮包成一层：外层 spacedBy 的间距就不作用在提示上，
             // 没有错误时这块高度就等于按钮本身，不会凭空多出一段空白。
             Column(modifier = Modifier.fillMaxWidth()) {
-                AnimatedVisibility(
-                    visible = errorText != null,
-                    enter = fadeIn(
+                // 高度、透明度、上浮、模糊全部由这一个进度推着走。
+                // 之前用 AnimatedVisibility 串 fadeIn + expand + slide：高度是「布局」在动、
+                // 位移是「图层」在动，两条曲线各走各的，进场几乎看不出浮起（消失时才明显）。
+                val appear = remember { Animatable(if (errorText != null) 1f else 0f) }
+                LaunchedEffect(errorText != null) {
+                    val visible = errorText != null
+                    appear.animateTo(
+                        targetValue = if (visible) 1f else 0f,
                         animationSpec = tween(
-                            durationMillis = ERROR_ENTER_MILLIS,
-                            easing = LinearOutSlowInEasing,
+                            durationMillis = if (visible) ERROR_ENTER_MILLIS else ERROR_EXIT_MILLIS,
+                            easing = if (visible) LinearOutSlowInEasing else FastOutLinearInEasing,
                         ),
-                    ) + expandVertically(
-                        animationSpec = tween(
-                            durationMillis = ERROR_ENTER_MILLIS,
-                            easing = FastOutSlowInEasing,
-                        ),
-                        // 内容贴顶：容器从 0 长起来时字留在原位往上浮，
-                        // 贴底的话它会跟着底边一起往下漂，看着像被推出去。
-                        expandFrom = Alignment.Top,
-                        // 关键：不裁切。高度动画必然有一段比整行文字矮，
-                        // 裁了就变成半截字；宁可让超出的那一小段暂时压在按钮上方。
-                        clip = false,
-                    ) + slideInVertically(
-                        animationSpec = tween(
-                            durationMillis = ERROR_ENTER_MILLIS,
-                            easing = FastOutSlowInEasing,
-                        ),
-                        // 从下方一个自身高度处滑上来，配合高度增长就是「向上划出」。
-                        initialOffsetY = { it },
-                    ),
-                    exit = fadeOut(
-                        animationSpec = tween(
-                            durationMillis = ERROR_EXIT_MILLIS,
-                            easing = FastOutLinearInEasing,
-                        ),
-                    ) + shrinkVertically(
-                        animationSpec = tween(
-                            durationMillis = ERROR_EXIT_MILLIS,
-                            easing = FastOutLinearInEasing,
-                        ),
-                        shrinkTowards = Alignment.Top,
-                        clip = false,
-                    ),
-                ) {
-                    Text(
-                        text = shownError.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        // 和按钮之间的 16dp 由这里出，跟着高度一起长出来。
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
                     )
                 }
+                val appearProgress = appear.value
+                // 先撑开位置、后显影：透明度、模糊都取平方曲线，前段字几乎看不见，
+                // 打开空间那一下就不会和字的出现抢注意力。
+                val appearOpacity = appearProgress * appearProgress
+                val appearBlur = ERROR_BLUR_RADIUS * (1f - appearProgress * appearProgress)
+                val liftPx = with(LocalDensity.current) { ERROR_LIFT.toPx() }
+
+                Text(
+                    text = shownError.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                        // 高度跟着进度长出来把按钮推开，但内容不裁切：
+                        // 高度还没长够时字照样完整，只是暂时压在按钮上方。
+                        .errorAppearHeight(appearProgress)
+                        .graphicsLayer {
+                            alpha = appearOpacity
+                            // 从下方一点点浮上来；数值小，只是让出现有方向感。
+                            translationY = (1f - appearProgress) * liftPx
+                        }
+                        .blur(
+                            radius = appearBlur,
+                            // 模糊时边缘会往外扩，不放开边界就会看到被切掉的一圈。
+                            edgeTreatment = BlurredEdgeTreatment.Unbounded,
+                        ),
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -263,3 +261,19 @@ private fun parseHourMinute(text: String): Pair<Int, Int> {
     val minute = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 0
     return hour.coerceIn(0, 23) to minute.coerceIn(0, 59)
 }
+
+/**
+ * 按 [progress] 压缩这块的布局高度，但内容仍按完整尺寸测量、绘制。
+ *
+ * 也就是 expandVertically(clip = false) 里「改高度」的那一半：父布局以为它只有这么高，
+ * 文字照旧完整画出来，所以高度还没长够时不会看到半截字。
+ */
+private fun Modifier.errorAppearHeight(progress: Float): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val height = (placeable.height * progress).roundToInt().coerceAtLeast(0)
+        layout(placeable.width, height) {
+            // 贴顶放置：高度从 0 长起来时字留在原位，不会跟着下边一起漂。
+            placeable.placeRelative(0, 0)
+        }
+    }
