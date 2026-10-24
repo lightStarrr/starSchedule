@@ -1,5 +1,15 @@
 package com.star.schedule.feature.timetable.presentation.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,8 +33,11 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +47,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.feature.timetable.presentation.LessonTimeField
+
+/** 错误提示进出的时长：进得慢一点（要让用户看清是什么错），收回时快一点，别挡着继续改时间。 */
+private const val ERROR_ENTER_MILLIS = 260
+private const val ERROR_EXIT_MILLIS = 160
 
 /**
  * 「新建 / 编辑课程时间」浮层：上面两张卡片选开始或结束，下面的时钟改选中的那一端。
@@ -63,6 +80,11 @@ fun LessonTimeEditorSheet(
     val activeTime = when (activeField) {
         LessonTimeField.Start -> startTime
         LessonTimeField.End -> endTime
+    }
+    // 退场动画期间还要有字可画：errorText 一变 null，直接读它就只剩一片空的渐隐区域。
+    var shownError by remember { mutableStateOf(errorText) }
+    LaunchedEffect(errorText) {
+        if (errorText != null) shownError = errorText
     }
 
     ModalBottomSheet(
@@ -117,32 +139,78 @@ fun LessonTimeEditorSheet(
                 TimePicker(state = pickerState)
             }
 
-            if (errorText != null) {
-                Text(
-                    text = errorText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(
-                    onClick = onDismiss,
-                    shapes = ButtonDefaults.shapes(),
+            // 提示和按钮包成一层：外层 spacedBy 的间距就不作用在提示上，
+            // 没有错误时这块高度就等于按钮本身，不会凭空多出一段空白。
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AnimatedVisibility(
+                    visible = errorText != null,
+                    enter = fadeIn(
+                        animationSpec = tween(
+                            durationMillis = ERROR_ENTER_MILLIS,
+                            easing = LinearOutSlowInEasing,
+                        ),
+                    ) + expandVertically(
+                        animationSpec = tween(
+                            durationMillis = ERROR_ENTER_MILLIS,
+                            easing = FastOutSlowInEasing,
+                        ),
+                        // 内容贴顶：容器从 0 长起来时字留在原位往上浮，
+                        // 贴底的话它会跟着底边一起往下漂，看着像被推出去。
+                        expandFrom = Alignment.Top,
+                        // 关键：不裁切。高度动画必然有一段比整行文字矮，
+                        // 裁了就变成半截字；宁可让超出的那一小段暂时压在按钮上方。
+                        clip = false,
+                    ) + slideInVertically(
+                        animationSpec = tween(
+                            durationMillis = ERROR_ENTER_MILLIS,
+                            easing = FastOutSlowInEasing,
+                        ),
+                        // 从下方一个自身高度处滑上来，配合高度增长就是「向上划出」。
+                        initialOffsetY = { it },
+                    ),
+                    exit = fadeOut(
+                        animationSpec = tween(
+                            durationMillis = ERROR_EXIT_MILLIS,
+                            easing = FastOutLinearInEasing,
+                        ),
+                    ) + shrinkVertically(
+                        animationSpec = tween(
+                            durationMillis = ERROR_EXIT_MILLIS,
+                            easing = FastOutLinearInEasing,
+                        ),
+                        shrinkTowards = Alignment.Top,
+                        clip = false,
+                    ),
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(
+                        text = shownError.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        // 和按钮之间的 16dp 由这里出，跟着高度一起长出来。
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                    )
                 }
-                Button(
-                    onClick = onConfirm,
-                    shapes = ButtonDefaults.shapes(),
-                    enabled = confirmEnabled,
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
                 ) {
-                    Text(stringResource(R.string.action_save))
+                    TextButton(
+                        onClick = onDismiss,
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        shapes = ButtonDefaults.shapes(),
+                        enabled = confirmEnabled,
+                    ) {
+                        Text(stringResource(R.string.action_save))
+                    }
                 }
             }
         }
