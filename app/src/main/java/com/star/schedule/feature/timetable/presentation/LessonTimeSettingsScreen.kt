@@ -1,18 +1,13 @@
 package com.star.schedule.feature.timetable.presentation
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -21,38 +16,30 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Bookmarks
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarData
-import androidx.compose.material3.SnackbarDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -66,7 +53,10 @@ import androidx.compose.ui.unit.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleIconButton
+import com.star.schedule.core.designsystem.component.CountdownSnackbar
+import com.star.schedule.core.designsystem.component.MESSAGE_SNACKBAR_TIMEOUT_MILLIS
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
+import com.star.schedule.core.designsystem.component.UNDO_SNACKBAR_TIMEOUT_MILLIS
 import com.star.schedule.core.designsystem.component.ElasticSwipeRow
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.component.rememberElasticSwipeState
@@ -76,6 +66,8 @@ import com.star.schedule.feature.schedule.presentation.TimetableEmptyState
 import com.star.schedule.feature.settings.presentation.SettingsListItem
 import com.star.schedule.feature.timetable.domain.LessonTimeRules
 import com.star.schedule.feature.timetable.presentation.components.LessonTimeEditorSheet
+import com.star.schedule.feature.timetable.presentation.components.OverwriteLessonTimeTemplateDialog
+import com.star.schedule.feature.timetable.presentation.components.SaveLessonTimeTemplateDialog
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -87,9 +79,6 @@ private const val LONG_GAP_MINUTES = 15
 
 /** 与 SettingsGroup 的左右留白保持一致。 */
 private val LIST_HORIZONTAL_PADDING = 16.dp
-
-/** 撤销提示停留多久，进度条走完就自动消失。 */
-private const val UNDO_TIMEOUT_MILLIS = 5_000
 
 @Composable
 fun LessonTimeSettingsRoute(
@@ -111,6 +100,13 @@ fun LessonTimeSettingsRoute(
         onSetTime = viewModel::setTime,
         onDismissEditor = viewModel::dismissEditor,
         onSave = viewModel::save,
+        onStartSaveTemplate = viewModel::startSaveTemplate,
+        onTemplateNameChange = viewModel::updateTemplateName,
+        onConfirmSaveTemplate = viewModel::confirmSaveTemplate,
+        onDismissSaveTemplate = viewModel::dismissSaveTemplate,
+        onConfirmOverwriteTemplate = viewModel::confirmOverwriteTemplate,
+        onDismissOverwriteTemplate = viewModel::dismissOverwriteTemplate,
+        onMessageShown = viewModel::onMessageShown,
     )
 }
 
@@ -134,6 +130,13 @@ private fun LessonTimeSettingsScreen(
     onSetTime: (LessonTimeField, Int) -> Unit,
     onDismissEditor: () -> Unit,
     onSave: () -> Unit,
+    onStartSaveTemplate: () -> Unit,
+    onTemplateNameChange: (String) -> Unit,
+    onConfirmSaveTemplate: () -> Unit,
+    onDismissSaveTemplate: () -> Unit,
+    onConfirmOverwriteTemplate: () -> Unit,
+    onDismissOverwriteTemplate: () -> Unit,
+    onMessageShown: (Long) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
@@ -143,6 +146,8 @@ private fun LessonTimeSettingsScreen(
     val undoLabel = stringResource(R.string.action_undo)
     val undo = state.undo
     val undoMessage = undo?.let { stringResource(R.string.lesson_time_deleted, it.period) }
+    val message = state.message
+    val messageText = message?.let { stringResource(it.type.textRes) }
 
     // 提示只负责展示和撤销：删除已经落库，撤销就是把那条原样插回去。
     // 用 Indefinite + 自己的倒计时，而不是 Duration.Short 的 4 秒：撤销要留出看得见的时间。
@@ -168,6 +173,18 @@ private fun LessonTimeSettingsScreen(
         }
     }
 
+    // 保存模板之类的一次性提示：同样用 Indefinite，由通用提示条的倒计时负责收起，
+    // 这样「已保存模板」和「撤销删除」是同一套视觉，不用两套计时逻辑。
+    // 和撤销提示共用队列，同一时间只会显示一条。
+    LaunchedEffect(message?.token) {
+        if (message == null || messageText == null) return@LaunchedEffect
+        snackbarHostState.showSnackbar(
+            message = messageText,
+            duration = SnackbarDuration.Indefinite,
+        )
+        onMessageShown(message.token)
+    }
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -180,10 +197,14 @@ private fun LessonTimeSettingsScreen(
                 hostState = snackbarHostState,
                 modifier = Modifier.navigationBarsPadding(),
             ) { data ->
-                UndoSnackbar(
+                // 撤销要留出看得见的时间；纯结果提示（已保存模板等）看得清就够了。
+                CountdownSnackbar(
                     data = data,
-                    onAction = { data.performAction() },
-                    onTimeout = { data.dismiss() },
+                    timeoutMillis = if (data.visuals.actionLabel != null) {
+                        UNDO_SNACKBAR_TIMEOUT_MILLIS
+                    } else {
+                        MESSAGE_SNACKBAR_TIMEOUT_MILLIS
+                    },
                 )
             }
         },
@@ -193,7 +214,12 @@ private fun LessonTimeSettingsScreen(
                 onBack = onBack,
                 scrollBehavior = scrollBehavior,
                 actions = {
-                    // 模板是全局资产、和本课表的节次不是一个作用域，只留纯图标入口。
+                    // 保存是「把当前这份存成模板」，模板页本身还是全局资产的入口，两个都留。
+                    CircleIconButton(
+                        icon = Icons.Rounded.BookmarkAdd,
+                        contentDescription = stringResource(R.string.content_desc_save_lesson_time_template),
+                        onClick = onStartSaveTemplate,
+                    )
                     CircleIconButton(
                         icon = Icons.Rounded.Bookmarks,
                         contentDescription = stringResource(R.string.title_course_time_templates),
@@ -315,7 +341,34 @@ private fun LessonTimeSettingsScreen(
             confirmEnabled = !editor.isSaving,
         )
     }
+
+    val saveTemplate = state.saveTemplate
+    if (saveTemplate != null) {
+        if (saveTemplate.confirmingOverwrite) {
+            OverwriteLessonTimeTemplateDialog(
+                name = saveTemplate.name,
+                isSaving = saveTemplate.isSaving,
+                onConfirm = onConfirmOverwriteTemplate,
+                onDismiss = onDismissOverwriteTemplate,
+            )
+        } else {
+            SaveLessonTimeTemplateDialog(
+                state = saveTemplate,
+                onNameChange = onTemplateNameChange,
+                onConfirm = onConfirmSaveTemplate,
+                onDismiss = onDismissSaveTemplate,
+            )
+        }
+    }
 }
+
+/** 一次性提示的文案。提示类型是业务状态，字符串资源只在这一层出现。 */
+private val LessonTimeMessageType.textRes: Int
+    get() = when (this) {
+        LessonTimeMessageType.TemplateSaved -> R.string.toast_template_saved
+        LessonTimeMessageType.TemplateOverwritten -> R.string.toast_template_overwritten
+        LessonTimeMessageType.NothingToSave -> R.string.toast_no_lessons_to_save_template
+    }
 
 /**
  * 拖动时的分段形状：只把朝向被拖走那一侧的两个圆角，从本行原本的半径渐变到「组首/组尾」的大半径。
@@ -394,76 +447,4 @@ private fun lessonTimeErrorText(error: LessonTimeError): String = when (error) {
     LessonTimeError.InvalidTime -> stringResource(R.string.error_lesson_time_invalid)
     LessonTimeError.EndNotAfterStart -> stringResource(R.string.error_end_time_after_start)
     LessonTimeError.Overlap -> stringResource(R.string.error_time_overlap_lesson_time)
-}
-
-/**
- * 带倒计时的撤销提示。
- *
- * Compose 的 Snackbar 只有「4 秒 / 10 秒 / 一直显示」三档，不会画倒计时；
- * 这里用 Indefinite 自己跑一条进度条，进度走完再 dismiss，用户能看到还剩多少时间。
- */
-@Composable
-private fun UndoSnackbar(
-    data: SnackbarData,
-    onAction: () -> Unit,
-    onTimeout: () -> Unit,
-) {
-    val progress = remember { Animatable(1f) }
-    // data 每次 showSnackbar 都是新实例，连续删两节也会重新开始倒计时；
-    // 前提是外层的 LaunchedEffect 用 token 做 key，能真正再触发一次 showSnackbar。
-    LaunchedEffect(data) {
-        progress.snapTo(1f)
-        progress.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(
-                durationMillis = UNDO_TIMEOUT_MILLIS,
-                easing = LinearEasing,
-            ),
-        )
-        onTimeout()
-    }
-
-    // 进度条画在 Snackbar 的底边上、叠在它上面，不参与排版：
-    // 塞进内容里会把文字往上顶，还不让提示条变高。
-    Box(
-        modifier = Modifier
-            // 官方 Snackbar 自己不处理边距：内容一接管就丢了默认 16dp，这里补回来。
-            // 底部让开导航栏的事交给 SnackbarHost 的 navigationBarsPadding()。
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .clip(SnackbarDefaults.shape),
-    ) {
-        Snackbar(
-            // 底色用 surface，和页面内容同一色系：文字 onSurface、操作项和进度条用 primary。
-            // 试过 secondaryContainer，整条偏灰绿，观感不如直接跟页面同色系。
-            // 默认的 inverseSurface 在深色模式下是浅底配浅字，读不清。
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            actionContentColor = MaterialTheme.colorScheme.primary,
-            action = {
-                data.visuals.actionLabel?.let { label ->
-                    TextButton(
-                        onClick = onAction,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary,
-                        ),
-                    ) {
-                        Text(label)
-                    }
-                }
-            },
-        ) {
-            Text(data.visuals.message)
-        }
-        LinearProgressIndicator(
-            progress = { progress.value },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(2.dp),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = Color.Transparent,
-            // 新规范会在轨道末端画一个「停止点」，2dp 的细线上就是一颗突兀的小圆点。
-            drawStopIndicator = {},
-        )
-    }
 }

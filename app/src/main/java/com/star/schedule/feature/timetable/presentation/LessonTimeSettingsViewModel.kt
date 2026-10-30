@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.timetable.domain.LessonTimeRules
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,31 @@ enum class LessonTimeField { Start, End }
 
 enum class LessonTimeError { InvalidTime, EndNotAfterStart, Overlap }
 
+/** 保存为模板时的校验错误。[Failed] 是写库失败，和名称无关。 */
+enum class SaveTemplateError { EmptyName, NameTooLong, Failed }
+
+/**
+ * 「保存为节次时间模板」对话框。
+ *
+ * [confirmingOverwrite] 为 true 时列表里已经有一个同名模板，先让用户确认覆盖，
+ * 这时名称输入框收起，只留一条确认文案。
+ */
+data class SaveTemplateDialog(
+    val name: String = "",
+    val error: SaveTemplateError? = null,
+    val isSaving: Boolean = false,
+    val confirmingOverwrite: Boolean = false,
+)
+
+/** 一次性提示的类型，文案由界面层映射成字符串资源。 */
+enum class LessonTimeMessageType { TemplateSaved, TemplateOverwritten, NothingToSave }
+
+/** [token] 单调递增：同样的提示连续出现两次时，界面靠它区分是两次事件。 */
+data class LessonTimeMessage(
+    val token: Long,
+    val type: LessonTimeMessageType,
+)
+
 /** 编辑浮层的草稿。[editingId] 为 null 表示新增。 */
 data class LessonTimeEditor(
     val editingId: Long? = null,
@@ -70,6 +96,10 @@ data class LessonTimeSettingsUiState(
     val editor: LessonTimeEditor? = null,
     /** 待撤销的删除；null 表示没有。新的删除会整个替换掉它，token 一定变。 */
     val undo: LessonTimeUndo? = null,
+    /** 保存为模板的对话框；null 表示没在保存。 */
+    val saveTemplate: SaveTemplateDialog? = null,
+    /** 一次性提示（保存成功等）；展示完由界面回调清空。 */
+    val message: LessonTimeMessage? = null,
 )
 
 /**
@@ -86,6 +116,13 @@ class LessonTimeSettingsViewModel(
 
     /** 完整实体只留在 ViewModel 里，UiState 只暴露 token 和节次号。 */
     private val pendingUndo = MutableStateFlow<PendingUndo?>(null)
+
+    private val saveTemplate = MutableStateFlow<SaveTemplateDialog?>(null)
+
+    private val message = MutableStateFlow<LessonTimeMessage?>(null)
+
+    /** 只在主线程递增，同样的提示连发两次也能拿到不同的 token。 */
+    private var nextMessageToken = 0L
 
     /**
      * 串行化写操作。
@@ -107,25 +144,26 @@ class LessonTimeSettingsViewModel(
     }
 
     val uiState: StateFlow<LessonTimeSettingsUiState> = combine(
-        timetableId,
-        lessonTimes,
-        editor,
-        pendingUndo,
-    ) { id, lessonTimes, draft, pending ->
-        LessonTimeSettingsUiState(
-            isLoading = false,
-            timetableId = id,
-            rows = lessonTimes.sortedBy { it.period }.map { lessonTime ->
-                LessonTimeRow(
-                    id = lessonTime.id,
-                    period = lessonTime.period,
-                    startTime = lessonTime.startTime,
-                    endTime = lessonTime.endTime,
-                )
-            },
-            editor = draft,
-            undo = pending?.let { LessonTimeUndo(token = it.token, period = it.entity.period) },
-        )
+        combine(timetableId, lessonTimes, editor, pendingUndo) { id, lessonTimes, draft, pending ->
+            LessonTimeSettingsUiState(
+                isLoading = false,
+                timetableId = id,
+                rows = lessonTimes.sortedBy { it.period }.map { lessonTime ->
+                    LessonTimeRow(
+                        id = lessonTime.id,
+                        period = lessonTime.period,
+                        startTime = lessonTime.startTime,
+                        endTime = lessonTime.endTime,
+                    )
+                },
+                editor = draft,
+                undo = pending?.let { LessonTimeUndo(token = it.token, period = it.entity.period) },
+            )
+        },
+        saveTemplate,
+        message,
+    ) { base, dialog, message ->
+        base.copy(saveTemplate = dialog, message = message)
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -221,6 +259,107 @@ class LessonTimeSettingsViewModel(
         }
     }
 
+    /**
+     * 打开「保存为模板」对话框。
+     *
+     * 模板是整份节次时间，没有节次时没什么可存的，直接给一条提示而不是弹一个空对话框。
+     */
+    fun startSaveTemplate() {
+        if (uiState.value.rows.isEmpty()) {
+            emitMessage(LessonTimeMessageType.NothingToSave)
+            return
+        }
+        saveTemplate.value = SaveTemplateDialog()
+    }
+
+    fun updateTemplateName(name: String) {
+        saveTemplate.update { current -> current?.copy(name = name, error = null) }
+    }
+
+    fun dismissSaveTemplate() {
+        if (saveTemplate.value?.isSaving == true) return
+        saveTemplate.value = null
+    }
+
+    fun confirmSaveTemplate() {
+        val current = saveTemplate.value ?: return
+        if (current.isSaving) return
+        val name = current.name.trim()
+        val error = validateTemplateName(name)
+        if (error != null) {
+            saveTemplate.value = current.copy(error = error)
+            return
+        }
+        viewModelScope.launch {
+            saveTemplate.update { it?.copy(name = name, error = null, isSaving = true) }
+            val existingId = try {
+                repository.getLessonTimeTemplateIdByName(name)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                null
+            }
+            if (existingId != null) {
+                // 同名不吃掉用户输入：先把名字留住，等确认后再用 overwrite 覆盖。
+                saveTemplate.update { it?.copy(isSaving = false, confirmingOverwrite = true) }
+            } else {
+                writeTemplate(name, overwrite = false)
+            }
+        }
+    }
+
+    fun confirmOverwriteTemplate() {
+        val current = saveTemplate.value ?: return
+        if (current.isSaving) return
+        viewModelScope.launch {
+            saveTemplate.update { it?.copy(error = null, isSaving = true) }
+            writeTemplate(current.name.trim(), overwrite = true)
+        }
+    }
+
+    /** 覆盖确认里点「返回」：只收起确认，名称还在，用户可以改个名字再存。 */
+    fun dismissOverwriteTemplate() {
+        if (saveTemplate.value?.isSaving == true) return
+        saveTemplate.update { it?.copy(confirmingOverwrite = false) }
+    }
+
+    fun onMessageShown(token: Long) {
+        if (message.value?.token != token) return
+        message.value = null
+    }
+
+    /**
+     * 落库。放在协程里直接调用，调用方负责先把 `isSaving` 置 true。
+     */
+    private suspend fun writeTemplate(name: String, overwrite: Boolean) {
+        val timetableId = uiState.value.timetableId
+        if (timetableId == null) {
+            saveTemplate.value = null
+            return
+        }
+        try {
+            repository.saveLessonTimeTemplateFromTimetable(timetableId, name, overwrite)
+            saveTemplate.value = null
+            emitMessage(
+                if (overwrite) {
+                    LessonTimeMessageType.TemplateOverwritten
+                } else {
+                    LessonTimeMessageType.TemplateSaved
+                },
+            )
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // 对话框留在原地报错：名称是用户刚输入的，没必要让他重敲一遍。
+            saveTemplate.update { it?.copy(isSaving = false, error = SaveTemplateError.Failed) }
+        }
+    }
+
+    private fun emitMessage(type: LessonTimeMessageType) {
+        nextMessageToken += 1
+        message.value = LessonTimeMessage(token = nextMessageToken, type = type)
+    }
+
     fun delete(row: LessonTimeRow) {
         val timetableId = uiState.value.timetableId ?: return
         val entity = LessonTimeEntity(
@@ -281,6 +420,16 @@ class LessonTimeSettingsViewModel(
 
         /** 新增一节时的默认时长，和常见 45 分钟一节课对齐。 */
         private const val DEFAULT_DURATION_MINUTES = 45
+
+        /** 和 `error_template_name_too_long` 的文案保持一致。 */
+        internal const val MAX_TEMPLATE_NAME_LENGTH = 100
+
+        /** 名称校验是纯函数：界面只负责显示错误，单测也直接测它。 */
+        internal fun validateTemplateName(name: String): SaveTemplateError? = when {
+            name.isBlank() -> SaveTemplateError.EmptyName
+            name.length > MAX_TEMPLATE_NAME_LENGTH -> SaveTemplateError.NameTooLong
+            else -> null
+        }
     }
 }
 

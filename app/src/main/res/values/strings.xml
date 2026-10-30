@@ -115,8 +115,9 @@
     <string name="content_desc_delete_lesson_time">Delete class time</string>
     <string name="content_desc_edit_course">Edit course</string>
     <string name="content_desc_delete_course">Delete course</string>
-    <string name="title_course_time_templates">Class time templates</string>
-    <string name="toast_no_lessons_to_save_template">No class times in this timetable; cannot save template</string>
+    <string name="title_course_time_templates">Lesson time templates</string>
+    <string name="content_desc_save_lesson_time_template">Save as lesson time template</string>
+    <string name="toast_no_lessons_to_save_template">No lesson times in this timetable; cannot save template</string>
     <string name="action_save_current_as_template">Save current as template</string>
     <string name="action_import_template">Import</string>
     <string name="toast_no_template_to_export">No templates to export</string>
@@ -131,11 +132,12 @@
     <string name="action_overwrite">Overwrite</string>
     <string name="action_rename">Rename</string>
     <string name="action_skip">Skip</string>
-    <string name="title_save_template">Save class time template</string>
+    <string name="title_save_template">Save lesson time template</string>
     <string name="label_template_name">Template name</string>
-    <string name="save_template_helper">Save this timetable\'s class times as a template for other timetables.</string>
+    <string name="save_template_helper">Save this timetable\'s lesson times as a template for other timetables.</string>
     <string name="error_template_name_empty">Template name required</string>
     <string name="error_template_name_too_long">Template name must not exceed 100 characters</string>
+    <string name="error_template_save_failed">Save failed, please try again</string>
     <string name="toast_template_saved">Template saved</string>
     <string name="toast_template_save_failed">Save failed: %1$s</string>
     <string name="title_overwrite_template">Overwrite template?</string>

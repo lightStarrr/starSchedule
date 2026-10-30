@@ -39,6 +39,15 @@ class RoomScheduleRepository(
         dao.deleteLessonTimeAutoSort(lessonTime)
     }
 
+    override suspend fun getLessonTimeTemplateIdByName(name: String): Long? =
+        dao.getLessonTimeTemplateByNameOnce(name)?.id
+
+    override suspend fun saveLessonTimeTemplateFromTimetable(
+        timetableId: Long,
+        name: String,
+        overwrite: Boolean,
+    ): Long = dao.saveLessonTimeTemplateFromTimetable(timetableId, name, overwrite)
+
     override fun observeDayNotes(timetableId: Long): Flow<List<DayNoteEntity>> =
         dao.getDayNotesFlow(timetableId)
 
