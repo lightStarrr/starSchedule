@@ -59,7 +59,5 @@ interface TimetableRepository {
         overwrite: Boolean = false
     ): Long
 
-    suspend fun applyLessonTimeTemplateToTimetable(timetableId: Long, templateId: Long)
-
     suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity)
 }
