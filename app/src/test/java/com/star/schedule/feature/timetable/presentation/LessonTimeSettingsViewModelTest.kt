@@ -157,6 +157,117 @@ class LessonTimeSettingsViewModelTest {
         return first
     }
 
+    @Test
+    fun `saving a template trims the name and reports success`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.startSaveTemplate()
+        viewModel.updateTemplateName("  早八作息  ")
+        viewModel.confirmSaveTemplate()
+        advanceUntilIdle()
+
+        assertEquals(listOf("早八作息" to false), repository.savedTemplates)
+        assertNull(viewModel.uiState.value.saveTemplate)
+        assertEquals(LessonTimeMessageType.TemplateSaved, viewModel.uiState.value.message?.type)
+    }
+
+    @Test
+    fun `an existing name asks for overwrite before writing`() = runTest(dispatcher) {
+        repository.existingTemplateName = "早八作息"
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.startSaveTemplate()
+        viewModel.updateTemplateName("早八作息")
+        viewModel.confirmSaveTemplate()
+        advanceUntilIdle()
+
+        // 只问不写：覆盖会丢掉旧模板，必须先确认。
+        assertTrue(repository.savedTemplates.isEmpty())
+        assertTrue(viewModel.uiState.value.saveTemplate?.confirmingOverwrite == true)
+
+        viewModel.confirmOverwriteTemplate()
+        advanceUntilIdle()
+
+        assertEquals(listOf("早八作息" to true), repository.savedTemplates)
+        assertNull(viewModel.uiState.value.saveTemplate)
+        assertEquals(LessonTimeMessageType.TemplateOverwritten, viewModel.uiState.value.message?.type)
+    }
+
+    @Test
+    fun `dismissing the overwrite prompt keeps the typed name`() = runTest(dispatcher) {
+        repository.existingTemplateName = "早八作息"
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        viewModel.startSaveTemplate()
+        viewModel.updateTemplateName("早八作息")
+        viewModel.confirmSaveTemplate()
+        advanceUntilIdle()
+
+        viewModel.dismissOverwriteTemplate()
+        advanceUntilIdle()
+
+        val dialog = requireNotNull(viewModel.uiState.value.saveTemplate)
+        assertTrue(!dialog.confirmingOverwrite)
+        assertEquals("早八作息", dialog.name)
+    }
+
+    @Test
+    fun `a blank name is rejected without writing`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.startSaveTemplate()
+        viewModel.updateTemplateName("   ")
+        viewModel.confirmSaveTemplate()
+        advanceUntilIdle()
+
+        assertEquals(SaveTemplateError.EmptyName, viewModel.uiState.value.saveTemplate?.error)
+        assertTrue(repository.savedTemplates.isEmpty())
+    }
+
+    @Test
+    fun `a failed write keeps the dialog open with its error`() = runTest(dispatcher) {
+        repository.saveError = IllegalStateException("disk full")
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.startSaveTemplate()
+        viewModel.updateTemplateName("早八作息")
+        viewModel.confirmSaveTemplate()
+        advanceUntilIdle()
+
+        // 名称是用户刚敲的，失败了不要把他刚输入的对话框关掉。
+        val dialog = requireNotNull(viewModel.uiState.value.saveTemplate)
+        assertEquals(SaveTemplateError.Failed, dialog.error)
+        assertEquals("早八作息", dialog.name)
+        assertTrue(!dialog.isSaving)
+    }
+
+    @Test
+    fun `no lesson times means nothing to save into a template`() = runTest(dispatcher) {
+        repository.clearLessonTimes()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.startSaveTemplate()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.saveTemplate)
+        assertEquals(LessonTimeMessageType.NothingToSave, viewModel.uiState.value.message?.type)
+    }
+
+    @Test
+    fun `template names are limited to 100 characters`() {
+        assertNull(LessonTimeSettingsViewModel.validateTemplateName("课表"))
+        assertNull(LessonTimeSettingsViewModel.validateTemplateName("字".repeat(100)))
+        assertEquals(
+            SaveTemplateError.NameTooLong,
+            LessonTimeSettingsViewModel.validateTemplateName("字".repeat(101)),
+        )
+    }
+
     /**
      * WhileSubscribed 没人订阅时上游不会启动，uiState 永远停在初始值（timetableId 为 null），
      * delete 会静默 return。这里常驻收集一份，runTest 结束时由 backgroundScope 自动取消。
@@ -188,6 +299,15 @@ private class FakeScheduleRepository : ScheduleRepository {
     val deletedIds = mutableListOf<Long>()
     val inserted = mutableListOf<LessonTimeEntity>()
 
+    /** 保存模板的调用记录：名称 + 是否覆盖。 */
+    val savedTemplates = mutableListOf<Pair<String, Boolean>>()
+
+    /** 非 null 时视为库里已经有同名模板，用来触发覆盖确认。 */
+    var existingTemplateName: String? = null
+
+    /** 非 null 时写库直接失败。 */
+    var saveError: Exception? = null
+
     /** 非 null 时删除会卡在这里，用来制造写入重叠。 */
     var deleteGate: CompletableDeferred<Unit>? = null
 
@@ -213,6 +333,23 @@ private class FakeScheduleRepository : ScheduleRepository {
         resort { rows -> rows.filterNot { it.id == lessonTime.id } }
     }
 
+    override suspend fun getLessonTimeTemplateIdByName(name: String): Long? =
+        if (name == existingTemplateName) TEMPLATE_ID else null
+
+    override suspend fun saveLessonTimeTemplateFromTimetable(
+        timetableId: Long,
+        name: String,
+        overwrite: Boolean,
+    ): Long {
+        saveError?.let { throw it }
+        savedTemplates += name to overwrite
+        return TEMPLATE_ID
+    }
+
+    fun clearLessonTimes() {
+        lessonTimes.value = emptyList()
+    }
+
     override fun observeDayNotes(timetableId: Long): Flow<List<DayNoteEntity>> = flowOf(emptyList())
 
     override suspend fun upsertDayNote(note: DayNoteEntity): Long = 0L
@@ -225,5 +362,9 @@ private class FakeScheduleRepository : ScheduleRepository {
                 .sortedBy { it.startTime }
                 .mapIndexed { index, row -> row.copy(period = index + 1) }
         }
+    }
+
+    private companion object {
+        const val TEMPLATE_ID = 1L
     }
 }

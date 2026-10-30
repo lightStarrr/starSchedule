@@ -115,8 +115,9 @@
     <string name="content_desc_delete_lesson_time">删除课程时间</string>
     <string name="content_desc_edit_course">编辑课程</string>
     <string name="content_desc_delete_course">删除课程</string>
-    <string name="title_course_time_templates">课程时间模板</string>
-    <string name="toast_no_lessons_to_save_template">当前课表暂无课程时间，无法保存模板</string>
+    <string name="title_course_time_templates">节次时间模板</string>
+    <string name="content_desc_save_lesson_time_template">保存为节次时间模板</string>
+    <string name="toast_no_lessons_to_save_template">当前课表暂无节次时间，无法保存模板</string>
     <string name="action_save_current_as_template">保存当前为模板</string>
     <string name="action_import_template">导入</string>
     <string name="toast_no_template_to_export">暂无模板可导出</string>
@@ -131,11 +132,12 @@
     <string name="action_overwrite">覆盖</string>
     <string name="action_rename">重命名</string>
     <string name="action_skip">跳过</string>
-    <string name="title_save_template">保存课程时间模板</string>
+    <string name="title_save_template">保存节次时间模板</string>
     <string name="label_template_name">模板名称</string>
-    <string name="save_template_helper">将当前课表的课程时间保存为模板，可用于其他课表。</string>
+    <string name="save_template_helper">将当前课表的节次时间保存为模板，可用于其他课表。</string>
     <string name="error_template_name_empty">模板名称不能为空</string>
     <string name="error_template_name_too_long">模板名称不能超过100个字符</string>
+    <string name="error_template_save_failed">保存失败，请重试</string>
     <string name="toast_template_saved">已保存为模板</string>
     <string name="toast_template_save_failed">保存失败: %1$s</string>
     <string name="title_overwrite_template">覆盖模板？</string>

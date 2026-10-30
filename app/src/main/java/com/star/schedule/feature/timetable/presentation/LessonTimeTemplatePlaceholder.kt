@@ -16,7 +16,7 @@ import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageTopBar
 
 /**
- * 课程时间模板页目前是空的：只有顶栏，内容留给后续实现。
+ * 节次时间模板页目前是空的：只有顶栏，内容留给后续实现。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
