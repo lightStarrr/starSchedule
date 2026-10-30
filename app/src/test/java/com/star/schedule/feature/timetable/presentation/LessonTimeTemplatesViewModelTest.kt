@@ -2,6 +2,7 @@ package com.star.schedule.feature.timetable.presentation
 
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
+import com.star.schedule.core.database.LessonTimeApplySnapshot
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.LessonTimeTemplateEntity
 import com.star.schedule.core.database.LessonTimeTemplateItemEntity
@@ -94,10 +95,10 @@ class LessonTimeTemplatesViewModelTest {
 
             assertTrue(repository.isGone(7L))
             assertTrue(viewModel.uiState.value.rows.isEmpty())
-            val undo = requireNotNull(viewModel.uiState.value.undo)
+            val undo = requireNotNull(viewModel.uiState.value.undo) as LessonTimeTemplatesUndo.Deleted
             assertEquals("早八作息", undo.name)
 
-            viewModel.undoDelete(undo.token)
+            viewModel.undo(undo.token)
             advanceUntilIdle()
 
             assertEquals(listOf(7L), repository.restoredTemplateIds)
@@ -123,7 +124,7 @@ class LessonTimeTemplatesViewModelTest {
         advanceUntilIdle()
         val second = requireNotNull(viewModel.uiState.value.undo)
 
-        viewModel.undoDelete(first.token)
+        viewModel.undo(first.token)
         advanceUntilIdle()
 
         assertTrue(repository.restoredTemplateIds.isEmpty())
@@ -139,7 +140,7 @@ class LessonTimeTemplatesViewModelTest {
         viewModel.delete(viewModel.uiState.value.rows.single())
         advanceUntilIdle()
         val undo = requireNotNull(viewModel.uiState.value.undo)
-        viewModel.undoDelete(undo.token)
+        viewModel.undo(undo.token)
         advanceUntilIdle()
 
         assertEquals(
@@ -149,6 +150,171 @@ class LessonTimeTemplatesViewModelTest {
         // 模板没恢复回来，列表仍然是空的。
         assertTrue(viewModel.uiState.value.rows.isEmpty())
     }
+
+
+    @Test
+    fun `requesting apply previews the courses that would lose their time`() = runTest(dispatcher) {
+        repository.seedCourses(listOf(course("晚自习", listOf(5, 6))))
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.requestApply(viewModel.uiState.value.rows.single())
+        advanceUntilIdle()
+
+        val preview = requireNotNull(viewModel.uiState.value.applyPreview)
+        assertEquals("早八作息", preview.templateName)
+        assertEquals("2026 秋季学期", preview.timetableName)
+        assertEquals(2, preview.periodCount)
+        assertEquals(listOf("晚自习"), preview.missing.map { it.courseName })
+        assertEquals(listOf(5, 6), preview.missing.single().periods)
+    }
+
+    @Test
+    fun `confirming apply writes into the current timetable and offers undo`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.requestApply(viewModel.uiState.value.rows.single())
+        advanceUntilIdle()
+        viewModel.confirmApply()
+        advanceUntilIdle()
+
+        assertEquals(listOf(5L to 7L), repository.applied)
+        assertNull(viewModel.uiState.value.applyPreview)
+        val undo = requireNotNull(viewModel.uiState.value.undo) as LessonTimeTemplatesUndo.Applied
+        assertEquals("早八作息", undo.templateName)
+    }
+
+    @Test
+    fun `an empty template is not applied`() = runTest(dispatcher) {
+        repository.seed(
+            template = LessonTimeTemplateEntity(id = 9L, name = "空模板", createdAt = 3L, updatedAt = 3L),
+            items = emptyList(),
+        )
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val emptyRow = viewModel.uiState.value.rows.first { it.id == 9L }
+        viewModel.requestApply(emptyRow)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.applyPreview)
+        assertEquals(
+            LessonTimeTemplatesMessageType.TemplateEmpty,
+            viewModel.uiState.value.message?.type,
+        )
+        assertTrue(repository.applied.isEmpty())
+    }
+
+    @Test
+    fun `without a current timetable applying is unavailable`() = runTest(dispatcher) {
+        repository.clearTimetable()
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertTrue(!viewModel.uiState.value.canApply)
+        viewModel.requestApply(viewModel.uiState.value.rows.single())
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.applyPreview)
+        assertEquals(
+            LessonTimeTemplatesMessageType.NoTimetable,
+            viewModel.uiState.value.message?.type,
+        )
+    }
+
+    @Test
+    fun `a failed apply reports a message and leaves no undo`() = runTest(dispatcher) {
+        repository.applyError = IllegalStateException("disk full")
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.requestApply(viewModel.uiState.value.rows.single())
+        advanceUntilIdle()
+        viewModel.confirmApply()
+        advanceUntilIdle()
+
+        assertEquals(
+            LessonTimeTemplatesMessageType.ApplyFailed,
+            viewModel.uiState.value.message?.type,
+        )
+        assertNull(viewModel.uiState.value.undo)
+    }
+
+    @Test
+    fun `undoing an apply restores the snapshot it got`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.requestApply(viewModel.uiState.value.rows.single())
+        advanceUntilIdle()
+        viewModel.confirmApply()
+        advanceUntilIdle()
+        val undo = requireNotNull(viewModel.uiState.value.undo)
+
+        viewModel.undo(undo.token)
+        advanceUntilIdle()
+
+        assertEquals(listOf(5L), repository.restoredSnapshots.map { it.timetableId })
+        assertNull(viewModel.uiState.value.undo)
+    }
+
+    @Test
+    fun `a failed undo of an apply reports its own message`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.requestApply(viewModel.uiState.value.rows.single())
+        advanceUntilIdle()
+        viewModel.confirmApply()
+        advanceUntilIdle()
+        repository.restoreError = IllegalStateException("disk full")
+        val undo = requireNotNull(viewModel.uiState.value.undo)
+
+        viewModel.undo(undo.token)
+        advanceUntilIdle()
+
+        assertEquals(
+            LessonTimeTemplatesMessageType.ApplyUndoFailed,
+            viewModel.uiState.value.message?.type,
+        )
+    }
+
+    @Test
+    fun `a late undo of a previous apply restores nothing`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        val row = viewModel.uiState.value.rows.single()
+
+        viewModel.requestApply(row)
+        advanceUntilIdle()
+        viewModel.confirmApply()
+        advanceUntilIdle()
+        val first = requireNotNull(viewModel.uiState.value.undo)
+
+        viewModel.requestApply(row)
+        advanceUntilIdle()
+        viewModel.confirmApply()
+        advanceUntilIdle()
+        val second = requireNotNull(viewModel.uiState.value.undo)
+
+        viewModel.undo(first.token)
+        advanceUntilIdle()
+
+        assertTrue(repository.restoredSnapshots.isEmpty())
+        assertEquals(second, viewModel.uiState.value.undo)
+    }
+
+    private fun course(name: String, periods: List<Int>) = CourseEntity(
+        id = 0,
+        timetableId = 5,
+        name = name,
+        teacher = "",
+        location = "",
+        dayOfWeek = 1,
+        periods = periods,
+        weeks = listOf(1),
+    )
 
     /**
      * WhileSubscribed 没人订阅时上游不会启动，uiState 一直停在初始值。
@@ -165,10 +331,32 @@ class LessonTimeTemplatesViewModelTest {
 private class FakeTemplateRepository : ScheduleRepository {
     private val templates = MutableStateFlow<List<LessonTimeTemplateEntity>>(emptyList())
     private val items = MutableStateFlow<List<LessonTimeTemplateItemEntity>>(emptyList())
+    private val timetableId = MutableStateFlow<Long?>(5L)
+    private val timetable = MutableStateFlow<TimetableEntity?>(
+        TimetableEntity(id = 5L, name = "2026 秋季学期", showWeekend = false, startDate = "2026-09-01"),
+    )
+    private val courses = MutableStateFlow<List<CourseEntity>>(emptyList())
 
     val restoredTemplateIds = mutableListOf<Long>()
 
+    /** 「应用」的调用记录：timetableId to templateId。 */
+    val applied = mutableListOf<Pair<Long, Long>>()
+
+    /** 撤销时收到的快照。 */
+    val restoredSnapshots = mutableListOf<LessonTimeApplySnapshot>()
+
     var restoreError: Exception? = null
+
+    var applyError: Exception? = null
+
+    fun clearTimetable() {
+        timetableId.value = null
+        timetable.value = null
+    }
+
+    fun seedCourses(list: List<CourseEntity>) {
+        courses.value = list
+    }
 
     fun seed(template: LessonTimeTemplateEntity, items: List<LessonTimeTemplateItemEntity>) {
         templates.value = templates.value + template
@@ -189,6 +377,22 @@ private class FakeTemplateRepository : ScheduleRepository {
     override suspend fun getLessonTimeTemplateItemsOnce(
         templateId: Long,
     ): List<LessonTimeTemplateItemEntity> = items.value.filter { it.templateId == templateId }
+
+    override suspend fun applyLessonTimeTemplateToTimetable(
+        timetableId: Long,
+        templateId: Long,
+    ): LessonTimeApplySnapshot? {
+        applyError?.let { throw it }
+        // 空模板不写库，和真实实现一致。
+        if (items.value.none { it.templateId == templateId }) return null
+        applied += timetableId to templateId
+        return LessonTimeApplySnapshot(timetableId = timetableId, lessonTimesBefore = emptyList())
+    }
+
+    override suspend fun restoreAppliedLessonTimeTemplate(snapshot: LessonTimeApplySnapshot) {
+        restoredSnapshots += snapshot
+        restoreError?.let { throw it }
+    }
 
     override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) {
         templates.value = templates.value.filterNot { it.id == template.id }
@@ -213,11 +417,11 @@ private class FakeTemplateRepository : ScheduleRepository {
         this.items.value = this.items.value.filterNot { it.templateId == template.id } + items
     }
 
-    override fun observeCurrentTimetableId(): Flow<Long?> = flowOf(null)
+    override fun observeCurrentTimetableId(): Flow<Long?> = timetableId
 
-    override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = flowOf(null)
+    override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = timetable
 
-    override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> = flowOf(emptyList())
+    override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> = courses
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =
         flowOf(emptyList())

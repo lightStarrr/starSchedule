@@ -2,6 +2,7 @@ package com.star.schedule.feature.timetable.presentation
 
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
+import com.star.schedule.core.database.LessonTimeApplySnapshot
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.LessonTimeTemplateEntity
 import com.star.schedule.core.database.LessonTimeTemplateItemEntity
@@ -366,6 +367,13 @@ private class FakeScheduleRepository : ScheduleRepository {
     override suspend fun getLessonTimeTemplateItemsOnce(
         templateId: Long,
     ): List<LessonTimeTemplateItemEntity> = emptyList()
+
+    override suspend fun applyLessonTimeTemplateToTimetable(
+        timetableId: Long,
+        templateId: Long,
+    ): LessonTimeApplySnapshot? = null
+
+    override suspend fun restoreAppliedLessonTimeTemplate(snapshot: LessonTimeApplySnapshot) = Unit
 
     override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) = Unit
 

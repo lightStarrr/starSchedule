@@ -143,7 +143,6 @@
     <string name="toast_no_template_to_export">No templates to export</string>
     <string name="action_export_all">Export all</string>
     <string name="label_no_template">No templates yet</string>
-    <string name="content_desc_apply_template">Apply template</string>
     <string name="content_desc_export_template">Export template</string>
     <string name="content_desc_delete_template">Delete template</string>
     <string name="action_close">Close</string>
@@ -165,9 +164,17 @@
     <string name="toast_template_overwritten">Template overwritten</string>
     <string name="toast_template_overwrite_failed">Overwrite failed: %1$s</string>
     <string name="title_apply_template">Apply template?</string>
-    <string name="text_apply_template">Applying "%1$s" will overwrite this timetable\'s class times. Continue?</string>
-    <string name="toast_template_applied">Template applied</string>
     <string name="toast_template_apply_failed">Apply failed: %1$s</string>
+    <string name="text_apply_template_summary">Replaces the class times of "%1$s" with %2$d periods.</string>
+    <string name="text_apply_template_missing_notice">%1$d courses use periods after period %2$d; those periods will have no time shown:</string>
+    <string name="text_apply_template_course_periods">· %1$s (periods %2$s)</string>
+    <string name="text_apply_template_more">…and %1$d more</string>
+    <string name="list_separator">, </string>
+    <string name="lesson_time_template_applied">Applied "%1$s"</string>
+    <string name="lesson_time_template_apply_failed">Apply failed, please try again</string>
+    <string name="lesson_time_template_apply_undo_failed">Undo failed, please try again</string>
+    <string name="lesson_time_template_apply_empty">This template has no periods yet</string>
+    <string name="lesson_time_template_apply_no_timetable">There is no timetable to apply this template to</string>
     <string name="action_apply">Apply</string>
     <string name="title_delete_template">Delete template?</string>
     <string name="text_delete_template">Delete template "%1$s"?</string>

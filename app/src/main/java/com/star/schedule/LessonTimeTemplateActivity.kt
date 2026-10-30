@@ -10,6 +10,8 @@ import com.star.schedule.feature.schedule.data.RoomScheduleRepository
 import com.star.schedule.feature.timetable.presentation.LessonTimeTemplatesRoute
 import com.star.schedule.feature.timetable.presentation.LessonTimeTemplatesViewModel
 import com.star.schedule.feature.timetable.presentation.LessonTimeTemplatesViewModelFactory
+import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.platform.notification.ReminderRefresher
 import com.star.schedule.platform.systembar.installEdgeToEdge
 
 /**
@@ -22,7 +24,12 @@ class LessonTimeTemplateActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val repository = RoomScheduleRepository(DatabaseProvider.dao())
+        val dao = DatabaseProvider.dao()
+        // 应用模板会重排当前课表的节次，落库后要让提醒跟着重排。
+        val repository = RoomScheduleRepository(
+            dao = dao,
+            reminderRefresher = ReminderRefresher(dao, UnifiedNotificationManager(this)),
+        )
         val viewModel = ViewModelProvider(
             this,
             LessonTimeTemplatesViewModelFactory(repository),
