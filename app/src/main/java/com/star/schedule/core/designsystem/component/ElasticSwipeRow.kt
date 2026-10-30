@@ -154,8 +154,15 @@ fun ElasticSwipeRow(
     }
 
     val dragging = state.activeIndex == index
-    val progress = if (dragging && rowWidthPx > 0f) {
-        (outwardPx(currentSign()) / rowWidthPx).coerceIn(0f, 1f)
+    /**
+     * 自己的淡出进度只看自己的位移，不读列表级的 [ElasticSwipeState.progress]。
+     *
+     * 删除收尾时 `releaseSharedState()` 会把 progress 归零；如果透明度跟着它走，
+     * 那一帧整行会从全透明跳回不透明，在已经滑到屏幕左侧的位置露出一条卡片残影，
+     * 再被列表移除慢慢淡掉——就是「侧边闪一下」。
+     */
+    val ownProgress = if (rowWidthPx > 0f) {
+        (abs(offset) / rowWidthPx).coerceIn(0f, 1f)
     } else {
         0f
     }
@@ -207,7 +214,7 @@ fun ElasticSwipeRow(
         modifier = modifier
             .onSizeChanged { rowWidthPx = it.width.toFloat() }
             .offset { IntOffset((offset + follow * with(density) { config.neighborDrag.toPx() }).roundToInt(), 0) }
-            .alpha(1f - progress)
+            .alpha(1f - ownProgress)
             .draggable(
                 orientation = Orientation.Horizontal,
                 onDragStarted = {

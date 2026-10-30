@@ -287,7 +287,9 @@ private fun LessonTimeTemplateEditScreen(
                                 onDelete = { onDeleteRow(row) },
                                 modifier = Modifier
                                     .padding(horizontal = LIST_HORIZONTAL_PADDING)
-                                    .animateItem(),
+                                    // 删除时这一行已经自己滑出去并淡到 0；
+                                    // 再让 LazyList 做「消失淡出」会在原地留一条残影闪一下。
+                                    .animateItem(fadeOutSpec = null),
                             ) { info ->
                                 val morph = abs(info.follow)
                                 val shapes = if (morph > 0.001f && info.morphSide != 0) {
