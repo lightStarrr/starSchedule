@@ -116,6 +116,11 @@
     <string name="content_desc_edit_course">Edit course</string>
     <string name="content_desc_delete_course">Delete course</string>
     <string name="title_course_time_templates">Lesson time templates</string>
+    <string name="lesson_time_templates_empty">No lesson time templates yet</string>
+    <string name="lesson_time_templates_empty_hint">Tap the save button on the lesson times page to save the current lesson times as a template</string>
+    <string name="lesson_time_template_summary">%1$d periods · updated %2$s</string>
+    <string name="lesson_time_template_deleted">Template "%1$s" deleted</string>
+    <string name="lesson_time_template_restore_failed">Restore failed, please save the template again</string>
     <string name="content_desc_save_lesson_time_template">Save as lesson time template</string>
     <string name="toast_no_lessons_to_save_template">No lesson times in this timetable; cannot save template</string>
     <string name="action_save_current_as_template">Save current as template</string>

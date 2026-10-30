@@ -146,6 +146,31 @@ abstract class ScheduleDao {
     @Query("SELECT * FROM lesson_time_template_item WHERE templateId = :templateId ORDER BY period ASC")
     abstract suspend fun getLessonTimeTemplateItemsOnce(templateId: Long): List<LessonTimeTemplateItemEntity>
 
+    /**
+     * 全部模板的节次，给列表算「共几节、几点到几点」用。
+     *
+     * 模板数量很少，一次取全量在内存里分组，比给每个模板单独查一次更省事。
+     */
+    @Query("SELECT * FROM lesson_time_template_item")
+    abstract fun getLessonTimeTemplateItemsFlow(): Flow<List<LessonTimeTemplateItemEntity>>
+
+    /**
+     * 撤销删除：连模板连同它的节次一起按原 id 插回去。
+     *
+     * 显式带上主键，Room 会照用这个 id，节次里的 templateId 因此仍然对得上；
+     * 中间那段时间如果又有人建了同名模板，唯一索引会直接抛异常，由调用方转成提示。
+     */
+    @Transaction
+    open suspend fun restoreLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    ) {
+        insertLessonTimeTemplate(template)
+        if (items.isNotEmpty()) {
+            insertLessonTimeTemplateItems(items)
+        }
+    }
+
     @Transaction
     open suspend fun saveLessonTimeTemplateFromTimetable(
         timetableId: Long,

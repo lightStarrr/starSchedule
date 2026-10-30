@@ -116,6 +116,11 @@
     <string name="content_desc_edit_course">编辑课程</string>
     <string name="content_desc_delete_course">删除课程</string>
     <string name="title_course_time_templates">节次时间模板</string>
+    <string name="lesson_time_templates_empty">还没有节次时间模板</string>
+    <string name="lesson_time_templates_empty_hint">在节次时间页点右上角的保存按钮，就能把当前节次时间存成模板</string>
+    <string name="lesson_time_template_summary">共 %1$d 节 · %2$s 更新</string>
+    <string name="lesson_time_template_deleted">已删除模板「%1$s」</string>
+    <string name="lesson_time_template_restore_failed">恢复失败，请重新保存模板</string>
     <string name="content_desc_save_lesson_time_template">保存为节次时间模板</string>
     <string name="toast_no_lessons_to_save_template">当前课表暂无节次时间，无法保存模板</string>
     <string name="action_save_current_as_template">保存当前为模板</string>
