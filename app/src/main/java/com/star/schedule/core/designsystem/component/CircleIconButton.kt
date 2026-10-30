@@ -25,12 +25,14 @@ fun CircleIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
     contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     IconButton(
         onClick = onClick,
         modifier = modifier,
+        enabled = enabled,
         shapes = IconButtonDefaults.shapes(shape = CircleShape),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = containerColor,

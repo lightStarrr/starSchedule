@@ -33,6 +33,9 @@ class LessonTimeTemplateActivity : ComponentActivity() {
                 LessonTimeTemplatesRoute(
                     viewModel = viewModel,
                     onBack = ::finish,
+                    onOpenTemplate = { row ->
+                        startActivity(LessonTimeTemplateEditActivity.intent(this, row.id))
+                    },
                 )
             }
         }

@@ -57,15 +57,13 @@ import com.star.schedule.feature.schedule.presentation.TimetableEmptyState
 import com.star.schedule.feature.settings.presentation.SettingsListItem
 import com.star.schedule.feature.timetable.domain.LessonTimeRules
 import com.star.schedule.feature.timetable.presentation.components.LessonTimeEditorSheet
+import com.star.schedule.feature.timetable.presentation.components.lessonTimeSupportingText
 import com.star.schedule.feature.timetable.presentation.components.OverwriteLessonTimeTemplateDialog
 import com.star.schedule.feature.timetable.presentation.components.SaveLessonTimeTemplateDialog
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
-
-/** 相邻两节空档超过这个分钟数就在副标题里提示，正常的课间不提示。 */
-private const val LONG_GAP_MINUTES = 15
 
 
 /** 与 SettingsGroup 的左右留白保持一致。 */
@@ -360,29 +358,6 @@ private val LessonTimeMessageType.textRes: Int
         LessonTimeMessageType.TemplateOverwritten -> R.string.toast_template_overwritten
         LessonTimeMessageType.NothingToSave -> R.string.toast_no_lessons_to_save_template
     }
-
-/**
- * 副标题：第几节；和上一节之间空档超过 [LONG_GAP_MINUTES] 分钟时再补一句间隔，
- * 正常课间不写，免得每行都多一句废话。
- */
-@Composable
-private fun lessonTimeSupportingText(
-    row: LessonTimeRow,
-    previous: LessonTimeRow?,
-): String {
-    val previousEnd = previous?.spanMinutes?.last
-    val start = row.spanMinutes?.first
-    val gap = if (previousEnd != null && start != null) {
-        LessonTimeRules.gapMinutes(previousEnd, start)
-    } else {
-        null
-    }
-    return if (gap != null && gap > LONG_GAP_MINUTES) {
-        stringResource(R.string.lesson_time_period_with_gap, row.period, gap)
-    } else {
-        stringResource(R.string.lesson_time_period, row.period)
-    }
-}
 
 @Composable
 private fun lessonTimeErrorText(error: LessonTimeError): String = when (error) {

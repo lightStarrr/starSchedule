@@ -63,6 +63,13 @@ class RoomScheduleRepository(
         templateId: Long,
     ): List<LessonTimeTemplateItemEntity> = dao.getLessonTimeTemplateItemsOnce(templateId)
 
+    override suspend fun replaceLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    ) {
+        dao.replaceLessonTimeTemplate(template, items)
+    }
+
     override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) {
         dao.deleteLessonTimeTemplate(template)
     }

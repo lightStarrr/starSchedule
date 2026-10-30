@@ -368,6 +368,11 @@ private class FakeScheduleRepository : ScheduleRepository {
         items: List<LessonTimeTemplateItemEntity>,
     ) = Unit
 
+    override suspend fun replaceLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    ) = Unit
+
     fun clearLessonTimes() {
         lessonTimes.value = emptyList()
     }

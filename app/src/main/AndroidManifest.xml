@@ -77,6 +77,10 @@
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
+            android:name=".LessonTimeTemplateEditActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
             android:name=".CourseSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
