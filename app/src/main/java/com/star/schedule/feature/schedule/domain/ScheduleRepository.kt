@@ -51,6 +51,17 @@ interface ScheduleRepository {
 
     suspend fun getLessonTimeTemplateItemsOnce(templateId: Long): List<LessonTimeTemplateItemEntity>
 
+    /**
+     * 用一组节次直接建模板（「另存为新模板」走这里）。
+     *
+     * 和 [saveLessonTimeTemplateFromTimetable] 的区别：那份是从课表读，这份由调用方给内容。
+     */
+    suspend fun saveLessonTimeTemplateFromItems(
+        templateName: String,
+        lessonTimes: List<LessonTimeTemplateItemEntity>,
+        overwrite: Boolean = false,
+    ): Long
+
     /** 编辑模板：名称和节次整份替换，节次会按开始时间重新编号 1..n。 */
     suspend fun replaceLessonTimeTemplate(
         template: LessonTimeTemplateEntity,

@@ -2,6 +2,7 @@ package com.star.schedule.feature.timetable.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -88,8 +89,42 @@ fun RenameTemplateDialog(
     )
 }
 
-/** 有未保存改动时返回：说清楚「返回就会丢」，两个按钮都写明后果。 */
+/**
+ * 保存：覆盖当前模板，还是按当前名称另存为新模板。
+ *
+ * 三个动作都平铺出来，不用两步确认——「新建」在重名时会自动补 ` (1)`，
+ * 所以选哪个都不会丢数据，留一个「返回」给误触。
+ */
 @Composable
+fun SaveTemplateChoiceDialog(
+    templateName: String,
+    canOverwrite: Boolean,
+    isSaving: Boolean,
+    onOverwrite: () -> Unit,
+    onSaveAsNew: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.title_save_template_choice)) },
+        text = { Text(stringResource(R.string.text_save_template_choice, templateName)) },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onDismiss, enabled = !isSaving) {
+                    Text(stringResource(R.string.action_back))
+                }
+                TextButton(onClick = onSaveAsNew, enabled = !isSaving) {
+                    Text(stringResource(R.string.action_save_as_new))
+                }
+                TextButton(onClick = onOverwrite, enabled = canOverwrite && !isSaving) {
+                    Text(stringResource(R.string.action_overwrite))
+                }
+            }
+        },
+    )
+}
+
+/** 有未保存改动时返回：说清楚「返回就会丢」，两个按钮都写明后果。 */@Composable
 fun DiscardTemplateChangesDialog(
     onDiscard: () -> Unit,
     onKeepEditing: () -> Unit,

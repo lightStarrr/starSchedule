@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.color.successColors
 import com.star.schedule.core.designsystem.component.CircleIconButton
 import com.star.schedule.core.designsystem.component.CountdownSnackbar
 import com.star.schedule.core.designsystem.component.ElasticSwipeRow
@@ -57,6 +58,7 @@ import com.star.schedule.feature.settings.presentation.SettingsListItem
 import com.star.schedule.feature.timetable.presentation.components.DiscardTemplateChangesDialog
 import com.star.schedule.feature.timetable.presentation.components.LessonTimeEditorSheet
 import com.star.schedule.feature.timetable.presentation.components.RenameTemplateDialog
+import com.star.schedule.feature.timetable.presentation.components.SaveTemplateChoiceDialog
 import com.star.schedule.feature.timetable.presentation.components.lessonTimeSupportingText
 import kotlin.math.abs
 
@@ -79,7 +81,10 @@ fun LessonTimeTemplateEditRoute(
     LessonTimeTemplateEditScreen(
         state = state,
         onBack = viewModel::requestBack,
-        onSave = viewModel::save,
+        onSave = viewModel::requestSave,
+        onOverwrite = viewModel::save,
+        onSaveAsNew = viewModel::saveAsNew,
+        onDismissSaveChoice = viewModel::dismissSaveChoice,
         onAdd = viewModel::startAdd,
         onEditRow = viewModel::startEdit,
         onDeleteRow = viewModel::delete,
@@ -111,6 +116,9 @@ private fun LessonTimeTemplateEditScreen(
     state: LessonTimeTemplateEditUiState,
     onBack: () -> Unit,
     onSave: () -> Unit,
+    onOverwrite: () -> Unit,
+    onSaveAsNew: () -> Unit,
+    onDismissSaveChoice: () -> Unit,
     onAdd: () -> Unit,
     onEditRow: (LessonTimeRow) -> Unit,
     onDeleteRow: (LessonTimeRow) -> Unit,
@@ -132,6 +140,7 @@ private fun LessonTimeTemplateEditScreen(
     val navigationBarInset = navigationBarBottomInset()
     val snackbarHostState = remember { SnackbarHostState() }
     val swipeState = rememberElasticSwipeState()
+    val success = successColors()
     val undoLabel = stringResource(R.string.action_undo)
     val undo = state.undo
     val undoMessage = undo?.let { stringResource(R.string.lesson_time_deleted, it.period) }
@@ -186,17 +195,18 @@ private fun LessonTimeTemplateEditScreen(
                 onBack = onBack,
                 scrollBehavior = scrollBehavior,
                 actions = {
-                    // 没改动时勾是灰的：模板保存是整份替换，重复保存没有意义。
-                    CircleIconButton(
-                        icon = Icons.Rounded.Check,
-                        contentDescription = stringResource(R.string.action_save),
-                        onClick = onSave,
-                        enabled = state.isDirty && !state.isSaving,
-                    )
                     CircleIconButton(
                         icon = Icons.Rounded.Add,
                         contentDescription = stringResource(R.string.title_add_template_period),
                         onClick = onAdd,
+                    )
+                    // 保存用 success 绿，和「已完成」的语义一致；点开还要选覆盖还是新建。
+                    CircleIconButton(
+                        icon = Icons.Rounded.Check,
+                        contentDescription = stringResource(R.string.action_save),
+                        onClick = onSave,
+                        containerColor = success.container,
+                        contentColor = success.content,
                     )
                 },
             )
@@ -342,6 +352,17 @@ private fun LessonTimeTemplateEditScreen(
             onNameChange = onRenameChange,
             onConfirm = onConfirmRename,
             onDismiss = onDismissRename,
+        )
+    }
+
+    if (state.saveChoice) {
+        SaveTemplateChoiceDialog(
+            templateName = state.name,
+            canOverwrite = state.isDirty,
+            isSaving = state.isSaving,
+            onOverwrite = onOverwrite,
+            onSaveAsNew = onSaveAsNew,
+            onDismiss = onDismissSaveChoice,
         )
     }
 

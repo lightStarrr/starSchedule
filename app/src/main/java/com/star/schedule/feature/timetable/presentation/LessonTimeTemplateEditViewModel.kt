@@ -43,6 +43,8 @@ data class LessonTimeTemplateEditUiState(
     val isDirty: Boolean = false,
     /** 返回时弹「放弃修改？」 */
     val discardConfirm: Boolean = false,
+    /** 点保存后弹的三选一：覆盖 / 新建 / 返回。 */
+    val saveChoice: Boolean = false,
     /** 页面可以关了（保存成功或确认放弃）。 */
     val finish: Boolean = false,
     val message: LessonTimeTemplateEditMessage? = null,
@@ -292,12 +294,23 @@ class LessonTimeTemplateEditViewModel(
         mutableState.update { it.copy(discardConfirm = false, finish = true) }
     }
 
+    /** 顶栏的勾：先问一句这一步是覆盖还是另存为新模板。 */
+    fun requestSave() {
+        mutableState.update { it.copy(saveChoice = true) }
+    }
+
+    fun dismissSaveChoice() {
+        if (mutableState.value.isSaving) return
+        mutableState.update { it.copy(saveChoice = false) }
+    }
+
+    /** 覆盖当前模板。没有改动时没什么可覆盖的，直接忽略。 */
     fun save() {
         val state = mutableState.value
         val template = template ?: return
         if (state.isSaving || !state.isDirty || state.isLoading) return
         viewModelScope.launch {
-            mutableState.update { it.copy(isSaving = true) }
+            mutableState.update { it.copy(isSaving = true, saveChoice = false) }
             try {
                 repository.replaceLessonTimeTemplate(
                     template = template.copy(
@@ -307,6 +320,50 @@ class LessonTimeTemplateEditViewModel(
                     items = state.rows.mapIndexed { index, row ->
                         LessonTimeTemplateItemEntity(
                             templateId = template.id,
+                            period = index + 1,
+                            startTime = row.startTime,
+                            endTime = row.endTime,
+                        )
+                    },
+                )
+                mutableState.update { it.copy(isSaving = false, finish = true) }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                nextMessageToken += 1
+                mutableState.update { current ->
+                    current.copy(
+                        isSaving = false,
+                        message = LessonTimeTemplateEditMessage(
+                            token = nextMessageToken,
+                            type = LessonTimeTemplateEditMessageType.SaveFailed,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * 另存为新模板。
+     *
+     * 名字沿用草稿里的名称；已经被别的模板占用时自动加 ` (1)`、` (2)`……
+     * 用户不用为了「先存一份再改」去手动想名字。
+     */
+    fun saveAsNew() {
+        val state = mutableState.value
+        if (state.isSaving || state.isLoading) return
+        viewModelScope.launch {
+            mutableState.update { it.copy(isSaving = true, saveChoice = false) }
+            try {
+                val name = resolveNewTemplateName(state.name) { candidate ->
+                    repository.getLessonTimeTemplateIdByName(candidate) != null
+                }
+                repository.saveLessonTimeTemplateFromItems(
+                    templateName = name,
+                    lessonTimes = state.rows.mapIndexed { index, row ->
+                        LessonTimeTemplateItemEntity(
+                            templateId = 0,
                             period = index + 1,
                             startTime = row.startTime,
                             endTime = row.endTime,
@@ -354,6 +411,29 @@ class LessonTimeTemplateEditViewModel(
     companion object {
         private const val DEFAULT_START_MINUTES = 8 * 60
         private const val DEFAULT_DURATION_MINUTES = 45
+    }
+}
+
+/**
+ * 给「另存为新模板」挑一个不冲突的名字：没被占用就用原名，占用了就依次试 ` (1)`、` (2)`……
+ *
+ * [base] 必须非空——模板名由重命名对话框把关，不允许空名，这里不再兜底造一个。
+ * 名称上限和「保存为模板」那条路径一致：加后缀前先截断原名，别让最终名字超长。
+ * [exists] 由调用方注入，查库和单测共用同一个实现。
+ */
+internal suspend fun resolveNewTemplateName(
+    base: String,
+    exists: suspend (String) -> Boolean,
+): String {
+    val max = LessonTimeSettingsViewModel.MAX_TEMPLATE_NAME_LENGTH
+    val trimmed = base.trim().take(max)
+    if (!exists(trimmed)) return trimmed
+    var index = 1
+    while (true) {
+        val suffix = " ($index)"
+        val candidate = trimmed.take(max - suffix.length).trimEnd() + suffix
+        if (!exists(candidate)) return candidate
+        index += 1
     }
 }
 

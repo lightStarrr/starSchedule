@@ -231,6 +231,12 @@ private class FakeTemplateRepository : ScheduleRepository {
     override suspend fun getLessonTimeTemplateIdByName(name: String): Long? =
         templates.value.firstOrNull { it.name == name }?.id
 
+    override suspend fun saveLessonTimeTemplateFromItems(
+        templateName: String,
+        lessonTimes: List<LessonTimeTemplateItemEntity>,
+        overwrite: Boolean,
+    ): Long = 0L
+
     override suspend fun saveLessonTimeTemplateFromTimetable(
         timetableId: Long,
         name: String,
