@@ -118,6 +118,31 @@ abstract class ScheduleDao {
         lessonTimes.forEach { insertLessonTime(it) }
     }
 
+    @Query("SELECT * FROM lesson_time WHERE timetableId = :timetableId ORDER BY period ASC")
+    abstract suspend fun getLessonTimesOnce(timetableId: Long): List<LessonTimeEntity>
+
+    /**
+     * 应用模板：先记下当前节次，再整份替换。
+     *
+     * 返回的快照留给「撤销」。课程一概不动——课程用到模板之外的节次时只是没有时间显示，
+     * 由界面提前告知，不在数据层做裁剪或删除。
+     */
+    @Transaction
+    open suspend fun applyLessonTimesToTimetable(
+        timetableId: Long,
+        lessonTimes: List<LessonTimeEntity>,
+    ): LessonTimeApplySnapshot {
+        val before = getLessonTimesOnce(timetableId)
+        replaceLessonTimesForTimetable(timetableId, lessonTimes)
+        return LessonTimeApplySnapshot(timetableId = timetableId, lessonTimesBefore = before)
+    }
+
+    /** 撤销应用：整份换回应用前的节次（行 id 已被释放，按原 id 插回不会冲突）。 */
+    @Transaction
+    open suspend fun restoreLessonTimeApplySnapshot(snapshot: LessonTimeApplySnapshot) {
+        replaceLessonTimesForTimetable(snapshot.timetableId, snapshot.lessonTimesBefore)
+    }
+
     // ------------------ 课程时间模板 ------------------
     @Query("SELECT * FROM lesson_time_template ORDER BY updatedAt DESC")
     abstract fun getLessonTimeTemplatesFlow(): Flow<List<LessonTimeTemplateEntity>>
@@ -267,22 +292,6 @@ abstract class ScheduleDao {
         }
 
         return templateId
-    }
-
-    @Transaction
-    open suspend fun applyLessonTimeTemplateToTimetable(timetableId: Long, templateId: Long) {
-        val items = getLessonTimeTemplateItemsOnce(templateId).sortedBy { it.period }
-        replaceLessonTimesForTimetable(
-            timetableId,
-            items.map { item ->
-                LessonTimeEntity(
-                    timetableId = timetableId,
-                    period = item.period,
-                    startTime = item.startTime,
-                    endTime = item.endTime
-                )
-            }
-        )
     }
 
     // ------------------ 课程 ------------------

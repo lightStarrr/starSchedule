@@ -2,6 +2,7 @@ package com.star.schedule.feature.schedule.domain
 
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
+import com.star.schedule.core.database.LessonTimeApplySnapshot
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.LessonTimeTemplateEntity
 import com.star.schedule.core.database.LessonTimeTemplateItemEntity
@@ -70,6 +71,20 @@ interface ScheduleRepository {
 
     /** 删除模板，它的节次由外键级联删掉。 */
     suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity)
+
+    /**
+     * 把模板应用到指定课表：整份替换该课表的节次。
+     *
+     * 模板没有节次时返回 null 且不写库（绝不能变成「清空课表」）。
+     * 课程不做任何裁剪，用到模板之外的节次时只是没有时间显示。
+     */
+    suspend fun applyLessonTimeTemplateToTimetable(
+        timetableId: Long,
+        templateId: Long,
+    ): LessonTimeApplySnapshot?
+
+    /** 撤销应用：整份还原应用前的节次。 */
+    suspend fun restoreAppliedLessonTimeTemplate(snapshot: LessonTimeApplySnapshot)
 
     /** 撤销删除：按原样把模板和节次插回去。 */
     suspend fun restoreLessonTimeTemplate(

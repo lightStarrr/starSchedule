@@ -143,7 +143,6 @@
     <string name="toast_no_template_to_export">暂无模板可导出</string>
     <string name="action_export_all">导出全部</string>
     <string name="label_no_template">暂无模板</string>
-    <string name="content_desc_apply_template">应用模板</string>
     <string name="content_desc_export_template">导出模板</string>
     <string name="content_desc_delete_template">删除模板</string>
     <string name="action_close">关闭</string>
@@ -165,9 +164,17 @@
     <string name="toast_template_overwritten">已覆盖模板</string>
     <string name="toast_template_overwrite_failed">覆盖失败: %1$s</string>
     <string name="title_apply_template">应用模板？</string>
-    <string name="text_apply_template">应用“%1$s”将覆盖当前课表的课程时间，是否继续？</string>
-    <string name="toast_template_applied">已应用模板</string>
     <string name="toast_template_apply_failed">应用失败: %1$s</string>
+    <string name="text_apply_template_summary">将用 %2$d 个节次覆盖「%1$s」的节次时间。</string>
+    <string name="text_apply_template_missing_notice">有 %1$d 门课程用到了第 %2$d 节之后，应用后这些节次没有时间显示：</string>
+    <string name="text_apply_template_course_periods">· %1$s（第 %2$s 节）</string>
+    <string name="text_apply_template_more">…等 %1$d 门</string>
+    <string name="list_separator">、</string>
+    <string name="lesson_time_template_applied">已应用模板「%1$s」</string>
+    <string name="lesson_time_template_apply_failed">应用失败，请重试</string>
+    <string name="lesson_time_template_apply_undo_failed">撤销失败，请重试</string>
+    <string name="lesson_time_template_apply_empty">这个模板还没有节次</string>
+    <string name="lesson_time_template_apply_no_timetable">还没有可应用的课表</string>
     <string name="action_apply">应用</string>
     <string name="title_delete_template">删除模板？</string>
     <string name="text_delete_template">确定删除模板“%1$s”？</string>

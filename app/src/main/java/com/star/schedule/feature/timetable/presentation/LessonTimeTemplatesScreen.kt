@@ -22,6 +22,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +49,7 @@ import com.star.schedule.feature.schedule.presentation.EmptyTimetableState
 import com.star.schedule.feature.schedule.presentation.TimetableEmptyState
 import com.star.schedule.feature.settings.presentation.SettingsListItem
 import com.star.schedule.feature.timetable.domain.formatTemplateUpdatedAt
+import com.star.schedule.feature.timetable.presentation.components.ApplyTemplateDialog
 import kotlin.math.abs
 
 /** 与 SettingsGroup 的左右留白保持一致。 */
@@ -65,7 +67,10 @@ fun LessonTimeTemplatesRoute(
         onBack = onBack,
         onOpenTemplate = onOpenTemplate,
         onDelete = viewModel::delete,
-        onUndoDelete = viewModel::undoDelete,
+        onRequestApply = viewModel::requestApply,
+        onCancelApply = viewModel::cancelApply,
+        onConfirmApply = viewModel::confirmApply,
+        onUndo = viewModel::undo,
         onDismissUndo = viewModel::dismissUndo,
         onMessageShown = viewModel::onMessageShown,
     )
@@ -74,7 +79,7 @@ fun LessonTimeTemplatesRoute(
 /**
  * 节次时间模板：和节次时间页同一个列表样式，一行一个模板，左滑删除并给一条可撤销的提示。
  *
- * 点一行进编辑页改名字和节次；新建入口在节次时间页的保存按钮上。
+ * 点一行进编辑页改名字和节次，行内「应用」把模板套到当前课表；新建入口在节次时间页的保存按钮上。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -83,7 +88,10 @@ private fun LessonTimeTemplatesScreen(
     onBack: () -> Unit,
     onOpenTemplate: (LessonTimeTemplateRow) -> Unit,
     onDelete: (LessonTimeTemplateRow) -> Unit,
-    onUndoDelete: (Long) -> Unit,
+    onRequestApply: (LessonTimeTemplateRow) -> Unit,
+    onCancelApply: () -> Unit,
+    onConfirmApply: () -> Unit,
+    onUndo: (Long) -> Unit,
     onDismissUndo: (Long) -> Unit,
     onMessageShown: (Long) -> Unit,
 ) {
@@ -93,11 +101,18 @@ private fun LessonTimeTemplatesScreen(
     val swipeState = rememberElasticSwipeState()
     val undoLabel = stringResource(R.string.action_undo)
     val undo = state.undo
-    val undoMessage = undo?.let { stringResource(R.string.lesson_time_template_deleted, it.name) }
+    val undoMessage = when (undo) {
+        null -> null
+        is LessonTimeTemplatesUndo.Deleted ->
+            stringResource(R.string.lesson_time_template_deleted, undo.name)
+
+        is LessonTimeTemplatesUndo.Applied ->
+            stringResource(R.string.lesson_time_template_applied, undo.templateName)
+    }
     val message = state.message
     val messageText = message?.let { stringResource(it.type.textRes) }
 
-    // 与节次时间页同一套撤销语义：删除已经落库，撤销就是把那条原样插回去。
+    // 与节次时间页同一套撤销语义：操作已经落库，撤销就是按快照还原。
     // key 用 token 而不是文案：同名模板被删两次时文案完全一样，用文案做 key 不会重启倒计时。
     LaunchedEffect(undo?.token) {
         if (undo == null || undoMessage == null) return@LaunchedEffect
@@ -107,7 +122,7 @@ private fun LessonTimeTemplatesScreen(
             duration = SnackbarDuration.Indefinite,
         )
         if (result == SnackbarResult.ActionPerformed) {
-            onUndoDelete(undo.token)
+            onUndo(undo.token)
         } else {
             onDismissUndo(undo.token)
         }
@@ -220,6 +235,17 @@ private fun LessonTimeTemplatesScreen(
                                     title = row.name,
                                     supporting = templateSupportingText(row),
                                     onClick = { onOpenTemplate(row) },
+                                    trailing = {
+                                        // 应用是整份覆盖当前课表的节次，空模板或没有课表时不给点。
+                                        TextButton(
+                                            onClick = { onRequestApply(row) },
+                                            enabled = state.canApply &&
+                                                row.periodCount > 0 &&
+                                                !state.isApplying,
+                                        ) {
+                                            Text(stringResource(R.string.action_apply))
+                                        }
+                                    },
                                     shapeIndex = index,
                                     shapeCount = state.rows.size,
                                     shapes = shapes,
@@ -230,6 +256,16 @@ private fun LessonTimeTemplatesScreen(
                 }
             }
         }
+    }
+
+    val applyPreview = state.applyPreview
+    if (applyPreview != null) {
+        ApplyTemplateDialog(
+            preview = applyPreview,
+            isApplying = state.isApplying,
+            onConfirm = onConfirmApply,
+            onDismiss = onCancelApply,
+        )
     }
 }
 
@@ -244,4 +280,11 @@ private fun templateSupportingText(row: LessonTimeTemplateRow): String {
 private val LessonTimeTemplatesMessageType.textRes: Int
     get() = when (this) {
         LessonTimeTemplatesMessageType.RestoreFailed -> R.string.lesson_time_template_restore_failed
+        LessonTimeTemplatesMessageType.ApplyFailed -> R.string.lesson_time_template_apply_failed
+        LessonTimeTemplatesMessageType.ApplyUndoFailed ->
+            R.string.lesson_time_template_apply_undo_failed
+
+        LessonTimeTemplatesMessageType.TemplateEmpty -> R.string.lesson_time_template_apply_empty
+        LessonTimeTemplatesMessageType.NoTimetable ->
+            R.string.lesson_time_template_apply_no_timetable
     }

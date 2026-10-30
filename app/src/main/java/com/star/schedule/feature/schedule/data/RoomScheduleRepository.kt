@@ -3,17 +3,22 @@ package com.star.schedule.feature.schedule.data
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
+import com.star.schedule.core.database.LessonTimeApplySnapshot
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.LessonTimeTemplateEntity
 import com.star.schedule.core.database.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
+import com.star.schedule.feature.timetable.domain.LessonTimeTemplateApply
+import com.star.schedule.platform.notification.ReminderRefresher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class RoomScheduleRepository(
-    private val dao: ScheduleDao
+    private val dao: ScheduleDao,
+    /** 应用模板会改节次，落库后要重排提醒；不传就只写库。 */
+    private val reminderRefresher: ReminderRefresher? = null,
 ) : ScheduleRepository {
     override fun observeCurrentTimetableId(): Flow<Long?> =
         dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
@@ -74,6 +79,34 @@ class RoomScheduleRepository(
         items: List<LessonTimeTemplateItemEntity>,
     ) {
         dao.replaceLessonTimeTemplate(template, items)
+    }
+
+    override suspend fun applyLessonTimeTemplateToTimetable(
+        timetableId: Long,
+        templateId: Long,
+    ): LessonTimeApplySnapshot? {
+        val items = dao.getLessonTimeTemplateItemsOnce(templateId)
+        // 空模板不是「清空课表」，直接拒绝：界面会提示「这个模板还没有节次」。
+        if (items.isEmpty()) return null
+        val periods = LessonTimeTemplateApply.normalize(items)
+        val snapshot = dao.applyLessonTimesToTimetable(
+            timetableId = timetableId,
+            lessonTimes = periods.map { period ->
+                LessonTimeEntity(
+                    timetableId = timetableId,
+                    period = period.period,
+                    startTime = period.startTime,
+                    endTime = period.endTime,
+                )
+            },
+        )
+        reminderRefresher?.refreshIfCurrent(timetableId)
+        return snapshot
+    }
+
+    override suspend fun restoreAppliedLessonTimeTemplate(snapshot: LessonTimeApplySnapshot) {
+        dao.restoreLessonTimeApplySnapshot(snapshot)
+        reminderRefresher?.refreshIfCurrent(snapshot.timetableId)
     }
 
     override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) {
