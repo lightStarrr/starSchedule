@@ -180,6 +180,52 @@ class LessonTimeTemplateEditViewModelTest {
     }
 
     @Test
+    fun `the save button asks which way to save`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.requestSave()
+        assertTrue(viewModel.uiState.value.saveChoice)
+
+        viewModel.dismissSaveChoice()
+        assertFalse(viewModel.uiState.value.saveChoice)
+        assertTrue(repository.replaced.isEmpty())
+        assertTrue(repository.created.isEmpty())
+    }
+
+    @Test
+    fun `saving as new adds a number when the name is already used`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.saveAsNew()
+        advanceUntilIdle()
+
+        // 当前模板自己占着「早八作息」，所以另存出来的是「早八作息 (1)」。
+        val created = repository.created.single()
+        assertEquals("早八作息 (1)", created.first)
+        assertEquals(listOf(1, 2), created.second.map { it.period })
+        assertTrue(viewModel.uiState.value.finish)
+        assertTrue(repository.replaced.isEmpty())
+    }
+
+    @Test
+    fun `saving as new keeps a free name as is`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.startRename()
+        viewModel.updateRenameName("秋季作息")
+        viewModel.confirmRename()
+        advanceUntilIdle()
+
+        viewModel.saveAsNew()
+        advanceUntilIdle()
+
+        assertEquals("秋季作息", repository.created.single().first)
+    }
+
+    @Test
     fun `a deleted template shows as missing`() = runTest(dispatcher) {
         repository.remove(7L)
         val viewModel = createViewModel()
@@ -187,6 +233,25 @@ class LessonTimeTemplateEditViewModelTest {
 
         assertTrue(viewModel.uiState.value.isMissing)
         assertNull(viewModel.uiState.value.rows.firstOrNull())
+    }
+
+    @Test
+    fun `a taken name counts up until a free one`() = runTest(dispatcher) {
+        val taken = setOf("早八作息", "早八作息 (1)", "早八作息 (2)")
+
+        val name = resolveNewTemplateName("早八作息") { it in taken }
+
+        assertEquals("早八作息 (3)", name)
+    }
+
+    @Test
+    fun `a numbered name stays within the length limit`() = runTest(dispatcher) {
+        val base = "字".repeat(LessonTimeSettingsViewModel.MAX_TEMPLATE_NAME_LENGTH)
+
+        val name = resolveNewTemplateName(base) { it == base }
+
+        assertEquals(LessonTimeSettingsViewModel.MAX_TEMPLATE_NAME_LENGTH, name.length)
+        assertTrue(name.endsWith(" (1)"))
     }
 
     private fun createViewModel(): LessonTimeTemplateEditViewModel =
@@ -202,6 +267,9 @@ private class FakeEditRepository : ScheduleRepository {
     var takenName: String? = null
 
     val replaced = mutableListOf<SavedTemplate>()
+
+    /** 「另存为新模板」的调用记录：名称 + 节次。 */
+    val created = mutableListOf<Pair<String, List<LessonTimeTemplateItemEntity>>>()
 
     data class SavedTemplate(
         val template: LessonTimeTemplateEntity,
@@ -227,8 +295,13 @@ private class FakeEditRepository : ScheduleRepository {
         templateId: Long,
     ): List<LessonTimeTemplateItemEntity> = items.filter { it.templateId == templateId }
 
-    override suspend fun getLessonTimeTemplateIdByName(name: String): Long? =
-        if (name == takenName) 99L else null
+    /** 库里的真实占用情况：当前模板自己占着原名，另存过的名字也算占用。 */
+    override suspend fun getLessonTimeTemplateIdByName(name: String): Long? = when {
+        name == takenName -> 99L
+        name == template?.name -> template?.id
+        created.any { it.first == name } -> 100L
+        else -> null
+    }
 
     override suspend fun replaceLessonTimeTemplate(
         template: LessonTimeTemplateEntity,
@@ -251,6 +324,15 @@ private class FakeEditRepository : ScheduleRepository {
         template: LessonTimeTemplateEntity,
         items: List<LessonTimeTemplateItemEntity>,
     ) = Unit
+
+    override suspend fun saveLessonTimeTemplateFromItems(
+        templateName: String,
+        lessonTimes: List<LessonTimeTemplateItemEntity>,
+        overwrite: Boolean,
+    ): Long {
+        created += templateName to lessonTimes
+        return 100L
+    }
 
     override suspend fun saveLessonTimeTemplateFromTimetable(
         timetableId: Long,

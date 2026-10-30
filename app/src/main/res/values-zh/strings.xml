@@ -130,6 +130,9 @@
     <string name="action_discard">放弃</string>
     <string name="action_keep_editing">继续编辑</string>
     <string name="toast_template_edit_save_failed">保存失败，请重试</string>
+    <string name="title_save_template_choice">保存模板</string>
+    <string name="text_save_template_choice">把改动存到「%1$s」，还是按当前名称另存为新模板？重名时会自动加序号。</string>
+    <string name="action_save_as_new">新建</string>
     <string name="lesson_time_template_summary">共 %1$d 节 · %2$s 更新</string>
     <string name="lesson_time_template_deleted">已删除模板「%1$s」</string>
     <string name="lesson_time_template_restore_failed">恢复失败，请重新保存模板</string>
