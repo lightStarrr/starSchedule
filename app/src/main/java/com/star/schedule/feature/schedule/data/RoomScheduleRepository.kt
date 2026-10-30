@@ -4,6 +4,8 @@ import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.LessonTimeTemplateEntity
+import com.star.schedule.core.database.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.ScheduleDao
 import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
@@ -47,6 +49,30 @@ class RoomScheduleRepository(
         name: String,
         overwrite: Boolean,
     ): Long = dao.saveLessonTimeTemplateFromTimetable(timetableId, name, overwrite)
+
+    override fun observeLessonTimeTemplates(): Flow<List<LessonTimeTemplateEntity>> =
+        dao.getLessonTimeTemplatesFlow()
+
+    override fun observeLessonTimeTemplateItems(): Flow<List<LessonTimeTemplateItemEntity>> =
+        dao.getLessonTimeTemplateItemsFlow()
+
+    override suspend fun getLessonTimeTemplateByIdOnce(templateId: Long): LessonTimeTemplateEntity? =
+        dao.getLessonTimeTemplateByIdOnce(templateId)
+
+    override suspend fun getLessonTimeTemplateItemsOnce(
+        templateId: Long,
+    ): List<LessonTimeTemplateItemEntity> = dao.getLessonTimeTemplateItemsOnce(templateId)
+
+    override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) {
+        dao.deleteLessonTimeTemplate(template)
+    }
+
+    override suspend fun restoreLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    ) {
+        dao.restoreLessonTimeTemplate(template, items)
+    }
 
     override fun observeDayNotes(timetableId: Long): Flow<List<DayNoteEntity>> =
         dao.getDayNotesFlow(timetableId)

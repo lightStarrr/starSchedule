@@ -3,6 +3,8 @@ package com.star.schedule.feature.timetable.presentation
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.LessonTimeTemplateEntity
+import com.star.schedule.core.database.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -345,6 +347,26 @@ private class FakeScheduleRepository : ScheduleRepository {
         savedTemplates += name to overwrite
         return TEMPLATE_ID
     }
+
+    override fun observeLessonTimeTemplates(): Flow<List<LessonTimeTemplateEntity>> =
+        flowOf(emptyList())
+
+    override fun observeLessonTimeTemplateItems(): Flow<List<LessonTimeTemplateItemEntity>> =
+        flowOf(emptyList())
+
+    override suspend fun getLessonTimeTemplateByIdOnce(templateId: Long): LessonTimeTemplateEntity? =
+        null
+
+    override suspend fun getLessonTimeTemplateItemsOnce(
+        templateId: Long,
+    ): List<LessonTimeTemplateItemEntity> = emptyList()
+
+    override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) = Unit
+
+    override suspend fun restoreLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    ) = Unit
 
     fun clearLessonTimes() {
         lessonTimes.value = emptyList()

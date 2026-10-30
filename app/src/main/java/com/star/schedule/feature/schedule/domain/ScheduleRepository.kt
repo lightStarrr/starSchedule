@@ -3,6 +3,8 @@ package com.star.schedule.feature.schedule.domain
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.LessonTimeTemplateEntity
+import com.star.schedule.core.database.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.TimetableEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -38,6 +40,25 @@ interface ScheduleRepository {
         name: String,
         overwrite: Boolean = false,
     ): Long
+
+    /** 模板列表，按更新时间倒序。 */
+    fun observeLessonTimeTemplates(): Flow<List<LessonTimeTemplateEntity>>
+
+    /** 所有模板的节次，用来算列表里的「共几节、几点到几点」。 */
+    fun observeLessonTimeTemplateItems(): Flow<List<LessonTimeTemplateItemEntity>>
+
+    suspend fun getLessonTimeTemplateByIdOnce(templateId: Long): LessonTimeTemplateEntity?
+
+    suspend fun getLessonTimeTemplateItemsOnce(templateId: Long): List<LessonTimeTemplateItemEntity>
+
+    /** 删除模板，它的节次由外键级联删掉。 */
+    suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity)
+
+    /** 撤销删除：按原样把模板和节次插回去。 */
+    suspend fun restoreLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    )
 
     fun observeDayNotes(timetableId: Long): Flow<List<DayNoteEntity>>
 
