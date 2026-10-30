@@ -214,18 +214,10 @@ class LessonTimeSettingsViewModel(
         val state = uiState.value
         val timetableId = state.timetableId ?: return
 
-        val start = LessonTimeRules.parseMinutes(current.startTime)
-        val end = LessonTimeRules.parseMinutes(current.endTime)
-        val error = when {
-            start == null || end == null -> LessonTimeError.InvalidTime
-            end <= start -> LessonTimeError.EndNotAfterStart
-            else -> {
-                val others = state.rows
-                    .filter { it.id != current.editingId }
-                    .mapNotNull { it.spanMinutes }
-                if (LessonTimeRules.overlaps(start, end, others)) LessonTimeError.Overlap else null
-            }
-        }
+        val others = state.rows
+            .filter { it.id != current.editingId }
+            .mapNotNull { it.spanMinutes }
+        val error = validateLessonTimeRange(current.startTime, current.endTime, others)
         if (error != null) {
             editor.value = current.copy(error = error)
             return

@@ -205,6 +205,14 @@ private class FakeTemplateRepository : ScheduleRepository {
         this.items.value = this.items.value + items
     }
 
+    override suspend fun replaceLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    ) {
+        templates.value = templates.value.map { if (it.id == template.id) template else it }
+        this.items.value = this.items.value.filterNot { it.templateId == template.id } + items
+    }
+
     override fun observeCurrentTimetableId(): Flow<Long?> = flowOf(null)
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = flowOf(null)

@@ -155,6 +155,24 @@ abstract class ScheduleDao {
     abstract fun getLessonTimeTemplateItemsFlow(): Flow<List<LessonTimeTemplateItemEntity>>
 
     /**
+     * 编辑模板：整份替换名称和节次。
+     *
+     * 节次是全量替换而不是逐条 diff——编辑页本来就是一份草稿，
+     * 逐条比对既容易漏掉「改时间导致顺序变化」，也没必要。
+     */
+    @Transaction
+    open suspend fun replaceLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    ) {
+        updateLessonTimeTemplate(template)
+        deleteLessonTimeTemplateItemsByTemplateId(template.id)
+        if (items.isNotEmpty()) {
+            insertLessonTimeTemplateItems(items)
+        }
+    }
+
+    /**
      * 撤销删除：连模板连同它的节次一起按原 id 插回去。
      *
      * 显式带上主键，Room 会照用这个 id，节次里的 templateId 因此仍然对得上；

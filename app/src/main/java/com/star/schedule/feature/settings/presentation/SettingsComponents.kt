@@ -84,6 +84,7 @@ private fun settingsItemColors(): ListItemColors {
 internal fun SettingsListItem(
     title: String,
     supporting: String,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     leading: (@Composable () -> Unit)? = null,
@@ -98,6 +99,7 @@ internal fun SettingsListItem(
     val resolvedShapes = shapes ?: ListItemDefaults.segmentedShapes(shapeIndex, shapeCount)
     if (onClick == null) {
         SegmentedListItem(
+            modifier = modifier,
             shapes = resolvedShapes,
             enabled = enabled,
             colors = colors,
@@ -110,6 +112,7 @@ internal fun SettingsListItem(
     } else {
         SegmentedListItem(
             onClick = onClick,
+            modifier = modifier,
             shapes = resolvedShapes,
             enabled = enabled,
             colors = colors,

@@ -57,11 +57,13 @@ private val LIST_HORIZONTAL_PADDING = 16.dp
 fun LessonTimeTemplatesRoute(
     viewModel: LessonTimeTemplatesViewModel,
     onBack: () -> Unit,
+    onOpenTemplate: (LessonTimeTemplateRow) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LessonTimeTemplatesScreen(
         state = state,
         onBack = onBack,
+        onOpenTemplate = onOpenTemplate,
         onDelete = viewModel::delete,
         onUndoDelete = viewModel::undoDelete,
         onDismissUndo = viewModel::dismissUndo,
@@ -72,13 +74,14 @@ fun LessonTimeTemplatesRoute(
 /**
  * 节次时间模板：和节次时间页同一个列表样式，一行一个模板，左滑删除并给一条可撤销的提示。
  *
- * 模板是全局资产，所以这里只有「看」和「删」，新建入口在节次时间页的保存按钮上。
+ * 点一行进编辑页改名字和节次；新建入口在节次时间页的保存按钮上。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LessonTimeTemplatesScreen(
     state: LessonTimeTemplatesUiState,
     onBack: () -> Unit,
+    onOpenTemplate: (LessonTimeTemplateRow) -> Unit,
     onDelete: (LessonTimeTemplateRow) -> Unit,
     onUndoDelete: (Long) -> Unit,
     onDismissUndo: (Long) -> Unit,
@@ -216,6 +219,7 @@ private fun LessonTimeTemplatesScreen(
                                 SettingsListItem(
                                     title = row.name,
                                     supporting = templateSupportingText(row),
+                                    onClick = { onOpenTemplate(row) },
                                     shapeIndex = index,
                                     shapeCount = state.rows.size,
                                     shapes = shapes,

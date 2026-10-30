@@ -51,6 +51,12 @@ interface ScheduleRepository {
 
     suspend fun getLessonTimeTemplateItemsOnce(templateId: Long): List<LessonTimeTemplateItemEntity>
 
+    /** 编辑模板：名称和节次整份替换，节次会按开始时间重新编号 1..n。 */
+    suspend fun replaceLessonTimeTemplate(
+        template: LessonTimeTemplateEntity,
+        items: List<LessonTimeTemplateItemEntity>,
+    )
+
     /** 删除模板，它的节次由外键级联删掉。 */
     suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity)
 
