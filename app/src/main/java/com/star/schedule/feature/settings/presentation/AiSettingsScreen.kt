@@ -2,29 +2,21 @@ package com.star.schedule.feature.settings.presentation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.UnfoldMore
-import androidx.compose.material3.DropdownMenuPopup
-import androidx.compose.material3.DropdownMenuGroup
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SelectableDropdownMenuItem
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.common.Constants
+import com.star.schedule.core.designsystem.component.AppMenu
+import com.star.schedule.core.designsystem.component.MenuEntry
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.navigationBarBottomInset
@@ -118,7 +112,7 @@ private fun AiSettingsScreen(
                             shapeCount = 1,
                             leading = { Icon(Icons.Rounded.Cloud, contentDescription = null) },
                             trailing = {
-                                // 菜单以这个图标为锚点展开，所以触发按钮与 DropdownMenu 必须同一层
+                                // 菜单以这个图标为锚点展开，所以触发按钮与菜单必须同一层
                                 Box {
                                     IconButton(onClick = { menuExpanded = true }) {
                                         Icon(
@@ -147,9 +141,9 @@ private fun AiSettingsScreen(
 }
 
 /**
- * M3E 菜单：内容分成两组容器，组间靠间距分隔；菜单项不放图标，文字对齐更干净。
+ * 服务商菜单：两组，第一组是可选中的服务商，第二组是「新建服务商」动作。
+ * 样式细节（内边距、间距、同心圆角、按压形变）都由 [AppMenu] 统一处理。
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ProviderMenu(
     expanded: Boolean,
@@ -159,42 +153,47 @@ private fun ProviderMenu(
     onSelectProvider: (String) -> Unit,
     onNewProvider: () -> Unit,
 ) {
-    val providerCount = if (cloudEnabled) 2 else 1
+    val noneLabel = stringResource(R.string.ai_provider_none)
+    val cloudLabel = stringResource(R.string.ai_provider_cloud)
+    val newLabel = stringResource(R.string.ai_provider_new)
 
-    // 官方分组菜单用的是 DropdownMenuPopup：它没有自己的容器，视觉完全由下面的分组承担
-    DropdownMenuPopup(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuGroup(shapes = MenuDefaults.groupShape(index = 0, count = 2)) {
-            SelectableDropdownMenuItem(
+    val providerEntries = buildList {
+        add(
+            MenuEntry(
+                label = noneLabel,
                 selected = selectedProviderId == null,
                 onClick = {
                     onDismiss()
                     onSelectProvider("")
                 },
-                text = { Text(stringResource(R.string.ai_provider_none)) },
-                shapes = MenuDefaults.itemShape(index = 0, count = providerCount),
-            )
-            if (cloudEnabled) {
-                SelectableDropdownMenuItem(
+            ),
+        )
+        if (cloudEnabled) {
+            add(
+                MenuEntry(
+                    label = cloudLabel,
                     selected = selectedProviderId == Constants.AI_PROVIDER_CLOUD,
                     onClick = {
                         onDismiss()
                         onSelectProvider(Constants.AI_PROVIDER_CLOUD)
                     },
-                    text = { Text(stringResource(R.string.ai_provider_cloud)) },
-                    shapes = MenuDefaults.itemShape(index = 1, count = providerCount),
-                )
-            }
-        }
-        Spacer(Modifier.height(MenuDefaults.GroupSpacing))
-        DropdownMenuGroup(shapes = MenuDefaults.groupShape(index = 1, count = 2)) {
-            DropdownMenuItem(
-                onClick = {
-                    onDismiss()
-                    onNewProvider()
-                },
-                text = { Text(stringResource(R.string.ai_provider_new)) },
-                shape = MenuDefaults.itemShape(index = 0, count = 1).shape,
+                ),
             )
         }
     }
+    val actionEntries = listOf(
+        MenuEntry(
+            label = newLabel,
+            onClick = {
+                onDismiss()
+                onNewProvider()
+            },
+        ),
+    )
+
+    AppMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        groups = listOf(providerEntries, actionEntries),
+    )
 }
