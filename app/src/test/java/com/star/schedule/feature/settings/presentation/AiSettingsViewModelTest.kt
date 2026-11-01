@@ -4,6 +4,9 @@ import com.star.schedule.core.common.Constants
 import com.star.schedule.feature.settings.domain.AiModel
 import com.star.schedule.feature.settings.domain.AiModelCatalog
 import com.star.schedule.feature.settings.domain.AiModelRepository
+import com.star.schedule.feature.settings.domain.AiReasoning
+import com.star.schedule.feature.settings.domain.AiReasoningEffort
+import com.star.schedule.feature.settings.domain.AiReasoningMode
 import com.star.schedule.feature.settings.domain.AiUsage
 import com.star.schedule.feature.settings.domain.AiUsageRepository
 import com.star.schedule.feature.settings.domain.SettingsRepository
@@ -58,7 +61,7 @@ class AiSettingsViewModelTest {
 
         assertEquals(1, modelRepository.fetchCount)
         assertTrue(state.value.models is AiModelUiState.Ready)
-        assertEquals(2, (state.value.models as AiModelUiState.Ready).catalog.models.size)
+        assertEquals(3, (state.value.models as AiModelUiState.Ready).catalog.models.size)
     }
 
     @Test
@@ -169,6 +172,131 @@ class AiSettingsViewModelTest {
         assertEquals(2, modelRepository.fetchCount)
     }
 
+    @Test
+    fun `follows server default model when nothing is selected`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+
+        assertEquals("deepseek-chat", state.value.effectiveModel?.alias)
+        assertEquals(AiReasoningAvailability.Adjustable, state.value.reasoningAvailability)
+    }
+
+    @Test
+    fun `reasoning availability follows the selected model capability`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        settings.set(Constants.PREF_AI_MODEL_ALIAS, "deepseek-reasoner")
+
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+        assertEquals(AiReasoningAvailability.Fixed, state.value.reasoningAvailability)
+
+        viewModel.selectModel("deepseek-lite")
+        advanceUntilIdle()
+        assertEquals(AiReasoningAvailability.Unsupported, state.value.reasoningAvailability)
+    }
+
+    @Test
+    fun `unknown mode and failed fetch both read as unknown`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        modelRepository.result = Result.success(
+            AiModelCatalog(
+                models = listOf(
+                    AiModel(
+                        alias = "mystery",
+                        displayName = "Mystery",
+                        reasoning = AiReasoning(mode = AiReasoningMode.Unknown),
+                    ),
+                ),
+                defaultAlias = "mystery",
+            ),
+        )
+
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+        assertEquals(AiReasoningAvailability.Unknown, state.value.reasoningAvailability)
+
+        modelRepository.result = Result.failure(IllegalStateException("offline"))
+        viewModel.refreshModels()
+        advanceUntilIdle()
+        assertEquals(AiReasoningAvailability.Unknown, state.value.reasoningAvailability)
+    }
+
+    @Test
+    fun `selecting effort stores the wire value and empty follows model default`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+
+        val viewModel = createViewModel()
+        collectState(viewModel)
+        advanceUntilIdle()
+
+        viewModel.selectReasoningEffort(AiReasoningEffort.Low)
+        advanceUntilIdle()
+        assertEquals("low", settings.value(Constants.PREF_AI_REASONING_EFFORT))
+
+        viewModel.selectReasoningEffort(null)
+        advanceUntilIdle()
+        assertEquals("", settings.value(Constants.PREF_AI_REASONING_EFFORT))
+    }
+
+    @Test
+    fun `switching model keeps the stored effort untouched`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+
+        val viewModel = createViewModel()
+        collectState(viewModel)
+        advanceUntilIdle()
+
+        viewModel.selectReasoningEffort(AiReasoningEffort.Low)
+        advanceUntilIdle()
+        val writesAfterSelect = settings.writes(Constants.PREF_AI_REASONING_EFFORT)
+
+        viewModel.selectModel("deepseek-lite")
+        advanceUntilIdle()
+
+        assertEquals("low", settings.value(Constants.PREF_AI_REASONING_EFFORT))
+        assertEquals(writesAfterSelect, settings.writes(Constants.PREF_AI_REASONING_EFFORT))
+    }
+
+    @Test
+    fun `stored effort outside current model levels is ignored but preserved`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        // 当前模型只给 low/medium，偏好却是 high
+        settings.set(Constants.PREF_AI_REASONING_EFFORT, "high")
+
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+
+        assertNull(state.value.effectiveReasoningEffort)
+        assertEquals("high", settings.value(Constants.PREF_AI_REASONING_EFFORT))
+        assertEquals(0, settings.writes(Constants.PREF_AI_REASONING_EFFORT))
+    }
+
+    @Test
+    fun `invalid stored effort degrades to follow model default`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        settings.set(Constants.PREF_AI_REASONING_EFFORT, "ultra")
+
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+
+        assertNull(state.value.selectedReasoningEffort)
+        assertEquals(0, settings.writes(Constants.PREF_AI_REASONING_EFFORT))
+    }
+
     private fun TestScope.createViewModel() = AiSettingsViewModel(
         repository = settings,
         usageRepository = usageRepository,
@@ -187,9 +315,27 @@ class AiSettingsViewModelTest {
 
 private fun sampleCatalog() = AiModelCatalog(
     models = listOf(
-        AiModel(alias = "deepseek-chat", displayName = "DeepSeek Chat"),
-        AiModel(alias = "deepseek-reasoner", displayName = "DeepSeek Reasoner"),
+        AiModel(
+            alias = "deepseek-chat",
+            displayName = "DeepSeek Chat",
+            reasoning = AiReasoning(
+                mode = AiReasoningMode.Effort,
+                efforts = listOf(AiReasoningEffort.Low, AiReasoningEffort.Medium),
+                defaultEffort = AiReasoningEffort.Medium,
+            ),
+        ),
+        AiModel(
+            alias = "deepseek-reasoner",
+            displayName = "DeepSeek Reasoner",
+            reasoning = AiReasoning(mode = AiReasoningMode.Fixed),
+        ),
+        AiModel(
+            alias = "deepseek-lite",
+            displayName = "DeepSeek Lite",
+            reasoning = AiReasoning(mode = AiReasoningMode.None),
+        ),
     ),
+    defaultAlias = "deepseek-chat",
 )
 
 private class FakeModelRepository : AiModelRepository {

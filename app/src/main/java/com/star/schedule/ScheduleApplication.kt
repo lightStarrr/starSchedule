@@ -77,21 +77,27 @@ class ScheduleApplication : Application() {
                 dao.getPreferenceFlow(Constants.PREF_PRIVACY_DATA_ENABLED),
                 dao.getPreferenceFlow(Constants.PREF_AI_PROVIDER_ID),
                 dao.getPreferenceFlow(Constants.PREF_AI_MODEL_ALIAS),
-            ) { dataCollection, providerId, modelAlias -> Triple(dataCollection, providerId, modelAlias) }
-                .collect { (dataCollection, providerId, modelAlias) ->
-                    val enabled = Constants.isDataCollectionEnabled(dataCollection)
+                dao.getPreferenceFlow(Constants.PREF_AI_REASONING_EFFORT),
+            ) { dataCollection, providerId, modelAlias, effort ->
+                AiPreferences(dataCollection, providerId, modelAlias, effort)
+            }
+                .collect { prefs ->
+                    val enabled = Constants.isDataCollectionEnabled(prefs.dataCollection)
                     Telemetry.setDataCollectionEnabled(enabled)
 
                     if (enabled) return@collect
 
                     // 关掉匿名统计时把云端相关偏好真正落成空值，而不是只在 UI 上显示成「无」：
-                    // 偏好里留着 cloud / alias 的话，以后任何直接读偏好的入口（比如构造 chat 请求）
-                    // 都会绕过隐私开关。
-                    if (providerId == Constants.AI_PROVIDER_CLOUD) {
+                    // 偏好里留着 cloud / alias / 档位的话，以后任何直接读偏好的入口（比如构造 chat 请求）
+                    // 都会绕过隐私开关，也会让重开开关后显示用户没设过的档位。
+                    if (prefs.providerId == Constants.AI_PROVIDER_CLOUD) {
                         dao.setPreference(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_NONE)
                     }
-                    if (!modelAlias.isNullOrEmpty()) {
+                    if (!prefs.modelAlias.isNullOrEmpty()) {
                         dao.setPreference(Constants.PREF_AI_MODEL_ALIAS, "")
+                    }
+                    if (!prefs.reasoningEffort.isNullOrEmpty()) {
+                        dao.setPreference(Constants.PREF_AI_REASONING_EFFORT, "")
                     }
                 }
         }
@@ -116,3 +122,11 @@ class ScheduleApplication : Application() {
         })
     }
 }
+
+/** 隐私联动要用到的四个偏好，打包成一个值避免 combine 出 Pair 套 Pair。 */
+private data class AiPreferences(
+    val dataCollection: String?,
+    val providerId: String?,
+    val modelAlias: String?,
+    val reasoningEffort: String?,
+)

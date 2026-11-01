@@ -14,6 +14,9 @@ import com.star.schedule.core.telemetry.DeviceCredentialStore
 import com.star.schedule.core.telemetry.KeystoreAesGcmCipher
 import com.star.schedule.core.telemetry.SharedPreferencesStore
 import com.star.schedule.feature.settings.domain.AiModel
+import com.star.schedule.feature.settings.domain.AiReasoning
+import com.star.schedule.feature.settings.domain.AiReasoningEffort
+import com.star.schedule.feature.settings.domain.AiReasoningMode
 import com.star.schedule.feature.settings.domain.AiModelCatalog
 import com.star.schedule.feature.settings.domain.AiModelRepository
 import kotlinx.serialization.SerialName
@@ -85,17 +88,40 @@ private fun AiModelListDto.toDomain() = AiModelCatalog(
         // alias 是落库与请求用的键，缺了这条就没法选；展示名缺失时退回 alias
         val alias = dto.alias?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val displayName = dto.displayName?.takeIf { it.isNotBlank() } ?: alias
-        AiModel(alias = alias, displayName = displayName)
+        AiModel(alias = alias, displayName = displayName, reasoning = dto.reasoning.toDomain())
     },
+    defaultAlias = defaultAlias,
 )
+
+/**
+ * `reasoning` 的解析一律走 domain 的 `fromWire`：
+ * 认不出的 mode 当 Unknown（猜成 Effort 会放开一个必然 400 的开关），认不出的档位直接丢掉。
+ */
+private fun AiReasoningDto?.toDomain(): AiReasoning {
+    if (this == null) return AiReasoning()
+    return AiReasoning(
+        mode = AiReasoningMode.fromWire(mode),
+        efforts = efforts.mapNotNull(AiReasoningEffort::fromWire).distinct(),
+        defaultEffort = AiReasoningEffort.fromWire(defaultEffort),
+    )
+}
 
 @Serializable
 private data class AiModelListDto(
     val items: List<AiModelDto> = emptyList(),
+    @SerialName("default") val defaultAlias: String = "",
 )
 
 @Serializable
 private data class AiModelDto(
     @SerialName("alias") val alias: String? = null,
     @SerialName("display_name") val displayName: String? = null,
+    @SerialName("reasoning") val reasoning: AiReasoningDto? = null,
+)
+
+@Serializable
+private data class AiReasoningDto(
+    @SerialName("mode") val mode: String? = null,
+    @SerialName("efforts") val efforts: List<String> = emptyList(),
+    @SerialName("default") val defaultEffort: String? = null,
 )
