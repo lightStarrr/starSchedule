@@ -310,7 +310,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
             tintBitmap(src, textColorInt)
         }
         val defaultIconBitmap =
-            ContextCompat.getDrawable(context, R.drawable.ic_notification)?.mutate()
+            ContextCompat.getDrawable(context, R.drawable.ic_logo)?.mutate()
                 ?.let { drawable ->
                     drawable.setTint(textColorInt)
                     drawable.toBitmap()
@@ -367,7 +367,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
 
         customSmallIconBitmap?.let { smallIcon ->
             notificationBuilder.setSmallIcon(Icon.createWithBitmap(smallIcon))
-        } ?: notificationBuilder.setSmallIcon(R.drawable.ic_notification)
+        } ?: notificationBuilder.setSmallIcon(R.drawable.ic_logo)
 
         val notification = notificationBuilder.build()
 
@@ -422,7 +422,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
             if (customSmallIconBitmap != null) {
                 setSmallIcon(IconCompat.createWithBitmap(customSmallIconBitmap))
             } else {
-                setSmallIcon(R.drawable.ic_notification)
+                setSmallIcon(R.drawable.ic_logo)
             }
             setContentTitle(
                 context.getString(

@@ -6,13 +6,16 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -26,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,6 +46,7 @@ import androidx.core.net.toUri
 import com.star.schedule.BuildConfig
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
+import com.star.schedule.core.designsystem.color.brandColors
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.component.rememberHorizontalSegmentedShape
 import com.star.schedule.core.designsystem.navigationBarBottomInset
@@ -100,11 +105,36 @@ private fun AboutScreen(
                 ),
             ) {
                 item {
-                    SettingsSectionTitle(
-                        resId = R.string.about_section_info,
-                        topPadding = 0.dp,
-                    )
+                    // 品牌卡片：底色与图形分别取图标那两个 tone，跟着深浅色切换
+                    val brand = brandColors()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(BRAND_CARD_HEIGHT)
+                            // 和列表卡片同一套「组首」形状，四角都是大圆角
+                            .clip(ListItemDefaults.segmentedShapes(0, 1).shape)
+                            .background(brand.container),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_logo),
+                                contentDescription = stringResource(R.string.app_name),
+                                tint = brand.content,
+                                modifier = Modifier.size(BRAND_LOGO_SIZE),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = brand.content,
+                            )
+                        }
+                    }
                 }
+
+                item { SettingsSectionTitle(R.string.about_section_info) }
                 item {
                     SettingsGroup {
                         SettingsListItem(
@@ -206,5 +236,8 @@ private fun SponsorQr(
         )
     }
 }
+
+private val BRAND_CARD_HEIGHT = 160.dp
+private val BRAND_LOGO_SIZE = 88.dp
 
 private val SPONSOR_QR_HEIGHT = 220.dp

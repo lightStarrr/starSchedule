@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 通知图标：复用应用图标前台的图形，但按 24dp 通知图标重新适配尺寸。
-     前台按自适应图标规范画在 108dp 画布上，图形只占中间约 32%；直接当作
-     通知 smallIcon 使用会缩到约 8dp。这里以画布中心放大 2.3 倍，使图形
-     占画布约 76%，与普通通知图标观感一致。 -->
+<!-- 应用 logo：图标前景图形去掉自适应图标的安全区留白，按画布放大 2.3 倍铺满。
+     通知 smallIcon 与关于页的品牌卡片共用这一份，改图形只改这里。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"

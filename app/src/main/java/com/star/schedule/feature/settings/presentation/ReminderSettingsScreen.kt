@@ -266,7 +266,7 @@ private fun ReminderSettingsScreen(
                                                 )
                                             } else {
                                                 Icon(
-                                                    painter = painterResource(R.drawable.ic_notification),
+                                                    painter = painterResource(R.drawable.ic_logo),
                                                     contentDescription = null,
                                                     tint = MaterialTheme.colorScheme.primary,
                                                 )
