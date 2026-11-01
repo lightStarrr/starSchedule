@@ -264,6 +264,13 @@
     <string name="ai_usage_loading">Loading…</string>
     <string name="ai_usage_unavailable">Usage unavailable</string>
     <string name="ai_usage_footer">%1$s tokens per day · %2$d requests</string>
+    <string name="ai_model_row_title">Current model</string>
+    <string name="ai_section_model">Model</string>
+    <string name="ai_model_follow_default">Server default</string>
+    <string name="ai_model_menu">Choose model</string>
+    <string name="ai_model_loading">Loading…</string>
+    <string name="ai_model_unavailable">Model list unavailable</string>
+    <string name="ai_model_empty">No models available</string>
     <string name="ai_usage_loading_hint">Fetching today\'s usage</string>
     <string name="ai_usage_unavailable_hint">Try again later or check your network</string>
     <string name="about_app_title">About the app</string>

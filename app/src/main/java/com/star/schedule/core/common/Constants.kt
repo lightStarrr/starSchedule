@@ -27,6 +27,15 @@ object Constants {
 
     /** 没有选中任何服务商（菜单里的「无」），AI 功能视为关闭。 */
     const val AI_PROVIDER_NONE = ""
+
+    /**
+     * 选中的云端模型 alias。
+     *
+     * 存 alias 而不是模型 UUID：后台约定 alias 全局唯一，而 UUID 是模型行主键，
+     * 模型删掉重加会变、alias 不变；请求时服务端也能按 alias 解析。
+     * 空串表示「跟随服务端默认」，即请求里不带 model。
+     */
+    const val PREF_AI_MODEL_ALIAS = "ai_model_alias"
     const val PREF_TIMETABLE_WALLPAPER_PREFIX = "timetable_wallpaper_"
 
     /** 缺省视为开启：老用户升级后继续上报，只有明确关掉才停。 */
