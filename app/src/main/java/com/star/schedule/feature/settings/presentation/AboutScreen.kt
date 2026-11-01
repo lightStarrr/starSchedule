@@ -1,11 +1,17 @@
 package com.star.schedule.feature.settings.presentation
 
 import android.content.Intent
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,14 +23,19 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -32,6 +43,7 @@ import com.star.schedule.BuildConfig
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.component.rememberHorizontalSegmentedShape
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 
 @Composable
@@ -112,6 +124,32 @@ private fun AboutScreen(
                     }
                 }
 
+                item { SettingsSectionTitle(R.string.about_section_sponsor) }
+                item {
+                    // 左右两块各占一半，外侧大圆角、相邻处小圆角，跟列表卡片同一套形状
+                    val leftShape = rememberHorizontalSegmentedShape(index = 0, count = 2)
+                    val rightShape = rememberHorizontalSegmentedShape(index = 1, count = 2)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+                    ) {
+                        SponsorQr(
+                            resId = R.drawable.sponsor_wechat,
+                            contentDescription = stringResource(R.string.about_sponsor_wechat),
+                            shape = leftShape,
+                            modifier = Modifier.weight(1f),
+                        )
+                        SponsorQr(
+                            resId = R.drawable.sponsor_alipay,
+                            contentDescription = stringResource(R.string.about_sponsor_alipay),
+                            shape = rightShape,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
                 item { SettingsSectionTitle(R.string.about_section_contact) }
                 item {
                     SettingsGroup {
@@ -137,3 +175,36 @@ private fun AboutScreen(
         }
     }
 }
+
+/**
+ * 收款码等比缩放到固定高度并在自己那一半里居中。
+ *
+ * 两张图原始比例不同（0.735 / 0.667），用 [ContentScale.Fit] 而不是拉伸，
+ * 否则二维码会变形扫不出来。
+ */
+@Composable
+private fun SponsorQr(
+    @DrawableRes resId: Int,
+    contentDescription: String,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceBright)
+            .padding(vertical = 20.dp, horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(resId),
+            contentDescription = contentDescription,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(SPONSOR_QR_HEIGHT),
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+private val SPONSOR_QR_HEIGHT = 220.dp

@@ -257,6 +257,9 @@
     <string name="about_build_title">Build</string>
     <string name="about_section_info">Application info</string>
     <string name="about_section_contact">Contact</string>
+    <string name="about_section_sponsor">Sponsor</string>
+    <string name="about_sponsor_wechat">WeChat donation QR code</string>
+    <string name="about_sponsor_alipay">Alipay donation QR code</string>
     <string name="version_label">Version %1$s</string>
     <string name="qq_group_title">QQ group</string>
     <string name="github_title">GitHub</string>
