@@ -27,6 +27,10 @@ object Telemetry {
 
     private var recorder: LaunchRecorder? = null
 
+    /** 默认开启；用户在设置页关掉后立即停止记录与上报。 */
+    @Volatile
+    private var dataCollectionEnabled = true
+
     fun install(
         application: Application,
         scope: CoroutineScope,
@@ -102,7 +106,20 @@ object Telemetry {
             processStartElapsedMillis = processStartElapsedMillis,
             elapsedMillis = { SystemClock.elapsedRealtime() },
             log = { message -> Log.w(TAG, message) },
+            enabled = { dataCollectionEnabled },
         )
+    }
+
+    /**
+     * 隐私开关。关闭后不再记录、不再上报，并清掉本地积压。
+     *
+     * 云端 AI 共用同一个开关：AI 请求必须带设备令牌，而令牌只能靠注册拿到，
+     * 关掉统计就等于关掉云端能力，所以这里不单独维护第二个状态。
+     */
+    fun setDataCollectionEnabled(enabled: Boolean) {
+        if (dataCollectionEnabled == enabled) return
+        dataCollectionEnabled = enabled
+        recorder?.onDataCollectionChanged(enabled)
     }
 
     fun onProcessStart() {

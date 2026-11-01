@@ -38,6 +38,7 @@ class ScheduleApplication : Application() {
         }
         DatabaseProvider.init(this)
         observeRecentsPreference()
+        observePrivacyPreference()
         observeProcessLifecycle()
     }
 
@@ -60,6 +61,20 @@ class ScheduleApplication : Application() {
                     if (!enabled) {
                         RecentsTaskVisibility.apply(this@ScheduleApplication, excluded = false)
                     }
+                }
+        }
+    }
+
+    /**
+     * 隐私开关要在这里订阅而不是在设置页里处理：用户在设置页关掉后可能直接划掉应用，
+     * 只有进程级订阅能保证下一次启动一开始就是关闭状态。
+     */
+    private fun observePrivacyPreference() {
+        applicationScope.launch {
+            DatabaseProvider.dao()
+                .getPreferenceFlow(Constants.PREF_PRIVACY_DATA_ENABLED)
+                .collect { value ->
+                    Telemetry.setDataCollectionEnabled(Constants.isDataCollectionEnabled(value))
                 }
         }
     }

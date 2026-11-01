@@ -60,6 +60,11 @@ class LaunchQueue(
         writeLocked(readLocked().filterNot { it.sessionId == sessionId })
     }
 
+    /** 用户在隐私设置里关掉统计时调用：这些记录本身就是使用轨迹，不该继续留在本地。 */
+    suspend fun clear() = mutex.withLock {
+        store.remove(KEY_RECORDS)
+    }
+
     suspend fun size(): Int = mutex.withLock { readLocked().size }
 
     private fun readLocked(): List<LaunchRecord> {

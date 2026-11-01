@@ -209,6 +209,7 @@
     <string name="settings_title">设置</string>
     <string name="settings_section_notifications">通知</string>
     <string name="settings_section_behavior">行为</string>
+    <string name="settings_section_privacy">隐私</string>
     <string name="settings_section_about">关于</string>
     <string name="settings_reminder_requires_timetable">启用提醒前请先选择课表</string>
     <string name="current_timetable_label">当前课表: %1$s</string>
@@ -242,6 +243,8 @@
     <string name="notification_test_support_delayed">测试通知功能（延迟）</string>
     <string name="hide_from_recents_title">后台隐藏应用</string>
     <string name="hide_from_recents_support">开启后应用将不在最近任务列表中显示</string>
+    <string name="privacy_analytics_title">匿名使用统计</string>
+    <string name="privacy_analytics_support">上传启动次数与版本信息用于改进应用。关闭后将同时停用云端 AI，因为它需要设备标识。</string>
     <string name="about_app_title">关于应用</string>
     <string name="version_label">版本 %1$s</string>
     <string name="qq_group_title">QQ群聊</string>
