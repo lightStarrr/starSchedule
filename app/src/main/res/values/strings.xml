@@ -270,8 +270,8 @@
     <string name="ai_model_follow_default_named">Server default (%1$s)</string>
     <string name="ai_reasoning_row_title">Reasoning effort</string>
     <string name="ai_reasoning_menu">Choose reasoning effort</string>
-    <string name="ai_reasoning_follow_default">Model default</string>
-    <string name="ai_reasoning_follow_default_named">Model default (%1$s)</string>
+    <string name="ai_reasoning_follow_default">Server default</string>
+    <string name="ai_reasoning_follow_default_named">Server default (%1$s)</string>
     <string name="ai_reasoning_fixed">Always on — can\'t be changed</string>
     <string name="ai_reasoning_unsupported">This model takes no effort level</string>
     <string name="ai_reasoning_unknown">Can\'t determine yet</string>

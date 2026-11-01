@@ -88,6 +88,17 @@ data class AiSettingsUiState(
         }
 
     /**
+     * 实际会下发的默认档位。
+     *
+     * 服务端虽然已经按模型裁剪过一遍，这里仍再判一次 `efforts`：
+     * 万一后台配了模型不支持的全局值，宁可不显示括号，也不要告诉用户一个「说了也不会发」的档位。
+     */
+    val effectiveDefaultReasoningEffort: AiReasoningEffort?
+        get() = effectiveReasoning?.defaultEffort?.takeIf { effort ->
+            effectiveReasoning?.efforts?.contains(effort) == true
+        }
+
+    /**
      * 思考强度行的可用性。
      *
      * 判断放这里而不是 Composable：将来 chat 请求要复用同一套「能不能发 reasoning_effort」的结论，

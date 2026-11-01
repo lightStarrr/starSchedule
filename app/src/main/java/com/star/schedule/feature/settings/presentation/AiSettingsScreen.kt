@@ -341,7 +341,7 @@ private fun ReasoningRow(
                     ReasoningMenu(
                         expanded = expanded,
                         efforts = reasoning.efforts,
-                        defaultEffort = reasoning.defaultEffort,
+                        defaultEffort = state.effectiveDefaultReasoningEffort,
                         selected = state.effectiveReasoningEffort,
                         onDismiss = { expanded = false },
                         onSelectReasoningEffort = { effort ->
@@ -362,7 +362,7 @@ private fun reasoningSupportingText(state: AiSettingsUiState): String {
         return stringResource(availability.supportingRes)
     }
     state.effectiveReasoningEffort?.let { return stringResource(it.labelRes) }
-    val default = state.effectiveReasoning?.defaultEffort
+    val default = state.effectiveDefaultReasoningEffort
         ?: return stringResource(R.string.ai_reasoning_follow_default)
     return stringResource(R.string.ai_reasoning_follow_default_named, stringResource(default.labelRes))
 }

@@ -297,6 +297,49 @@ class AiSettingsViewModelTest {
         assertEquals(0, settings.writes(Constants.PREF_AI_REASONING_EFFORT))
     }
 
+    @Test
+    fun `default effort is exposed only when the model supports it`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+
+        // sampleCatalog 的默认模型给的是 low/medium，默认档位 medium → 可以显示括号
+        assertEquals(AiReasoningEffort.Medium, state.value.effectiveDefaultReasoningEffort)
+    }
+
+    @Test
+    fun `unsupported default effort is hidden instead of shown in parentheses`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        modelRepository.result = Result.success(
+            AiModelCatalog(
+                models = listOf(
+                    AiModel(
+                        alias = "narrow",
+                        displayName = "Narrow",
+                        reasoning = AiReasoning(
+                            mode = AiReasoningMode.Effort,
+                            efforts = listOf(AiReasoningEffort.Low),
+                            // 后台全局值可能是模型没有的档位：此时不该把它显示出来
+                            defaultEffort = AiReasoningEffort.High,
+                        ),
+                    ),
+                ),
+                defaultAlias = "narrow",
+            ),
+        )
+
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+
+        assertNull(state.value.effectiveDefaultReasoningEffort)
+        assertEquals(AiReasoningAvailability.Adjustable, state.value.reasoningAvailability)
+    }
+
     private fun TestScope.createViewModel() = AiSettingsViewModel(
         repository = settings,
         usageRepository = usageRepository,

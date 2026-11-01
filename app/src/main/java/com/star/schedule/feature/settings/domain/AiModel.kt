@@ -42,7 +42,10 @@ data class AiReasoning(
     val mode: AiReasoningMode = AiReasoningMode.Unknown,
     /** 保持服务端给的顺序、去重后的集合：只给两档的模型就只有两项。 */
     val efforts: List<AiReasoningEffort> = emptyList(),
-    /** 不传档位时服务端实际使用的档位；只有 [AiReasoningMode.Effort] 下才有意义。 */
+    /**
+     * 服务端配置的全局默认档位，已按本模型的档位裁剪过——也就是不传档位时**真正会下发**的值。
+     * 只有 [AiReasoningMode.Effort] 下才有意义；为空表示不会下发该字段。
+     */
     val defaultEffort: AiReasoningEffort? = null,
 ) {
     /** 能不能让用户选档位。`effort` 但没给任何档位属于异常数据，按不支持处理。 */
