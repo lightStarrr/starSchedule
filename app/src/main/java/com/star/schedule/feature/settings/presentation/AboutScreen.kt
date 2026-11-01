@@ -1,18 +1,23 @@
 package com.star.schedule.feature.settings.presentation
 
 import android.content.Intent
+import android.provider.Settings
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,14 +32,18 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.toShape
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
@@ -46,7 +55,6 @@ import androidx.core.net.toUri
 import com.star.schedule.BuildConfig
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
-import com.star.schedule.core.designsystem.color.brandColors
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.component.rememberHorizontalSegmentedShape
 import com.star.schedule.core.designsystem.navigationBarBottomInset
@@ -104,35 +112,7 @@ private fun AboutScreen(
                     bottom = 24.dp + navigationBarInset,
                 ),
             ) {
-                item {
-                    // 品牌卡片：底色与图形分别取图标那两个 tone，跟着深浅色切换
-                    val brand = brandColors()
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .height(BRAND_CARD_HEIGHT)
-                            // 和列表卡片同一套「组首」形状，四角都是大圆角
-                            .clip(ListItemDefaults.segmentedShapes(0, 1).shape)
-                            .background(brand.container),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_logo),
-                                contentDescription = stringResource(R.string.app_name),
-                                tint = brand.content,
-                                modifier = Modifier.size(BRAND_LOGO_SIZE),
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = brand.content,
-                            )
-                        }
-                    }
-                }
+                item { AboutBrandHeader() }
 
                 item { SettingsSectionTitle(R.string.about_section_info) }
                 item {
@@ -237,7 +217,71 @@ private fun SponsorQr(
     }
 }
 
-private val BRAND_CARD_HEIGHT = 160.dp
-private val BRAND_LOGO_SIZE = 88.dp
-
 private val SPONSOR_QR_HEIGHT = 220.dp
+
+/**
+ * 顶部品牌块：旋转的 7 边 cookie 当背景，上面压 logo 与应用名。
+ *
+ * 旋转只作用在纯色背景那一层：内容单独画在上面，不会跟着转。
+ * 系统把动画时长倍率设成 0（无障碍里的「移除动画」）时直接不转。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AboutBrandHeader() {
+    // 用当前主题（随用户壁纸取色）的容器色/内容色，而不是写死的品牌色
+    val container = MaterialTheme.colorScheme.primaryContainer
+    val content = MaterialTheme.colorScheme.onPrimaryContainer
+    val cookie = MaterialShapes.Cookie7Sided.toShape()
+    val rotation = rememberCookieRotation()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(BRAND_HEADER_HEIGHT),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(BRAND_COOKIE_SIZE)
+                .graphicsLayer { rotationZ = rotation }
+                .clip(cookie)
+                .background(container),
+        )
+        Icon(
+            painter = painterResource(R.drawable.ic_logo),
+            contentDescription = stringResource(R.string.app_name),
+            tint = content,
+            modifier = Modifier.size(BRAND_LOGO_SIZE),
+        )
+    }
+}
+
+/** 一圈 24 秒：慢到不抢注意力，又能看出在动。 */
+@Composable
+private fun rememberCookieRotation(): Float {
+    val context = LocalContext.current
+    val animationsEnabled = remember {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
+    if (!animationsEnabled) return 0f
+
+    val transition = rememberInfiniteTransition(label = "aboutBrandCookie")
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = COOKIE_ROTATION_MILLIS, easing = LinearEasing),
+        ),
+        label = "cookieRotation",
+    )
+    return angle
+}
+
+private val BRAND_HEADER_HEIGHT = 176.dp
+private val BRAND_COOKIE_SIZE = 136.dp
+private val BRAND_LOGO_SIZE = 80.dp
+private const val COOKIE_ROTATION_MILLIS = 24_000
