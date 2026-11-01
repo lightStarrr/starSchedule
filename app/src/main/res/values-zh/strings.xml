@@ -256,6 +256,11 @@
     <string name="ai_provider_none_hint">未选择，AI 功能已停用</string>
     <string name="ai_provider_menu">选择服务商</string>
     <string name="ai_provider_new">新建服务商</string>
+    <string name="ai_usage_title">今日额度</string>
+    <string name="ai_usage_remaining">剩余 %1$s</string>
+    <string name="ai_usage_loading">读取中…</string>
+    <string name="ai_usage_unavailable">暂时取不到用量</string>
+    <string name="ai_usage_footer">每日 %1$s token · 已请求 %2$d 次</string>
     <string name="about_app_title">关于应用</string>
     <string name="about_version_title">版本</string>
     <string name="about_build_title">构建</string>

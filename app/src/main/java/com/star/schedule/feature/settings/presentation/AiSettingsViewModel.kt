@@ -4,10 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.star.schedule.core.common.Constants
+import com.star.schedule.feature.settings.domain.AiUsage
+import com.star.schedule.feature.settings.domain.AiUsageRepository
 import com.star.schedule.feature.settings.domain.SettingsRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,8 +35,20 @@ data class AiSettingsUiState(
         get() = effectiveProviderId != null
 }
 
+/** 云端额度的展示状态：没选云端时整块不显示，所以 Hidden 是独立分支而不是空数据。 */
+sealed interface AiUsageUiState {
+    data object Hidden : AiUsageUiState
+
+    data object Loading : AiUsageUiState
+
+    data class Ready(val usage: AiUsage) : AiUsageUiState
+
+    data object Unavailable : AiUsageUiState
+}
+
 class AiSettingsViewModel(
     private val repository: SettingsRepository,
+    private val usageRepository: AiUsageRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<AiSettingsUiState> = combine(
@@ -48,6 +66,29 @@ class AiSettingsViewModel(
         AiSettingsUiState(),
     )
 
+    private val _usage = MutableStateFlow<AiUsageUiState>(AiUsageUiState.Hidden)
+    val usage: StateFlow<AiUsageUiState> = _usage
+
+    init {
+        // 只有真的用云端时才去拉额度；切走或改成「无」就把这块收起来并取消在途请求
+        viewModelScope.launch {
+            uiState
+                .map { it.effectiveProviderId }
+                .distinctUntilChanged()
+                .collectLatest { providerId ->
+                    if (providerId != Constants.AI_PROVIDER_CLOUD) {
+                        _usage.value = AiUsageUiState.Hidden
+                        return@collectLatest
+                    }
+                    _usage.value = AiUsageUiState.Loading
+                    _usage.value = usageRepository.fetchUsage().fold(
+                        onSuccess = { AiUsageUiState.Ready(it) },
+                        onFailure = { AiUsageUiState.Unavailable },
+                    )
+                }
+        }
+    }
+
     fun selectProvider(providerId: String) {
         viewModelScope.launch {
             repository.setPreference(Constants.PREF_AI_PROVIDER_ID, providerId)
@@ -57,11 +98,12 @@ class AiSettingsViewModel(
 
 class AiSettingsViewModelFactory(
     private val repository: SettingsRepository,
+    private val usageRepository: AiUsageRepository,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AiSettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return AiSettingsViewModel(repository) as T
+            return AiSettingsViewModel(repository, usageRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
