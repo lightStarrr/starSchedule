@@ -47,6 +47,15 @@ val releaseSigningReady =
 // 快照流水线在仓库还没配好密钥时要能出包，用调试签名顶上；正式发布不允许走这条路。
 val fallbackDebugSigning = providers.gradleProperty("fallbackDebugSigning").orNull.toBoolean()
 
+/**
+ * 后端 API 地址：gradle.properties 里配，换域名只改一行，不必动构建脚本。
+ * debug 默认指向模拟器宿主机；release 指向正式域名。
+ */
+val apiBaseUrlDebug = providers.gradleProperty("starApiBaseUrlDebug").orNull?.trim()
+    ?.takeIf { it.isNotEmpty() } ?: "http://10.0.2.2:8080/api/v1"
+val apiBaseUrlRelease = providers.gradleProperty("starApiBaseUrlRelease").orNull?.trim()
+    ?.takeIf { it.isNotEmpty() } ?: "https://schedule.leapstella.com/api/v1"
+
 android {
     namespace = "com.star.schedule"
     compileSdk = 37
@@ -84,12 +93,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrlDebug\"")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrlRelease\"")
             // 拿不到正式签名时保持未签名；显式传 fallbackDebugSigning 才用调试签名兜底。
             signingConfig = signingConfigs.findByName("release")
                 ?: signingConfigs.getByName("debug").takeIf { fallbackDebugSigning }
