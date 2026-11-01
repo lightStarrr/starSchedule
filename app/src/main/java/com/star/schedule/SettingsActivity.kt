@@ -45,6 +45,9 @@ class SettingsActivity : ComponentActivity() {
                     onOpenAiSettings = {
                         startActivity(Intent(this, AiSettingsActivity::class.java))
                     },
+                    onOpenAbout = {
+                        startActivity(Intent(this, AboutActivity::class.java))
+                    },
                     onRequestNotificationPermission = permissionGate::request,
                 )
             }

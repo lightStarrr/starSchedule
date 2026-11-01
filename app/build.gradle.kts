@@ -68,6 +68,9 @@ android {
         versionName = versionNameValue
 
         buildConfigField("String", "BUILD_ID", "\"$buildId\"")
+        // 构建标识拆成两段：关于页要把「版本」和「提交哈希 + 构建时间」分成两行展示
+        buildConfigField("String", "GIT_SHA", "\"$gitShortSha\"")
+        buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         buildConfigField(
             "String",
             "BUILD_STAMP",

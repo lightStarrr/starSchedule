@@ -253,6 +253,10 @@
     <string name="settings_ai_entry_support">Cloud models and AI features</string>
     <string name="ai_settings_title">AI settings</string>
     <string name="about_app_title">About the app</string>
+    <string name="about_version_title">Version</string>
+    <string name="about_build_title">Build</string>
+    <string name="about_section_info">Application info</string>
+    <string name="about_section_contact">Contact</string>
     <string name="version_label">Version %1$s</string>
     <string name="qq_group_title">QQ group</string>
     <string name="github_title">GitHub</string>
