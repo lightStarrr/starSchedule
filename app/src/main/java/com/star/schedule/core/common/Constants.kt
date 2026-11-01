@@ -36,6 +36,14 @@ object Constants {
      * 空串表示「跟随服务端默认」，即请求里不带 model。
      */
     const val PREF_AI_MODEL_ALIAS = "ai_model_alias"
+
+    /**
+     * 选中的思考强度（minimal / low / medium / high）。
+     *
+     * 空串表示「跟随模型默认」，即请求里不带 `reasoning_effort`。
+     * 服务端只对 `reasoning.mode = effort` 的模型接受这个字段，别的一律 400。
+     */
+    const val PREF_AI_REASONING_EFFORT = "ai_reasoning_effort"
     const val PREF_TIMETABLE_WALLPAPER_PREFIX = "timetable_wallpaper_"
 
     /** 缺省视为开启：老用户升级后继续上报，只有明确关掉才停。 */

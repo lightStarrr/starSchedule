@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.UnfoldMore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -47,6 +48,7 @@ import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.feature.settings.domain.AiModelCatalog
+import com.star.schedule.feature.settings.domain.AiReasoningEffort
 import java.text.NumberFormat
 
 @Composable
@@ -63,6 +65,7 @@ fun AiSettingsRoute(
         onBack = onBack,
         onSelectProvider = viewModel::selectProvider,
         onSelectModel = viewModel::selectModel,
+        onSelectReasoningEffort = viewModel::selectReasoningEffort,
         onRefreshModels = viewModel::refreshModels,
         onNewProvider = onNewProvider,
     )
@@ -76,6 +79,7 @@ private fun AiSettingsScreen(
     onBack: () -> Unit,
     onSelectProvider: (String) -> Unit,
     onSelectModel: (String) -> Unit,
+    onSelectReasoningEffort: (AiReasoningEffort?) -> Unit,
     onRefreshModels: () -> Unit,
     onNewProvider: () -> Unit,
 ) {
@@ -187,12 +191,20 @@ private fun AiSettingsScreen(
                                 topPadding = 24.dp,
                             )
                             SettingsGroup {
+                                // 本组行数恒定 2（模型与思考强度同进同出），
+                                // 直接写字面量而不是像服务商组那样按可见行算位置
                                 ModelRow(
                                     state = state,
                                     shapeIndex = 0,
-                                    shapeCount = 1,
+                                    shapeCount = 2,
                                     onSelectModel = onSelectModel,
                                     onRefreshModels = onRefreshModels,
+                                )
+                                ReasoningRow(
+                                    state = state,
+                                    shapeIndex = 1,
+                                    shapeCount = 2,
+                                    onSelectReasoningEffort = onSelectReasoningEffort,
                                 )
                             }
                         }
@@ -270,13 +282,145 @@ private fun modelSupportingText(state: AiSettingsUiState): String = when (val mo
     AiModelUiState.Hidden, AiModelUiState.Loading -> stringResource(R.string.ai_model_loading)
     AiModelUiState.Unavailable -> stringResource(R.string.ai_model_unavailable)
     is AiModelUiState.Ready -> {
-        val selected = state.selectedModel
+        val effective = state.effectiveModel
         when {
             models.catalog.isEmpty -> stringResource(R.string.ai_model_empty)
-            selected != null -> selected.displayName
+            // 跟随默认时把服务端实际的模型名放进括号，用户才知道不选具体模型会用哪个
+            state.selectedModelAlias == null && effective != null -> stringResource(
+                R.string.ai_model_follow_default_named,
+                effective.displayName,
+            )
+            effective != null -> effective.displayName
             else -> stringResource(R.string.ai_model_follow_default)
         }
     }
+}
+
+/**
+ * 思考强度行：与模型行同构，只是可选集合来自当前模型的能力。
+ *
+ * 模型不提供档位时（固定思考 / 不支持 / 尚未检测）本行照样显示但禁用，
+ * supporting 直接写原因——比弹一个只有一项的空菜单更有用。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReasoningRow(
+    state: AiSettingsUiState,
+    shapeIndex: Int,
+    shapeCount: Int,
+    onSelectReasoningEffort: (AiReasoningEffort?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val adjustable = state.reasoningAvailability == AiReasoningAvailability.Adjustable
+    val reasoning = state.effectiveReasoning
+
+    SettingsListItem(
+        title = stringResource(R.string.ai_reasoning_row_title),
+        supporting = reasoningSupportingText(state),
+        enabled = adjustable,
+        onClick = if (adjustable) {
+            { expanded = true }
+        } else {
+            null
+        },
+        shapeIndex = shapeIndex,
+        shapeCount = shapeCount,
+        leading = { Icon(Icons.Rounded.Psychology, contentDescription = null) },
+        trailing = {
+            Box {
+                IconButton(
+                    onClick = { expanded = true },
+                    enabled = adjustable,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.UnfoldMore,
+                        contentDescription = stringResource(R.string.ai_reasoning_menu),
+                    )
+                }
+                if (adjustable && reasoning != null) {
+                    ReasoningMenu(
+                        expanded = expanded,
+                        efforts = reasoning.efforts,
+                        defaultEffort = reasoning.defaultEffort,
+                        selected = state.effectiveReasoningEffort,
+                        onDismiss = { expanded = false },
+                        onSelectReasoningEffort = { effort ->
+                            expanded = false
+                            onSelectReasoningEffort(effort)
+                        },
+                    )
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun reasoningSupportingText(state: AiSettingsUiState): String {
+    val availability = state.reasoningAvailability
+    if (availability != AiReasoningAvailability.Adjustable) {
+        return stringResource(availability.supportingRes)
+    }
+    state.effectiveReasoningEffort?.let { return stringResource(it.labelRes) }
+    val default = state.effectiveReasoning?.defaultEffort
+        ?: return stringResource(R.string.ai_reasoning_follow_default)
+    return stringResource(R.string.ai_reasoning_follow_default_named, stringResource(default.labelRes))
+}
+
+/**
+ * 思考强度菜单：首项「跟随模型默认」括号里带该模型的实际默认档位。
+ *
+ * 与模型菜单首项不带名字是有意的：档位只有两三个字，而「跟随」的核心信息就是它等于哪档；
+ * 模型名很长，加括号会把菜单撑宽，且下面紧接着就有同名项。
+ */
+@Composable
+private fun ReasoningMenu(
+    expanded: Boolean,
+    efforts: List<AiReasoningEffort>,
+    defaultEffort: AiReasoningEffort?,
+    selected: AiReasoningEffort?,
+    onDismiss: () -> Unit,
+    onSelectReasoningEffort: (AiReasoningEffort?) -> Unit,
+) {
+    val followLabel = if (defaultEffort != null) {
+        stringResource(
+            R.string.ai_reasoning_follow_default_named,
+            stringResource(defaultEffort.labelRes),
+        )
+    } else {
+        stringResource(R.string.ai_reasoning_follow_default)
+    }
+
+    val entries = buildList {
+        add(
+            MenuEntry(
+                label = followLabel,
+                selected = selected == null,
+                onClick = {
+                    onDismiss()
+                    onSelectReasoningEffort(null)
+                },
+            ),
+        )
+        efforts.forEach { effort ->
+            add(
+                MenuEntry(
+                    label = stringResource(effort.labelRes),
+                    selected = effort == selected,
+                    onClick = {
+                        onDismiss()
+                        onSelectReasoningEffort(effort)
+                    },
+                ),
+            )
+        }
+    }
+
+    AppMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        groups = listOf(entries),
+    )
 }
 
 /**

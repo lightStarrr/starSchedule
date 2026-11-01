@@ -7,6 +7,9 @@ import com.star.schedule.core.common.Constants
 import com.star.schedule.feature.settings.domain.AiModel
 import com.star.schedule.feature.settings.domain.AiModelCatalog
 import com.star.schedule.feature.settings.domain.AiModelRepository
+import com.star.schedule.feature.settings.domain.AiReasoning
+import com.star.schedule.feature.settings.domain.AiReasoningEffort
+import com.star.schedule.feature.settings.domain.AiReasoningMode
 import com.star.schedule.feature.settings.domain.AiUsage
 import com.star.schedule.feature.settings.domain.AiUsageRepository
 import com.star.schedule.feature.settings.domain.SettingsRepository
@@ -36,6 +39,8 @@ data class AiSettingsUiState(
     val cloudEnabled: Boolean = true,
     val selectedProviderId: String? = null,
     val selectedModelAlias: String? = null,
+    /** null = 跟随模型默认（请求里不带 reasoning_effort）。 */
+    val selectedReasoningEffort: AiReasoningEffort? = null,
     val models: AiModelUiState = AiModelUiState.Hidden,
 ) {
     /**
@@ -58,6 +63,56 @@ data class AiSettingsUiState(
     /** 只有拿到列表且能查到才算选中；列表没到时不要退回默认，否则文案会闪。 */
     val selectedModel: AiModel?
         get() = (models as? AiModelUiState.Ready)?.catalog?.find(selectedModelAlias)
+
+    /**
+     * 真正生效的模型：用户选的那条；没选 → 服务端默认（含兜底第一条）。
+     * 列表没到、或选的 alias 已经下架（自愈协程还没跑完）时为 null。
+     */
+    val effectiveModel: AiModel?
+        get() {
+            val catalog = (models as? AiModelUiState.Ready)?.catalog ?: return null
+            return if (selectedModelAlias == null) catalog.defaultModel else catalog.find(selectedModelAlias)
+        }
+
+    val effectiveReasoning: AiReasoning?
+        get() = effectiveModel?.reasoning
+
+    /**
+     * 用户选的档位，若当前模型不提供该档位则视为「跟随默认」。
+     *
+     * 只影响展示与将来的请求参数，**不改写偏好**：用户切回原模型时选择还在。
+     */
+    val effectiveReasoningEffort: AiReasoningEffort?
+        get() = selectedReasoningEffort?.takeIf { effort ->
+            effectiveReasoning?.efforts?.contains(effort) == true
+        }
+
+    /**
+     * 思考强度行的可用性。
+     *
+     * 判断放这里而不是 Composable：将来 chat 请求要复用同一套「能不能发 reasoning_effort」的结论，
+     * 纯逻辑才能两边共用，也才能单测。
+     */
+    val reasoningAvailability: AiReasoningAvailability
+        get() {
+            val reasoning = effectiveReasoning
+            if (reasoning == null) {
+                return when (models) {
+                    AiModelUiState.Hidden, AiModelUiState.Loading -> AiReasoningAvailability.Loading
+                    else -> AiReasoningAvailability.Unknown
+                }
+            }
+            return when (reasoning.mode) {
+                AiReasoningMode.Effort -> if (reasoning.efforts.isEmpty()) {
+                    AiReasoningAvailability.Unsupported
+                } else {
+                    AiReasoningAvailability.Adjustable
+                }
+                AiReasoningMode.Fixed -> AiReasoningAvailability.Fixed
+                AiReasoningMode.None -> AiReasoningAvailability.Unsupported
+                AiReasoningMode.Unknown -> AiReasoningAvailability.Unknown
+            }
+        }
 }
 
 /** 云端额度的展示状态：没选云端时整块不显示，所以 Hidden 是独立分支而不是空数据。 */
@@ -83,12 +138,15 @@ class AiSettingsViewModel(
         repository.observePreference(Constants.PREF_PRIVACY_DATA_ENABLED),
         repository.observePreference(Constants.PREF_AI_PROVIDER_ID),
         repository.observePreference(Constants.PREF_AI_MODEL_ALIAS),
+        repository.observePreference(Constants.PREF_AI_REASONING_EFFORT),
         _models,
-    ) { dataCollection, providerId, modelAlias, models ->
+    ) { dataCollection, providerId, modelAlias, effortRaw, models ->
         AiSettingsUiState(
             cloudEnabled = Constants.isDataCollectionEnabled(dataCollection),
             selectedProviderId = providerId?.takeIf { it != Constants.AI_PROVIDER_NONE },
             selectedModelAlias = modelAlias?.takeIf { it.isNotEmpty() },
+            // 认不出的值（含空串）一律视为跟随默认，不崩也不误发请求
+            selectedReasoningEffort = AiReasoningEffort.fromWire(effortRaw),
             models = models,
         )
     }.stateIn(
@@ -160,6 +218,18 @@ class AiSettingsViewModel(
     fun selectModel(alias: String) {
         viewModelScope.launch {
             repository.setPreference(Constants.PREF_AI_MODEL_ALIAS, alias)
+        }
+    }
+
+    /**
+     * 传 null 表示「跟随模型默认」。
+     *
+     * 切模型时**不清空**这个偏好（用户明确要保留）：只在当前模型不提供该档位时按跟随默认展示，
+     * 偏好本身留给下次切回来时复用。
+     */
+    fun selectReasoningEffort(effort: AiReasoningEffort?) {
+        viewModelScope.launch {
+            repository.setPreference(Constants.PREF_AI_REASONING_EFFORT, effort?.wireValue ?: "")
         }
     }
 
