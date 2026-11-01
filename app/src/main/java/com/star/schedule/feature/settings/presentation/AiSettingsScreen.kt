@@ -1,5 +1,11 @@
 package com.star.schedule.feature.settings.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -77,6 +83,8 @@ private fun AiSettingsScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
     var menuExpanded by remember { mutableStateOf(false) }
+    // 进入页面时 usage 会从 Hidden 变成 Loading，这时不该播展开动画——只有用户自己切换服务商才播
+    var userSwitchedProvider by remember { mutableStateOf(false) }
 
     val selectedName = when (state.effectiveProviderId) {
         Constants.AI_PROVIDER_CLOUD -> stringResource(R.string.ai_provider_cloud)
@@ -117,13 +125,15 @@ private fun AiSettingsScreen(
                     )
                 }
                 item {
+                    val quotaVisible = usage != AiUsageUiState.Hidden
                     SettingsGroup {
                         SettingsListItem(
                             title = stringResource(R.string.ai_provider_row_title),
                             supporting = selectedName,
                             onClick = { menuExpanded = true },
+                            // 额度行出现时本行变成组内首项，圆角跟着换
                             shapeIndex = 0,
-                            shapeCount = 1,
+                            shapeCount = if (quotaVisible) 2 else 1,
                             leading = { Icon(Icons.Rounded.Cloud, contentDescription = null) },
                             trailing = {
                                 // 菜单以这个图标为锚点展开，所以触发按钮与菜单必须同一层
@@ -141,18 +151,27 @@ private fun AiSettingsScreen(
                                         cloudEnabled = state.cloudEnabled,
                                         selectedProviderId = state.effectiveProviderId,
                                         onDismiss = { menuExpanded = false },
-                                        onSelectProvider = onSelectProvider,
+                                        onSelectProvider = { providerId ->
+                                            userSwitchedProvider = true
+                                            onSelectProvider(providerId)
+                                        },
                                         onNewProvider = onNewProvider,
                                     )
                                 }
                             },
                         )
-                    }
-                }
-                if (usage != AiUsageUiState.Hidden) {
-                    item {
-                        Spacer(Modifier.height(8.dp))
-                        QuotaCard(state = usage)
+                        AnimatedVisibility(
+                            visible = quotaVisible,
+                            // 首次进入直接落位；用户切换服务商时才展开/收起
+                            enter = if (userSwitchedProvider) {
+                                expandVertically(expandFrom = Alignment.Top) + fadeIn()
+                            } else {
+                                EnterTransition.None
+                            },
+                            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+                        ) {
+                            QuotaRow(usage = usage)
+                        }
                     }
                 }
             }
@@ -161,66 +180,38 @@ private fun AiSettingsScreen(
 }
 
 /**
- * 云端额度卡片：只在选中云端 AI 时出现，展示当日剩余与已用比例。
+ * 额度行：和「当前服务商」同组，选中云端时展开、切走时收起。
  *
- * 取不到时不留空白——照样占位并说明，用户能分清「没额度」和「没网络」。
+ * 取不到时同样占位并说明，用户才能分清「没额度」和「没网络」。
  */
 @Composable
-private fun QuotaCard(state: AiUsageUiState) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        // 和列表卡片同一套圆角，块与块之间留 8dp
-        shape = ListItemDefaults.segmentedShapes(0, 1).shape,
-        color = MaterialTheme.colorScheme.surfaceBright,
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.ai_usage_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.weight(1f))
-                val trailing = when (state) {
-                    is AiUsageUiState.Ready -> stringResource(
-                        R.string.ai_usage_remaining,
-                        formatTokens(state.usage.remainingTokens),
-                    )
-                    AiUsageUiState.Loading -> stringResource(R.string.ai_usage_loading)
-                    AiUsageUiState.Unavailable -> stringResource(R.string.ai_usage_unavailable)
-                    AiUsageUiState.Hidden -> ""
-                }
-                Text(
-                    text = trailing,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (state is AiUsageUiState.Ready) {
-                Spacer(Modifier.height(10.dp))
-                LinearProgressIndicator(
-                    progress = { state.usage.usedFraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(CircleShape),
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(
-                        R.string.ai_usage_footer,
-                        formatTokens(state.usage.dailyQuota),
-                        state.usage.requestCount,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
+private fun QuotaRow(usage: AiUsageUiState) {
+    val ready = usage as? AiUsageUiState.Ready
+    SettingsQuotaItem(
+        title = stringResource(R.string.ai_usage_title),
+        value = when (usage) {
+            is AiUsageUiState.Ready -> stringResource(
+                R.string.ai_usage_remaining,
+                formatTokens(ready!!.usage.remainingTokens),
+            )
+            AiUsageUiState.Loading -> stringResource(R.string.ai_usage_loading)
+            AiUsageUiState.Unavailable -> stringResource(R.string.ai_usage_unavailable)
+            AiUsageUiState.Hidden -> ""
+        },
+        supporting = when (usage) {
+            is AiUsageUiState.Ready -> stringResource(
+                R.string.ai_usage_footer,
+                formatTokens(ready!!.usage.dailyQuota),
+                ready.usage.requestCount,
+            )
+            AiUsageUiState.Loading -> stringResource(R.string.ai_usage_loading_hint)
+            AiUsageUiState.Unavailable -> stringResource(R.string.ai_usage_unavailable_hint)
+            AiUsageUiState.Hidden -> ""
+        },
+        fraction = ready?.usage?.usedFraction,
+        shapeIndex = 1,
+        shapeCount = 2,
+    )
 }
 
 /** 千分位，别让用户数位数。 */

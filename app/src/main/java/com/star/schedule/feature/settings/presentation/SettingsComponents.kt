@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
@@ -21,6 +23,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -123,6 +126,57 @@ internal fun SettingsListItem(
             trailingContent = trailing,
         )
     }
+}
+
+/**
+ * 带比例的列表项（比如额度）：标题 + 右侧数值 + 支撑文案，中间一条进度。
+ *
+ * 用 [SegmentedListItem] 而不是自己拼卡片，是为了跟同一组里的其它行共用圆角、底色和间距；
+ * [fraction] 传 null 时不画进度条（读取中、取不到的时候）。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun SettingsQuotaItem(
+    title: String,
+    value: String,
+    supporting: String,
+    fraction: Float?,
+    shapeIndex: Int,
+    shapeCount: Int,
+) {
+    SegmentedListItem(
+        shapes = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount),
+        colors = settingsItemColors(),
+        verticalAlignment = Alignment.CenterVertically,
+        // 数值放在标题行内，而不是 trailingContent：后者会把支撑内容挤窄，进度条只剩半截
+        content = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        supportingContent = {
+            Column {
+                if (fraction != null) {
+                    LinearProgressIndicator(
+                        progress = { fraction.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .height(6.dp)
+                            .clip(CircleShape),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                Text(supporting)
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

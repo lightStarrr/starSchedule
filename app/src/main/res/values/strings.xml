@@ -264,6 +264,8 @@
     <string name="ai_usage_loading">Loading…</string>
     <string name="ai_usage_unavailable">Usage unavailable</string>
     <string name="ai_usage_footer">%1$s tokens per day · %2$d requests</string>
+    <string name="ai_usage_loading_hint">Fetching today\'s usage</string>
+    <string name="ai_usage_unavailable_hint">Try again later or check your network</string>
     <string name="about_app_title">About the app</string>
     <string name="about_version_title">Version</string>
     <string name="about_build_title">Build</string>
