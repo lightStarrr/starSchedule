@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class ScheduleApplication : Application() {
@@ -71,10 +72,20 @@ class ScheduleApplication : Application() {
      */
     private fun observePrivacyPreference() {
         applicationScope.launch {
-            DatabaseProvider.dao()
-                .getPreferenceFlow(Constants.PREF_PRIVACY_DATA_ENABLED)
-                .collect { value ->
-                    Telemetry.setDataCollectionEnabled(Constants.isDataCollectionEnabled(value))
+            val dao = DatabaseProvider.dao()
+            combine(
+                dao.getPreferenceFlow(Constants.PREF_PRIVACY_DATA_ENABLED),
+                dao.getPreferenceFlow(Constants.PREF_AI_PROVIDER_ID),
+            ) { dataCollection, providerId -> dataCollection to providerId }
+                .collect { (dataCollection, providerId) ->
+                    val enabled = Constants.isDataCollectionEnabled(dataCollection)
+                    Telemetry.setDataCollectionEnabled(enabled)
+
+                    // 关掉匿名统计时，把云端服务商真正落成「无」（空串），而不是只在 UI 上显示成无：
+                    // 偏好里留着 cloud 的话，以后任何直接读偏好的入口都会绕过隐私开关。
+                    if (!enabled && providerId == Constants.AI_PROVIDER_CLOUD) {
+                        dao.setPreference(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_NONE)
+                    }
                 }
         }
     }

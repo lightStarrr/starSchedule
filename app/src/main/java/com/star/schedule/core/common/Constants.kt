@@ -24,6 +24,9 @@ object Constants {
 
     /** 内置云端服务商的固定 id。 */
     const val AI_PROVIDER_CLOUD = "cloud"
+
+    /** 没有选中任何服务商（菜单里的「无」），AI 功能视为关闭。 */
+    const val AI_PROVIDER_NONE = ""
     const val PREF_TIMETABLE_WALLPAPER_PREFIX = "timetable_wallpaper_"
 
     /** 缺省视为开启：老用户升级后继续上报，只有明确关掉才停。 */

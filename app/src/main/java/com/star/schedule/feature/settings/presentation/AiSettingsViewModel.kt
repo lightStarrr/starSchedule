@@ -15,7 +15,12 @@ data class AiSettingsUiState(
     val cloudEnabled: Boolean = true,
     val selectedProviderId: String? = null,
 ) {
-    /** 云端被隐私开关关掉时，即使之前选过云端也视为没选。 */
+    /**
+     * 生效的服务商。
+     *
+     * 关闭匿名统计时 [com.star.schedule.ScheduleApplication] 会把云端选择真正写成「无」，
+     * 这里再兜一道：万一偏好里残留 cloud（比如降级安装），也不会被当成可用。
+     */
     val effectiveProviderId: String?
         get() = selectedProviderId?.takeIf { cloudEnabled || it != Constants.AI_PROVIDER_CLOUD }
 
@@ -34,7 +39,7 @@ class AiSettingsViewModel(
     ) { dataCollection, providerId ->
         AiSettingsUiState(
             cloudEnabled = Constants.isDataCollectionEnabled(dataCollection),
-            selectedProviderId = providerId?.takeIf { it.isNotBlank() },
+            selectedProviderId = providerId?.takeIf { it != Constants.AI_PROVIDER_NONE },
         )
     }.stateIn(
         viewModelScope,
