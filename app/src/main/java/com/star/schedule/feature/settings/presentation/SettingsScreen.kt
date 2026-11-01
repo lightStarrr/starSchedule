@@ -51,6 +51,7 @@ import com.star.schedule.BuildConfig
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.component.SettingChevron
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -243,6 +244,7 @@ private fun SettingsScreen(
                                 leading = {
                                     Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
                                 },
+                                trailing = { SettingChevron() },
                             )
                         }
                     }

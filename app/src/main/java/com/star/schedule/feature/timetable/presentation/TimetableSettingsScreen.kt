@@ -62,7 +62,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -114,6 +113,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.component.SettingChevron
 import com.star.schedule.core.designsystem.CourseBlockCornerRadius
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.platform.display.rememberScreenCornerRadius
@@ -270,10 +270,7 @@ private fun TimetableSettingsScreen(
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    Icon(
-                                        imageVector = Icons.Rounded.ChevronRight,
-                                        contentDescription = null,
-                                    )
+                                    SettingChevron()
                                 }
                             },
                         )
@@ -366,15 +363,6 @@ private fun TimetableSettingsScreen(
             },
         )
     }
-}
-
-/** 可点进去的设置项右侧统一用这个箭头，两侧文案对齐。 */
-@Composable
-private fun SettingChevron() {
-    Icon(
-        imageVector = Icons.Rounded.ChevronRight,
-        contentDescription = null,
-    )
 }
 
 /**
