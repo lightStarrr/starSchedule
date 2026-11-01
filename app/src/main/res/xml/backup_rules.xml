@@ -1,13 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   设备凭据与待投队列不参与备份：换机后应当重新注册并重新生成启动记录，
+   否则旧 token 会被带到新设备上，install_id 与新的 ANDROID_ID 也会对不上。
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="sharedpref" path="device.xml" />
+    <exclude domain="sharedpref" path="launch_queue.xml" />
 </full-backup-content>
