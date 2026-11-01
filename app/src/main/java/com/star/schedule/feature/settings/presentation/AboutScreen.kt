@@ -12,6 +12,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -44,12 +45,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.star.schedule.BuildConfig
@@ -139,24 +142,39 @@ private fun AboutScreen(
                     // 左右两块各占一半，外侧大圆角、相邻处小圆角，跟列表卡片同一套形状
                     val leftShape = rememberHorizontalSegmentedShape(index = 0, count = 2)
                     val rightShape = rememberHorizontalSegmentedShape(index = 1, count = 2)
-                    Row(
+                    val wechatPainter = painterResource(R.drawable.sponsor_wechat)
+                    val alipayPainter = painterResource(R.drawable.sponsor_alipay)
+                    val wechatDescription = stringResource(R.string.about_sponsor_wechat)
+                    val alipayDescription = stringResource(R.string.about_sponsor_alipay)
+
+                    BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
                     ) {
-                        SponsorQr(
-                            resId = R.drawable.sponsor_wechat,
-                            contentDescription = stringResource(R.string.about_sponsor_wechat),
-                            shape = leftShape,
-                            modifier = Modifier.weight(1f),
+                        val gap = ListItemDefaults.SegmentedGap
+                        val imageWidth = (maxWidth - gap) / 2 - SPONSOR_CARD_PADDING * 2
+                        // 两张图比例不同（1:1 与 2:3），统一按高的那张定卡片高度，图在里面各自居中
+                        val imageHeight = maxOf(
+                            imageWidth / wechatPainter.aspectRatio(),
+                            imageWidth / alipayPainter.aspectRatio(),
                         )
-                        SponsorQr(
-                            resId = R.drawable.sponsor_alipay,
-                            contentDescription = stringResource(R.string.about_sponsor_alipay),
-                            shape = rightShape,
-                            modifier = Modifier.weight(1f),
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                            SponsorQr(
+                                painter = wechatPainter,
+                                contentDescription = wechatDescription,
+                                shape = leftShape,
+                                imageHeight = imageHeight,
+                                modifier = Modifier.weight(1f),
+                            )
+                            SponsorQr(
+                                painter = alipayPainter,
+                                contentDescription = alipayDescription,
+                                shape = rightShape,
+                                imageHeight = imageHeight,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
 
@@ -187,37 +205,44 @@ private fun AboutScreen(
 }
 
 /**
- * 收款码等比缩放到固定高度并在自己那一半里居中。
+ * 收款码卡片：高度由调用方统一给定，图在里面等比缩放居中。
  *
- * 两张图原始比例不同（0.735 / 0.667），用 [ContentScale.Fit] 而不是拉伸，
- * 否则二维码会变形扫不出来。
+ * 用 [ContentScale.Fit] 而不是拉伸，否则二维码会变形扫不出来。
  */
 @Composable
 private fun SponsorQr(
-    @DrawableRes resId: Int,
+    painter: Painter,
     contentDescription: String,
     shape: Shape,
+    imageHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceBright)
-            .padding(vertical = 20.dp, horizontal = 12.dp),
+            .padding(SPONSOR_CARD_PADDING),
         contentAlignment = Alignment.Center,
     ) {
         Image(
-            painter = painterResource(resId),
+            painter = painter,
             contentDescription = contentDescription,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(SPONSOR_QR_HEIGHT),
+                .height(imageHeight),
             contentScale = ContentScale.Fit,
         )
     }
 }
 
-private val SPONSOR_QR_HEIGHT = 220.dp
+/** 宽高比，取不到时按 1:1 处理，避免除零。 */
+private fun Painter.aspectRatio(): Float {
+    val size = intrinsicSize
+    return if (size.width > 0f && size.height > 0f) size.width / size.height else 1f
+}
+
+private val SPONSOR_CARD_PADDING = 12.dp
+
 
 /**
  * 顶部品牌块：旋转的 7 边 cookie 当背景，上面压 logo 与应用名。
