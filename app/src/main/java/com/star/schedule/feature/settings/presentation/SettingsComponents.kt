@@ -134,11 +134,13 @@ internal fun SettingsActionItem(
     shapeIndex: Int,
     shapeCount: Int,
     leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) = SettingsListItem(
     title = title,
     supporting = supporting,
     onClick = onClick,
     leading = leading,
+    trailing = trailing,
     shapeIndex = shapeIndex,
     shapeCount = shapeCount,
 )

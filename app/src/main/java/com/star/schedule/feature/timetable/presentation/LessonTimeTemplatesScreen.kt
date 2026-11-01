@@ -3,6 +3,7 @@ package com.star.schedule.feature.timetable.presentation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,7 @@ import com.star.schedule.core.designsystem.component.ElasticSwipeRow
 import com.star.schedule.core.designsystem.component.MESSAGE_SNACKBAR_TIMEOUT_MILLIS
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.component.SettingChevron
 import com.star.schedule.core.designsystem.component.UNDO_SNACKBAR_TIMEOUT_MILLIS
 import com.star.schedule.core.designsystem.component.morphedSegmentedShapes
 import com.star.schedule.core.designsystem.component.rememberElasticSwipeState
@@ -238,14 +240,17 @@ private fun LessonTimeTemplatesScreen(
                                     supporting = templateSupportingText(row),
                                     onClick = { onOpenTemplate(row) },
                                     trailing = {
-                                        // 应用是整份覆盖当前课表的节次，空模板或没有课表时不给点。
-                                        TextButton(
-                                            onClick = { onRequestApply(row) },
-                                            enabled = state.canApply &&
-                                                row.periodCount > 0 &&
-                                                !state.isApplying,
-                                        ) {
-                                            Text(stringResource(R.string.action_apply))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            // 应用是整份覆盖当前课表的节次，空模板或没有课表时不给点。
+                                            TextButton(
+                                                onClick = { onRequestApply(row) },
+                                                enabled = state.canApply &&
+                                                    row.periodCount > 0 &&
+                                                    !state.isApplying,
+                                            ) {
+                                                Text(stringResource(R.string.action_apply))
+                                            }
+                                            SettingChevron()
                                         }
                                     },
                                     shapeIndex = index,
