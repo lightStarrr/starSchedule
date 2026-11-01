@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -59,6 +61,7 @@ import com.star.schedule.BuildConfig
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.component.nestedCornerRadius
 import com.star.schedule.core.designsystem.component.rememberHorizontalSegmentedShape
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 
@@ -146,6 +149,8 @@ private fun AboutScreen(
                     val alipayPainter = painterResource(R.drawable.sponsor_alipay)
                     val wechatDescription = stringResource(R.string.about_sponsor_wechat)
                     val alipayDescription = stringResource(R.string.about_sponsor_alipay)
+                    // 图片圆角跟着卡片走：外圆角减内边距，两段弧同心，不会显得突兀
+                    val imageCorner = nestedCornerRadius(SPONSOR_CARD_PADDING)
 
                     BoxWithConstraints(
                         modifier = Modifier
@@ -165,6 +170,7 @@ private fun AboutScreen(
                                 contentDescription = wechatDescription,
                                 shape = leftShape,
                                 imageHeight = imageHeight,
+                                imageCorner = imageCorner,
                                 modifier = Modifier.weight(1f),
                             )
                             SponsorQr(
@@ -172,6 +178,7 @@ private fun AboutScreen(
                                 contentDescription = alipayDescription,
                                 shape = rightShape,
                                 imageHeight = imageHeight,
+                                imageCorner = imageCorner,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -215,6 +222,7 @@ private fun SponsorQr(
     contentDescription: String,
     shape: Shape,
     imageHeight: Dp,
+    imageCorner: Dp,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -224,14 +232,24 @@ private fun SponsorQr(
             .padding(SPONSOR_CARD_PADDING),
         contentAlignment = Alignment.Center,
     ) {
-        Image(
-            painter = painter,
-            contentDescription = contentDescription,
+        // 外层锁死高度保证两张卡片等高；内层按图片自身比例定尺寸，
+        // 这样圆角裁的是图片本身的边界，正方形图上下留白时也不会露出直角
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(imageHeight),
-            contentScale = ContentScale.Fit,
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painter,
+                contentDescription = contentDescription,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(painter.aspectRatio())
+                    .clip(RoundedCornerShape(imageCorner)),
+                contentScale = ContentScale.Fit,
+            )
+        }
     }
 }
 
