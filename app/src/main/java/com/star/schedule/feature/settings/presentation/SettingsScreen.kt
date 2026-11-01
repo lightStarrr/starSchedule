@@ -1,6 +1,5 @@
 package com.star.schedule.feature.settings.presentation
 
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,8 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Shield
@@ -45,7 +42,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.BuildConfig
 import com.star.schedule.R
@@ -61,6 +57,7 @@ fun SettingsRoute(
     onBack: () -> Unit,
     onOpenReminderSettings: () -> Unit,
     onOpenAiSettings: () -> Unit,
+    onOpenAbout: () -> Unit,
     onRequestNotificationPermission: ((() -> Unit) -> Unit),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -69,6 +66,7 @@ fun SettingsRoute(
         onBack = onBack,
         onOpenReminderSettings = onOpenReminderSettings,
         onOpenAiSettings = onOpenAiSettings,
+        onOpenAbout = onOpenAbout,
         onReminderEnabledChange = viewModel::setReminderEnabled,
         onHideFromRecentsChange = viewModel::setHideFromRecents,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
@@ -92,6 +90,7 @@ private fun SettingsScreen(
     onBack: () -> Unit,
     onOpenReminderSettings: () -> Unit,
     onOpenAiSettings: () -> Unit,
+    onOpenAbout: () -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onHideFromRecentsChange: (Boolean) -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
@@ -103,8 +102,6 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val currentTimetable = state.timetables.firstOrNull { it.id == state.currentTimetableId }
-    // 直接读编译期常量：任何一次打包都能被唯一定位，不用再猜用户装的是哪版。
-    val buildStamp = BuildConfig.BUILD_STAMP
 
     val navigationBarInset = navigationBarBottomInset()
     Scaffold(
@@ -269,43 +266,18 @@ private fun SettingsScreen(
                     item { SettingsSectionTitle(R.string.settings_section_about) }
                     item {
                         SettingsGroup {
-                            // 只展示版本信息，之前的「连点五次播放彩蛋」已经去掉。
-                            SettingsListItem(
+                            // 设置页只留版本号，完整构建标识与联系方式都挪到关于页。
+                            SettingsActionItem(
                                 title = stringResource(R.string.about_app_title),
-                                supporting = stringResource(R.string.version_label, buildStamp),
+                                supporting = stringResource(
+                                    R.string.version_label,
+                                    BuildConfig.VERSION_NAME,
+                                ),
+                                onClick = onOpenAbout,
                                 shapeIndex = 0,
-                                shapeCount = 3,
+                                shapeCount = 1,
                                 leading = { Icon(Icons.Rounded.Info, contentDescription = null) },
-                            )
-                            SettingsActionItem(
-                                title = stringResource(R.string.github_title),
-                                supporting = stringResource(R.string.github_url),
-                                onClick = {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            context.getString(R.string.github_url).toUri(),
-                                        ),
-                                    )
-                                },
-                                shapeIndex = 1,
-                                shapeCount = 3,
-                                leading = { Icon(Icons.Rounded.Code, contentDescription = null) },
-                            )
-                            SettingsActionItem(
-                                title = stringResource(R.string.qq_group_title),
-                                supporting = "947574953",
-                                onClick = {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            context.getString(R.string.qq_group_url).toUri(),
-                                        ),
-                                    )
-                                },
-                                shapeIndex = 2,
-                                shapeCount = 3,
-                                leading = { Icon(Icons.Rounded.Group, contentDescription = null) },
+                                trailing = { SettingChevron() },
                             )
                         }
                     }
