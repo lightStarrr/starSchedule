@@ -252,6 +252,13 @@
     <string name="settings_ai_entry_title">AI settings</string>
     <string name="settings_ai_entry_support">Cloud models and AI features</string>
     <string name="ai_settings_title">AI settings</string>
+    <string name="ai_section_provider">Provider</string>
+    <string name="ai_provider_row_title">Current provider</string>
+    <string name="ai_provider_cloud">Cloud AI</string>
+    <string name="ai_provider_none">None</string>
+    <string name="ai_provider_none_hint">Not selected, AI is off</string>
+    <string name="ai_provider_menu">Choose provider</string>
+    <string name="ai_provider_new">New provider</string>
     <string name="about_app_title">About the app</string>
     <string name="about_version_title">Version</string>
     <string name="about_build_title">Build</string>

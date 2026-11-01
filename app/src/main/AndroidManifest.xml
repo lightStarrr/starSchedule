@@ -53,6 +53,10 @@
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
+            android:name=".NewAiProviderActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
             android:name=".AboutActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
