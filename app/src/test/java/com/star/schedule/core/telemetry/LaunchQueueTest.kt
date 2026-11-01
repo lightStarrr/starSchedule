@@ -99,4 +99,16 @@ class LaunchQueueTest {
         assertEquals(1, subject.size())
         assertNull(subject.snapshot().firstOrNull()?.coldStartMs)
     }
+
+    @Test
+    fun `clear drops every record`() = runTest {
+        val subject = queue()
+        subject.upsert(record("a"))
+        subject.upsert(record("b"))
+
+        subject.clear()
+
+        assertEquals(0, subject.size())
+        assertTrue(subject.snapshot().isEmpty())
+    }
 }
