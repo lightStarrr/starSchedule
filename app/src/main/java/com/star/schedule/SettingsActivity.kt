@@ -42,6 +42,9 @@ class SettingsActivity : ComponentActivity() {
                     onOpenReminderSettings = {
                         startActivity(Intent(this, ReminderActivity::class.java))
                     },
+                    onOpenAiSettings = {
+                        startActivity(Intent(this, AiSettingsActivity::class.java))
+                    },
                     onRequestNotificationPermission = permissionGate::request,
                 )
             }
