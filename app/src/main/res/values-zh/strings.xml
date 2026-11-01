@@ -249,6 +249,13 @@
     <string name="settings_ai_entry_title">AI 设置</string>
     <string name="settings_ai_entry_support">云端模型与 AI 功能</string>
     <string name="ai_settings_title">AI 设置</string>
+    <string name="ai_section_provider">服务商</string>
+    <string name="ai_provider_row_title">当前服务商</string>
+    <string name="ai_provider_cloud">云端 AI</string>
+    <string name="ai_provider_none">无</string>
+    <string name="ai_provider_none_hint">未选择，AI 功能已停用</string>
+    <string name="ai_provider_menu">选择服务商</string>
+    <string name="ai_provider_new">新建服务商</string>
     <string name="about_app_title">关于应用</string>
     <string name="about_version_title">版本</string>
     <string name="about_build_title">构建</string>

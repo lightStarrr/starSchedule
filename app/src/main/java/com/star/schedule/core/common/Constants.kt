@@ -18,6 +18,12 @@ object Constants {
      * 所以两者共用同一个偏好，避免出现「关掉统计但还在用云端 AI」的矛盾状态。
      */
     const val PREF_PRIVACY_DATA_ENABLED = "privacy_data_enabled"
+
+    /** 当前选中的 AI 服务商 id；`cloud` 是内置云端服务，其余为自建服务商。 */
+    const val PREF_AI_PROVIDER_ID = "ai_provider_id"
+
+    /** 内置云端服务商的固定 id。 */
+    const val AI_PROVIDER_CLOUD = "cloud"
     const val PREF_TIMETABLE_WALLPAPER_PREFIX = "timetable_wallpaper_"
 
     /** 缺省视为开启：老用户升级后继续上报，只有明确关掉才停。 */
