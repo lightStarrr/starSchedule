@@ -35,6 +35,7 @@ class LaunchRecorderTest {
         ids: ArrayDeque<String>,
         processStartElapsedMillis: Long = 100L,
         elapsedMillis: () -> Long = { 920L },
+        enabled: () -> Boolean = { true },
     ) = LaunchRecorder(
         queue = queue,
         api = api,
@@ -46,6 +47,7 @@ class LaunchRecorderTest {
         elapsedMillis = elapsedMillis,
         newSessionId = { ids.removeFirst() },
         ioDispatcher = StandardTestDispatcher(testScheduler),
+        enabled = enabled,
     )
 
     @Test
@@ -142,6 +144,34 @@ class LaunchRecorderTest {
         assertEquals(1, api.registerCalls)
         assertEquals(1, api.launchCalls)
         assertEquals(1, api.meCalls)
+    }
+
+    @Test
+    fun `disabled collection records nothing`() = runTest {
+        val ids = ArrayDeque(listOf("cold", "warm"))
+        val recorder = recorder(ids, enabled = { false })
+
+        recorder.onProcessStart()
+        advanceUntilIdle()
+        recorder.onForeground()
+        advanceUntilIdle()
+
+        assertEquals(0, queue.size())
+        assertEquals(0, api.registerCalls)
+        assertEquals(0, api.launchCalls)
+    }
+
+    @Test
+    fun `disabled collection clears pending records without sending`() = runTest {
+        queue.upsert(record("a"))
+        queue.upsert(record("b"))
+
+        val pending = recorder(ArrayDeque(), enabled = { false }).flush()
+
+        assertFalse(pending)
+        assertEquals(0, queue.size())
+        assertEquals(0, api.registerCalls)
+        assertEquals(0, api.launchCalls)
     }
 
     private fun record(sessionId: String, coldStartMs: Long? = null) = LaunchRecord(
