@@ -1,12 +1,17 @@
 package com.star.schedule.feature.settings.presentation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cloud
@@ -15,7 +20,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -25,10 +34,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.text.NumberFormat
 import com.star.schedule.R
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.designsystem.component.AppMenu
@@ -44,8 +55,10 @@ fun AiSettingsRoute(
     onNewProvider: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val usage by viewModel.usage.collectAsStateWithLifecycle()
     AiSettingsScreen(
         state = state,
+        usage = usage,
         onBack = onBack,
         onSelectProvider = viewModel::selectProvider,
         onNewProvider = onNewProvider,
@@ -56,6 +69,7 @@ fun AiSettingsRoute(
 @Composable
 private fun AiSettingsScreen(
     state: AiSettingsUiState,
+    usage: AiUsageUiState,
     onBack: () -> Unit,
     onSelectProvider: (String) -> Unit,
     onNewProvider: () -> Unit,
@@ -135,10 +149,82 @@ private fun AiSettingsScreen(
                         )
                     }
                 }
+                if (usage != AiUsageUiState.Hidden) {
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        QuotaCard(state = usage)
+                    }
+                }
             }
         }
     }
 }
+
+/**
+ * 云端额度卡片：只在选中云端 AI 时出现，展示当日剩余与已用比例。
+ *
+ * 取不到时不留空白——照样占位并说明，用户能分清「没额度」和「没网络」。
+ */
+@Composable
+private fun QuotaCard(state: AiUsageUiState) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        // 和列表卡片同一套圆角，块与块之间留 8dp
+        shape = ListItemDefaults.segmentedShapes(0, 1).shape,
+        color = MaterialTheme.colorScheme.surfaceBright,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.ai_usage_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.weight(1f))
+                val trailing = when (state) {
+                    is AiUsageUiState.Ready -> stringResource(
+                        R.string.ai_usage_remaining,
+                        formatTokens(state.usage.remainingTokens),
+                    )
+                    AiUsageUiState.Loading -> stringResource(R.string.ai_usage_loading)
+                    AiUsageUiState.Unavailable -> stringResource(R.string.ai_usage_unavailable)
+                    AiUsageUiState.Hidden -> ""
+                }
+                Text(
+                    text = trailing,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (state is AiUsageUiState.Ready) {
+                Spacer(Modifier.height(10.dp))
+                LinearProgressIndicator(
+                    progress = { state.usage.usedFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(CircleShape),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(
+                        R.string.ai_usage_footer,
+                        formatTokens(state.usage.dailyQuota),
+                        state.usage.requestCount,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** 千分位，别让用户数位数。 */
+private fun formatTokens(value: Long): String = NumberFormat.getIntegerInstance().format(value)
 
 /**
  * 服务商菜单：两组，第一组是可选中的服务商，第二组是「新建服务商」动作。

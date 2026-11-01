@@ -259,6 +259,11 @@
     <string name="ai_provider_none_hint">Not selected, AI is off</string>
     <string name="ai_provider_menu">Choose provider</string>
     <string name="ai_provider_new">New provider</string>
+    <string name="ai_usage_title">Today\'s quota</string>
+    <string name="ai_usage_remaining">%1$s left</string>
+    <string name="ai_usage_loading">Loading…</string>
+    <string name="ai_usage_unavailable">Usage unavailable</string>
+    <string name="ai_usage_footer">%1$s tokens per day · %2$d requests</string>
     <string name="about_app_title">About the app</string>
     <string name="about_version_title">Version</string>
     <string name="about_build_title">Build</string>
