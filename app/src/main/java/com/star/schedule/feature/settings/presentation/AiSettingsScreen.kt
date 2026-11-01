@@ -164,7 +164,7 @@ private fun ProviderMenu(
                 selected = selectedProviderId == null,
                 onClick = {
                     onDismiss()
-                    onSelectProvider("")
+                    onSelectProvider(Constants.AI_PROVIDER_NONE)
                 },
             ),
         )
