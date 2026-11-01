@@ -4,6 +4,7 @@ import com.star.schedule.core.network.ApiError
 import com.star.schedule.core.network.ApiResult
 import com.star.schedule.core.network.ClientInfo
 import com.star.schedule.core.network.ServerClock
+import com.star.schedule.core.network.summary
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +34,7 @@ class LaunchRecorder(
     private val elapsedMillis: () -> Long,
     private val newSessionId: () -> String = { UUID.randomUUID().toString() },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val log: (String) -> Unit = {},
 ) {
     private var coldRecord: LaunchRecord? = null
     private var foregroundHandled = false
@@ -76,8 +78,12 @@ class LaunchRecorder(
      * 4xx 与封禁是重发也不会成功的错误，必须直接出队，否则一条坏记录会卡住队头直到 TTL。
      */
     suspend fun flush(): Boolean = withContext(ioDispatcher) {
-        when (session.ensureRegistered()) {
-            is ApiResult.Failure -> return@withContext false
+        when (val registration = session.ensureRegistered()) {
+            is ApiResult.Failure -> {
+                // 静默失败最难排查，这里必须留一行带错误码的日志
+                log("设备注册失败，${registration.error.summary}")
+                return@withContext false
+            }
             is ApiResult.Success -> Unit
         }
         session.checkDeviceIfDue()
@@ -88,8 +94,10 @@ class LaunchRecorder(
                 is ApiResult.Success -> queue.remove(record.sessionId)
                 is ApiResult.Failure -> {
                     if (isPermanentFailure(result.error)) {
+                        log("启动上报被服务端拒绝，丢弃该记录，${result.error.summary}")
                         queue.remove(record.sessionId)
                     } else {
+                        log("启动上报失败，保留记录待下次补投，${result.error.summary}")
                         pending = true
                         break
                     }
