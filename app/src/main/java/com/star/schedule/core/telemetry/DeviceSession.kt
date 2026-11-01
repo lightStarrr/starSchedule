@@ -60,6 +60,16 @@ class DeviceSession(
         return result
     }
 
+    /**
+     * 最多每 [DeviceCredentialStore.DEVICE_CHECK_INTERVAL_MILLIS] 校验一次。
+     * 每次启动都拉 `/devices/me` 没有必要，封禁状态也不会在一天内反复变化。
+     */
+    suspend fun checkDeviceIfDue(): ApiResult<DeviceMe>? {
+        val last = credentials.lastDeviceCheckAt() ?: 0L
+        if (nowMillis() - last < DeviceCredentialStore.DEVICE_CHECK_INTERVAL_MILLIS) return null
+        return checkDevice()
+    }
+
     private suspend fun isBannedNow(): Boolean {
         val until = credentials.bannedUntil() ?: return false
         return until > nowMillis()

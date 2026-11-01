@@ -1,11 +1,13 @@
 package com.star.schedule
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.core.telemetry.Telemetry
 import com.star.schedule.platform.crash.CrashHandler
 import com.star.schedule.platform.recents.RecentsTaskVisibility
 import kotlinx.coroutines.CoroutineScope
@@ -22,11 +24,17 @@ class ScheduleApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+    // 进程起点，用于冷启动耗时统计。属性初始化早于 onCreate，不掺杂任何初始化开销。
+    private val processStartElapsedMillis = SystemClock.elapsedRealtime()
+
     override fun onCreate() {
         super.onCreate()
         // 崩溃页跑在独立的 :crash 进程，那边不用再装一遍——否则崩溃页自己出错就没人接了。
+        // 启动统计同理：:crash 进程不参与，否则一次崩溃会多记一条启动。
         if (!isCrashProcess()) {
             CrashHandler.install(this)
+            Telemetry.install(this, applicationScope, processStartElapsedMillis)
+            Telemetry.onProcessStart()
         }
         DatabaseProvider.init(this)
         observeRecentsPreference()
@@ -64,6 +72,7 @@ class ScheduleApplication : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 RecentsTaskVisibility.apply(this@ScheduleApplication, excluded = false)
+                Telemetry.onForeground()
             }
 
             override fun onStop(owner: LifecycleOwner) {
