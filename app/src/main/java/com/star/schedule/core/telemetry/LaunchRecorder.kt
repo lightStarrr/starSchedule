@@ -35,11 +35,13 @@ class LaunchRecorder(
     private val newSessionId: () -> String = { UUID.randomUUID().toString() },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val log: (String) -> Unit = {},
+    private val enabled: () -> Boolean = { true },
 ) {
     private var coldRecord: LaunchRecord? = null
     private var foregroundHandled = false
 
     fun onProcessStart() {
+        if (!enabled()) return
         val record = LaunchRecord(
             sessionId = newSessionId(),
             launchedAt = clock.nowUtcRfc3339(),
@@ -51,6 +53,7 @@ class LaunchRecorder(
     }
 
     fun onForeground() {
+        if (!enabled()) return
         val firstForeground = !foregroundHandled
         foregroundHandled = true
         val cold = coldRecord
@@ -78,6 +81,11 @@ class LaunchRecorder(
      * 4xx 与封禁是重发也不会成功的错误，必须直接出队，否则一条坏记录会卡住队头直到 TTL。
      */
     suspend fun flush(): Boolean = withContext(ioDispatcher) {
+        if (!enabled()) {
+            // 关闭期间连本地积压也清掉：留着就等于还在记录使用轨迹
+            queue.clear()
+            return@withContext false
+        }
         when (val registration = session.ensureRegistered()) {
             is ApiResult.Failure -> {
                 // 静默失败最难排查，这里必须留一行带错误码的日志
@@ -90,6 +98,11 @@ class LaunchRecorder(
 
         var pending = false
         for (record in queue.snapshot()) {
+            // 投递途中用户可能刚好关掉开关，逐条再确认一次
+            if (!enabled()) {
+                queue.clear()
+                return@withContext false
+            }
             when (val result = api.reportLaunch(record.toBody(clientInfo()))) {
                 is ApiResult.Success -> queue.remove(record.sessionId)
                 is ApiResult.Failure -> {
@@ -105,6 +118,15 @@ class LaunchRecorder(
             }
         }
         pending
+    }
+
+    /**
+     * 隐私开关变化。关掉时立刻清掉本地积压，不必等下一次启动——
+     * 那些记录本身就是「什么时候用过」的痕迹。
+     */
+    fun onDataCollectionChanged(enabledNow: Boolean) {
+        if (enabledNow) return
+        scope.launch(ioDispatcher) { queue.clear() }
     }
 
     private fun LaunchRecord.toBody(info: ClientInfo) = LaunchBody(

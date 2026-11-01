@@ -21,11 +21,13 @@ data class SettingsUiState(
     val wakeUpSimulationAvailable: Boolean = false,
     val wakeUpProxyInstalled: Boolean = false,
     val wakeUpSimulationEnabled: Boolean = false,
+    val dataCollectionEnabled: Boolean = true,
 )
 
 private data class SettingsPreferences(
     val hideFromRecents: Boolean,
     val wakeUpSimulationEnabled: Boolean,
+    val dataCollectionEnabled: Boolean,
 )
 
 class SettingsViewModel(
@@ -34,10 +36,12 @@ class SettingsViewModel(
     private val preferences = combine(
         repository.observePreference(Constants.PREF_HIDE_FROM_RECENTS),
         repository.observePreference(Constants.PREF_WAKEUP_SIMULATION_ENABLED),
-    ) { hideFromRecents, wakeUpSimulation ->
+        repository.observePreference(Constants.PREF_PRIVACY_DATA_ENABLED),
+    ) { hideFromRecents, wakeUpSimulation, dataCollection ->
         SettingsPreferences(
             hideFromRecents = hideFromRecents == "true",
             wakeUpSimulationEnabled = wakeUpSimulation == "true",
+            dataCollectionEnabled = Constants.isDataCollectionEnabled(dataCollection),
         )
     }
 
@@ -60,6 +64,7 @@ class SettingsViewModel(
             wakeUpSimulationAvailable = wakeUpSimulationAvailable,
             wakeUpProxyInstalled = wakeUpProxyInstalled,
             wakeUpSimulationEnabled = prefs.wakeUpSimulationEnabled,
+            dataCollectionEnabled = prefs.dataCollectionEnabled,
         )
     }.stateIn(
         viewModelScope,
@@ -97,6 +102,12 @@ class SettingsViewModel(
                 Constants.PREF_WAKEUP_SIMULATION_ENABLED,
                 enabled.toString(),
             )
+        }
+    }
+
+    fun setDataCollectionEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setPreference(Constants.PREF_PRIVACY_DATA_ENABLED, enabled.toString())
         }
     }
 

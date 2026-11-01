@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -67,6 +68,7 @@ fun SettingsRoute(
         onReminderEnabledChange = viewModel::setReminderEnabled,
         onHideFromRecentsChange = viewModel::setHideFromRecents,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
+        onDataCollectionChange = viewModel::setDataCollectionEnabled,
         onSendTestNotification = {
             onRequestNotificationPermission(viewModel::sendTestNotification)
         },
@@ -88,6 +90,7 @@ private fun SettingsScreen(
     onReminderEnabledChange: (Boolean) -> Unit,
     onHideFromRecentsChange: (Boolean) -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
+    onDataCollectionChange: (Boolean) -> Unit,
     onSendTestNotification: () -> Unit,
     onScheduleTestReminder: () -> Unit,
     onEnableReminder: () -> Unit,
@@ -219,6 +222,23 @@ private fun SettingsScreen(
                                 shapeCount = 1,
                                 leading = {
                                     Icon(Icons.Rounded.VisibilityOff, contentDescription = null)
+                                },
+                            )
+                        }
+                    }
+
+                    item { SettingsSectionTitle(R.string.settings_section_privacy) }
+                    item {
+                        SettingsGroup {
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.privacy_analytics_title),
+                                supporting = stringResource(R.string.privacy_analytics_support),
+                                checked = state.dataCollectionEnabled,
+                                onCheckedChange = onDataCollectionChange,
+                                shapeIndex = 0,
+                                shapeCount = 1,
+                                leading = {
+                                    Icon(Icons.Rounded.Shield, contentDescription = null)
                                 },
                             )
                         }
