@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Code
@@ -58,6 +59,7 @@ fun SettingsRoute(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
     onOpenReminderSettings: () -> Unit,
+    onOpenAiSettings: () -> Unit,
     onRequestNotificationPermission: ((() -> Unit) -> Unit),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -65,6 +67,7 @@ fun SettingsRoute(
         state = state,
         onBack = onBack,
         onOpenReminderSettings = onOpenReminderSettings,
+        onOpenAiSettings = onOpenAiSettings,
         onReminderEnabledChange = viewModel::setReminderEnabled,
         onHideFromRecentsChange = viewModel::setHideFromRecents,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
@@ -87,6 +90,7 @@ private fun SettingsScreen(
     state: SettingsUiState,
     onBack: () -> Unit,
     onOpenReminderSettings: () -> Unit,
+    onOpenAiSettings: () -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onHideFromRecentsChange: (Boolean) -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
@@ -222,6 +226,22 @@ private fun SettingsScreen(
                                 shapeCount = 1,
                                 leading = {
                                     Icon(Icons.Rounded.VisibilityOff, contentDescription = null)
+                                },
+                            )
+                        }
+                    }
+
+                    item { SettingsSectionTitle(R.string.settings_section_ai) }
+                    item {
+                        SettingsGroup {
+                            SettingsActionItem(
+                                title = stringResource(R.string.settings_ai_entry_title),
+                                supporting = stringResource(R.string.settings_ai_entry_support),
+                                onClick = onOpenAiSettings,
+                                shapeIndex = 0,
+                                shapeCount = 1,
+                                leading = {
+                                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
                                 },
                             )
                         }
