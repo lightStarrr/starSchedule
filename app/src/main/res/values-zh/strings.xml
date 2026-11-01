@@ -254,6 +254,9 @@
     <string name="about_build_title">构建</string>
     <string name="about_section_info">应用信息</string>
     <string name="about_section_contact">联系与反馈</string>
+    <string name="about_section_sponsor">赞助</string>
+    <string name="about_sponsor_wechat">微信赞助二维码</string>
+    <string name="about_sponsor_alipay">支付宝赞助二维码</string>
     <string name="version_label">版本 %1$s</string>
     <string name="qq_group_title">QQ群聊</string>
     <string name="github_title">GitHub</string>

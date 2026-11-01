@@ -54,7 +54,7 @@ fun morphedSegmentedShapes(
 }
 
 /** 从形状的 Outline 里读出四个角的半径（px）。圆角形状都是 Outline.Rounded。 */
-private fun Shape.cornerRadiiPx(density: Density, direction: LayoutDirection): FloatArray? {
+internal fun Shape.cornerRadiiPx(density: Density, direction: LayoutDirection): FloatArray? {
     val rounded = (createOutline(Size(400f, 200f), direction, density) as? Outline.Rounded)?.roundRect
         ?: return null
     return floatArrayOf(
