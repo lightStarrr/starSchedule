@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
+import com.star.schedule.feature.settings.data.RemoteAiModelRepository
 import com.star.schedule.feature.settings.data.RemoteAiUsageRepository
 import com.star.schedule.feature.settings.data.RoomSettingsRepository
 import com.star.schedule.feature.settings.presentation.AiSettingsRoute
@@ -34,6 +35,7 @@ class AiSettingsActivity : ComponentActivity() {
             AiSettingsViewModelFactory(
                 repository = settingsRepository,
                 usageRepository = RemoteAiUsageRepository(this),
+                modelRepository = RemoteAiModelRepository(this),
             ),
         )[AiSettingsViewModel::class.java]
 

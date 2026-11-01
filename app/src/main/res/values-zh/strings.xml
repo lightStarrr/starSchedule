@@ -261,6 +261,13 @@
     <string name="ai_usage_loading">读取中…</string>
     <string name="ai_usage_unavailable">暂时取不到用量</string>
     <string name="ai_usage_footer">每日 %1$s token · 已请求 %2$d 次</string>
+    <string name="ai_model_row_title">当前模型</string>
+    <string name="ai_section_model">模型</string>
+    <string name="ai_model_follow_default">跟随服务端默认</string>
+    <string name="ai_model_menu">选择模型</string>
+    <string name="ai_model_loading">读取中…</string>
+    <string name="ai_model_unavailable">暂时取不到模型列表</string>
+    <string name="ai_model_empty">服务端暂未提供模型</string>
     <string name="ai_usage_loading_hint">正在读取今日用量</string>
     <string name="ai_usage_unavailable_hint">稍后重试或检查网络</string>
     <string name="about_app_title">关于应用</string>

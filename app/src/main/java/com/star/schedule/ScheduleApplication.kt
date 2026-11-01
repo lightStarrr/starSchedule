@@ -76,15 +76,22 @@ class ScheduleApplication : Application() {
             combine(
                 dao.getPreferenceFlow(Constants.PREF_PRIVACY_DATA_ENABLED),
                 dao.getPreferenceFlow(Constants.PREF_AI_PROVIDER_ID),
-            ) { dataCollection, providerId -> dataCollection to providerId }
-                .collect { (dataCollection, providerId) ->
+                dao.getPreferenceFlow(Constants.PREF_AI_MODEL_ALIAS),
+            ) { dataCollection, providerId, modelAlias -> Triple(dataCollection, providerId, modelAlias) }
+                .collect { (dataCollection, providerId, modelAlias) ->
                     val enabled = Constants.isDataCollectionEnabled(dataCollection)
                     Telemetry.setDataCollectionEnabled(enabled)
 
-                    // 关掉匿名统计时，把云端服务商真正落成「无」（空串），而不是只在 UI 上显示成无：
-                    // 偏好里留着 cloud 的话，以后任何直接读偏好的入口都会绕过隐私开关。
-                    if (!enabled && providerId == Constants.AI_PROVIDER_CLOUD) {
+                    if (enabled) return@collect
+
+                    // 关掉匿名统计时把云端相关偏好真正落成空值，而不是只在 UI 上显示成「无」：
+                    // 偏好里留着 cloud / alias 的话，以后任何直接读偏好的入口（比如构造 chat 请求）
+                    // 都会绕过隐私开关。
+                    if (providerId == Constants.AI_PROVIDER_CLOUD) {
                         dao.setPreference(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_NONE)
+                    }
+                    if (!modelAlias.isNullOrEmpty()) {
+                        dao.setPreference(Constants.PREF_AI_MODEL_ALIAS, "")
                     }
                 }
         }
