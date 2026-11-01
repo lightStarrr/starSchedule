@@ -25,9 +25,6 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.DropdownMenuGroup
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
@@ -60,6 +57,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.component.AppMenu
+import com.star.schedule.core.designsystem.component.MenuEntry
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
@@ -483,26 +482,22 @@ private fun OverflowMenuButton(
             )
         }
 
-        DropdownMenuPopup(
+        AppMenu(
             expanded = isExpanded,
             onDismissRequest = { onExpandedChange(false) },
-        ) {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
-                actions.forEachIndexed { index, action ->
-                    DropdownMenuItem(
+            groups = listOf(
+                actions.map { action ->
+                    MenuEntry(
+                        label = action.label,
+                        leadingIcon = action.icon,
                         onClick = {
                             action.onClick()
                             onExpandedChange(false)
                         },
-                        text = { Text(action.label) },
-                        shape = MenuDefaults.itemShape(index, actions.size).shape,
-                        leadingIcon = {
-                            Icon(imageVector = action.icon, contentDescription = null)
-                        },
                     )
-                }
-            }
-        }
+                },
+            ),
+        )
     }
 }
 
