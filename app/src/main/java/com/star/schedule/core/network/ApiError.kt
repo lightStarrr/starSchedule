@@ -65,6 +65,22 @@ sealed interface ApiResult<out T> {
     data class Failure(val error: ApiError) : ApiResult<Nothing>
 }
 
+/** 一行诊断信息，用于日志；`code` 与 `request_id` 是排查的关键字段。 */
+val ApiError.summary: String
+    get() = when (this) {
+        is ApiError.Network -> "网络失败：${cause.message}"
+        is ApiError.Http -> buildString {
+            append("HTTP ")
+            append(status)
+            append(' ')
+            append(code)
+            requestId?.let { append("（request_id=$it）") }
+        }
+        is ApiError.Parse -> "响应解析失败：${cause.message}"
+        is ApiError.Unauthorized -> "鉴权失败：$code"
+        is ApiError.Banned -> "设备已被禁用"
+    }
+
 @Serializable
 internal data class ErrorEnvelope(val error: ErrorBody)
 

@@ -101,6 +101,7 @@ object Telemetry {
             scope = scope,
             processStartElapsedMillis = processStartElapsedMillis,
             elapsedMillis = { SystemClock.elapsedRealtime() },
+            log = { message -> Log.w(TAG, message) },
         )
     }
 
