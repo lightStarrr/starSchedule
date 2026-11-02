@@ -28,33 +28,18 @@ import kotlinx.serialization.Serializable
  * 与用量一样只读一次、不做 401 续期：列表是展示型数据，令牌失效就显示「暂时取不到」，
  * 不把设备注册流程牵扯进来。
  */
-class RemoteAiModelRepository(context: Context) : AiModelRepository {
+class RemoteAiModelRepository internal constructor(
+    private val baseUrl: String,
+    clientProvider: () -> ApiClient,
+) : AiModelRepository {
+    constructor(context: Context) : this(
+        baseUrl = BuildConfig.API_BASE_URL.trim(),
+        clientProvider = createClientProvider(context.applicationContext),
+    )
 
-    private val appContext = context.applicationContext
-
-    private val credentials by lazy {
-        DeviceCredentialStore(
-            store = SharedPreferencesStore(
-                appContext.getSharedPreferences(
-                    DeviceCredentialStore.PREFERENCES_NAME,
-                    Context.MODE_PRIVATE,
-                ),
-            ),
-            cipher = KeystoreAesGcmCipher(),
-        )
-    }
-
-    private val client by lazy {
-        ApiClient(
-            httpClient = SharedApiHttpClient.get(),
-            baseUrl = BuildConfig.API_BASE_URL.trim(),
-            tokenProvider = { credentials.token() },
-            onUnauthorized = { null },
-        )
-    }
+    private val client by lazy(clientProvider)
 
     override suspend fun fetchModels(): Result<AiModelCatalog> {
-        val baseUrl = BuildConfig.API_BASE_URL.trim()
         if (!ApiUrlValidator.isUsable(baseUrl)) {
             return Result.failure(IllegalStateException("API 地址不可用"))
         }
@@ -69,7 +54,10 @@ class RemoteAiModelRepository(context: Context) : AiModelRepository {
                 // 503 AI_NOT_CONFIGURED 表示后台一个模型都没配，这属于「空列表」而不是网络故障：
                 // 界面该提示「服务端暂未提供模型」，而不是让人以为网络有问题
                 val error = result.error
-                if (error is ApiError.Http && error.status == HTTP_SERVICE_UNAVAILABLE) {
+                if (error is ApiError.Http &&
+                    error.status == HTTP_SERVICE_UNAVAILABLE &&
+                    error.code == "AI_NOT_CONFIGURED"
+                ) {
                     Result.success(AiModelCatalog())
                 } else {
                     Result.failure(IllegalStateException(error.toString()))
@@ -80,6 +68,21 @@ class RemoteAiModelRepository(context: Context) : AiModelRepository {
 
     private companion object {
         const val HTTP_SERVICE_UNAVAILABLE = 503
+
+        fun createClientProvider(context: Context): () -> ApiClient = {
+            val credentials = DeviceCredentialStore(
+                store = SharedPreferencesStore(
+                    context.getSharedPreferences(DeviceCredentialStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
+                ),
+                cipher = KeystoreAesGcmCipher(),
+            )
+            ApiClient(
+                httpClient = SharedApiHttpClient.get(),
+                baseUrl = BuildConfig.API_BASE_URL.trim(),
+                tokenProvider = { credentials.token() },
+                onUnauthorized = { null },
+            )
+        }
     }
 }
 

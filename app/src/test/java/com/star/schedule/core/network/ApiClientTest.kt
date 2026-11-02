@@ -1,14 +1,23 @@
 package com.star.schedule.core.network
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.ResponseBody
+import okio.Buffer
+import okio.Source
+import okio.Timeout
+import okio.buffer
+import java.io.IOException
+import java.net.SocketTimeoutException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 class ApiClientTest {
@@ -139,6 +148,62 @@ class ApiClientTest {
     }
 
     @Test
+    fun `body read timeouts return a network failure and close every response`() = runTest {
+        var calls = 0
+        var closed = 0
+        val transport = fakeTransport { request ->
+            calls++
+            responseOf(request, 200).newBuilder()
+                .body(failingBody(SocketTimeoutException("Read timed out")) { closed++ })
+                .build()
+        }
+        val client = apiClient(StandardTestDispatcher(testScheduler), transport)
+
+        val result = client.call(ApiRequest("GET", "ai/models", retryPolicy = RetryPolicy.Read)) { it }
+
+        assertTrue(result is ApiResult.Failure)
+        assertTrue((result as ApiResult.Failure).error is ApiError.Network)
+        assertEquals(3, calls)
+        assertEquals(3, closed)
+    }
+
+    @Test
+    fun `recovers from a response body disconnection on retry`() = runTest {
+        var calls = 0
+        val transport = fakeTransport { request ->
+            calls++
+            if (calls == 1) {
+                responseOf(request, 200).newBuilder()
+                    .body(failingBody(IOException("Connection closed")))
+                    .build()
+            } else {
+                responseOf(request, 200, "recovered")
+            }
+        }
+        val client = apiClient(StandardTestDispatcher(testScheduler), transport)
+
+        val result = client.call(ApiRequest("GET", "ai/models", retryPolicy = RetryPolicy.Read)) { it }
+
+        assertEquals(ApiResult.Success("recovered"), result)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun `deserialization cancellation is not converted into a parse failure`() = runTest {
+        val client = apiClient(
+            StandardTestDispatcher(testScheduler),
+            fakeTransport { responseOf(it, 200, "{}") },
+        )
+
+        try {
+            client.call(ApiRequest("GET", "ai/models")) { throw CancellationException("Stopped") }
+            fail("Cancellation should propagate")
+        } catch (_: CancellationException) {
+            // 调用方取消请求时不应收到普通的解析错误。
+        }
+    }
+
+    @Test
     fun `omits authorization header for anonymous requests`() = runTest {
         var authorization: String? = "unset"
         val transport = fakeTransport { request ->
@@ -169,5 +234,18 @@ class ApiClientTest {
         assertEquals("120", request.header("X-Client-Version-Code"))
         assertTrue(request.header("X-Request-Id").isNullOrBlank().not())
         assertEquals("http://127.0.0.1:8080/api/v1/devices/me", request.url.toString())
+    }
+}
+
+private fun failingBody(error: IOException, onClose: () -> Unit = {}): ResponseBody {
+    val source = object : Source {
+        override fun read(sink: Buffer, byteCount: Long): Long = throw error
+        override fun timeout(): Timeout = Timeout.NONE
+        override fun close() = onClose()
+    }.buffer()
+    return object : ResponseBody() {
+        override fun contentType() = null
+        override fun contentLength(): Long = -1L
+        override fun source() = source
     }
 }

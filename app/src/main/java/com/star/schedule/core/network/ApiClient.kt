@@ -5,6 +5,7 @@ import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -76,6 +77,8 @@ class ApiClient(
                 is Outcome.Success -> {
                     return try {
                         ApiResult.Success(deserialize(outcome.body))
+                    } catch (cancel: CancellationException) {
+                        throw cancel
                     } catch (e: Exception) {
                         ApiResult.Failure(ApiError.Parse(e, outcome.requestId))
                     }
@@ -155,15 +158,19 @@ class ApiClient(
             return Outcome.Failure(ApiError.Network(e))
         }
 
-        response.use { resp ->
-            val requestId = resp.header(CommonHeadersInterceptor.HEADER_REQUEST_ID)
-            val rawBody = resp.body?.string().orEmpty()
-            if (resp.isSuccessful) {
-                return Outcome.Success(rawBody, requestId)
+        try {
+            response.use { resp ->
+                val requestId = resp.header(CommonHeadersInterceptor.HEADER_REQUEST_ID)
+                val rawBody = resp.body?.string().orEmpty()
+                if (resp.isSuccessful) {
+                    return Outcome.Success(rawBody, requestId)
+                }
+                return Outcome.Failure(
+                    mapHttpError(resp.code, rawBody, requestId, resp.header(HEADER_RETRY_AFTER)),
+                )
             }
-            return Outcome.Failure(
-                mapHttpError(resp.code, rawBody, requestId, resp.header(HEADER_RETRY_AFTER)),
-            )
+        } catch (e: IOException) {
+            return Outcome.Failure(ApiError.Network(e))
         }
     }
 
