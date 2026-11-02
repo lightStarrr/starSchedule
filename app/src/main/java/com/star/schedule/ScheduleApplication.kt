@@ -5,6 +5,7 @@ import android.os.SystemClock
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.work.Configuration
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.telemetry.Telemetry
@@ -17,7 +18,13 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
-class ScheduleApplication : Application() {
+class ScheduleApplication : Application(), Configuration.Provider {
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            // 小组件直接使用 JobScheduler 的 1001；为 WorkManager 保留独立区间。
+            .setJobSchedulerJobIdRange(10_000, 19_999)
+            .build()
 
     private companion object {
         const val CRASH_PROCESS_SUFFIX = ":crash"

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- 网络访问 -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -34,6 +35,17 @@
         android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true">
+
+        <!-- 由 ScheduleApplication 提供 WorkManager 配置，首次使用时按该配置初始化。 -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
 
         <activity
             android:name=".MainActivity"
