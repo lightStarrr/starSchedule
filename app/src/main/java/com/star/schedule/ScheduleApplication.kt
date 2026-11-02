@@ -32,11 +32,11 @@ class ScheduleApplication : Application() {
         super.onCreate()
         // 崩溃页跑在独立的 :crash 进程，那边不用再装一遍——否则崩溃页自己出错就没人接了。
         // 启动统计同理：:crash 进程不参与，否则一次崩溃会多记一条启动。
-        if (!isCrashProcess()) {
-            CrashHandler.install(this)
-            Telemetry.install(this, applicationScope, processStartElapsedMillis)
-            Telemetry.onProcessStart()
-        }
+        if (isCrashProcess()) return
+
+        CrashHandler.install(this)
+        Telemetry.install(this, applicationScope, processStartElapsedMillis)
+        Telemetry.onProcessStart()
         DatabaseProvider.init(this)
         observeRecentsPreference()
         observePrivacyPreference()
@@ -44,7 +44,7 @@ class ScheduleApplication : Application() {
     }
 
     private fun isCrashProcess(): Boolean =
-        applicationInfo.processName?.endsWith(CRASH_PROCESS_SUFFIX) == true
+        getProcessName().endsWith(CRASH_PROCESS_SUFFIX)
 
     /**
      * 把「从最近任务隐藏」的偏好同步到内存，供生命周期回调同步读取。
