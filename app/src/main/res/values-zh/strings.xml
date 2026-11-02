@@ -233,6 +233,9 @@
     <string name="notification_icon_subtitle_empty">点击上传自定义图标</string>
     <string name="notification_icon_subtitle_set">已设置自定义图标，点击更换或清除</string>
     <string name="action_reset_default">恢复默认</string>
+    <string name="live_capsule_settings_title">实况通知胶囊</string>
+    <string name="live_capsule_settings_available">此设备支持自定义</string>
+    <string name="live_capsule_settings_unavailable">此设备暂不支持</string>
     <string name="live_capsule_bg_title">实况通知胶囊背景颜色</string>
     <string name="live_capsule_bg_support">自定义实况通知胶囊的背景颜色</string>
     <string name="color_picker_title">选择颜色</string>
