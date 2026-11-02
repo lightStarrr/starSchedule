@@ -9,16 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.IntSize
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -28,7 +23,8 @@ fun WallpaperBackground(
     modifier: Modifier = Modifier,
 ) {
     val path = (state as? WallpaperState.Ready)?.localPath
-    val targetSize = rememberTargetSize()
+    // 首次布局前尺寸可能为 0，等待真实窗口尺寸后再解码，避免估算尺寸造成重复裁切。
+    val targetSize = LocalWindowInfo.current.containerSize
     val bitmap by produceState<Bitmap?>(
         initialValue = null,
         path,
@@ -90,28 +86,4 @@ private fun decodeWallpaper(
 
     // 区域解码失败时退回整图解码，尺寸仍受 sampleSize 约束。
     return runCatching { BitmapFactory.decodeFile(path, options) }.getOrNull()
-}
-
-/**
- * 壁纸要铺满的区域尺寸（像素）。
- *
- * 优先使用窗口容器尺寸，它随旋转变换，能保证裁切区域与当前朝向一致；
- * 首次布局前容器尺寸为 0，退回按屏幕配置估算。
- */
-@Composable
-private fun rememberTargetSize(): IntSize {
-    val containerSize = LocalWindowInfo.current.containerSize
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
-    val fallbackSize = remember(configuration, density) {
-        IntSize(
-            (configuration.screenWidthDp * density.density).roundToInt(),
-            (configuration.screenHeightDp * density.density).roundToInt(),
-        )
-    }
-    return if (containerSize.width > 0 && containerSize.height > 0) {
-        containerSize
-    } else {
-        fallbackSize
-    }
 }

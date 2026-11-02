@@ -10,9 +10,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -26,11 +26,11 @@ import androidx.compose.ui.unit.dp
 fun rememberScreenCornerRadius(): Dp {
     val view = LocalView.current
     val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
+    val containerSize = LocalWindowInfo.current.containerSize
     var radiusPx by remember { mutableIntStateOf(0) }
 
     // 布局完成后再读 insets；旋转/分屏时按新的屏幕尺寸重来一次。
-    LaunchedEffect(view, configuration.screenWidthDp, configuration.screenHeightDp) {
+    LaunchedEffect(view, containerSize) {
         withFrameNanos { }
         radiusPx = view.rootWindowInsets?.screenCornerRadiusPx() ?: 0
     }

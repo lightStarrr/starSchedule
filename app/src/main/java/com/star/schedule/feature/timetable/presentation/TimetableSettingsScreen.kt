@@ -40,7 +40,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -94,7 +93,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -205,17 +204,18 @@ private fun TimetableSettingsScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
-                val configuration = LocalConfiguration.current
+                val containerSize = LocalWindowInfo.current.containerSize
+                val density = LocalDensity.current
                 // 真实的高宽比：竖屏 >1，横屏 <1。不做下限夹取，横屏时卡片才会跟着变扁变宽。
                 val screenAspect = (
-                    configuration.screenHeightDp.toFloat() /
-                        configuration.screenWidthDp.toFloat()
+                    containerSize.height.coerceAtLeast(1).toFloat() /
+                        containerSize.width.coerceAtLeast(1).toFloat()
                     ).coerceAtLeast(0.2f)
                 // 顶栏折叠会让 innerPadding 每帧变化，maxHeight 也就跟着变；
                 // 卡片尺寸只在进入页面（顶栏展开）时量一次，滚动时不再跟着变，否则会一直缩放。
                 val viewportHeight = remember(
-                    configuration.screenWidthDp,
-                    configuration.screenHeightDp,
+                    containerSize,
+                    density,
                 ) { maxHeight }
                 // 尺寸受两个方向同时约束：不能超出剩余高度，也不能横向超出窗口。
                 // 先由可用高度反推宽度，再用窗口宽度收一次，最后按比例得到高度。
@@ -431,13 +431,12 @@ private fun TimetablePreviewPager(
     Column(modifier = Modifier.fillMaxWidth()) {
         // 左右各留 (宽 - 卡片宽)/2，居中的那一页才落在屏幕正中，两侧各露出半张相邻课表。
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            // 卡片尺寸由上层按可用高度算好传进来；这里只要屏幕宽度算圆角比例。
-            val configuration = LocalConfiguration.current
+            // 卡片尺寸由上层按可用高度算好传进来；圆角按实际可用宽度等比缩放。
             // 圆角跟着设备屏幕走：屏幕圆角多大，就按「卡片宽 / 屏幕宽」等比缩到卡片上；
             // 取不到（模拟器、老系统）时退回 24dp。
             val screenCornerRadius = rememberScreenCornerRadius()
-            val cardCorner = if (screenCornerRadius > 0.dp) {
-                (screenCornerRadius * (maxCardWidth.value / configuration.screenWidthDp))
+            val cardCorner = if (screenCornerRadius > 0.dp && maxWidth > 0.dp) {
+                (screenCornerRadius * (maxCardWidth / maxWidth))
                     .coerceIn(PreviewCardMinCorner, PreviewCardMaxCorner)
             } else {
                 PreviewCardFallbackCorner
