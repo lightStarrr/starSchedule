@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.map
 
 class RoomScheduleRepository(
     private val dao: ScheduleDao,
-    /** 应用模板会改节次，落库后要重排提醒；不传就只写库。 */
+    /** 节次写入与模板应用后重排提醒；只读页面可不传。 */
     private val reminderRefresher: ReminderRefresher? = null,
 ) : ScheduleRepository {
     override fun observeCurrentTimetableId(): Flow<Long?> =
@@ -36,14 +36,18 @@ class RoomScheduleRepository(
     // 写入统一走 DAO 的 AutoSort 事务：节次号永远等于按开始时间排序后的位置，
     // 时间列从上到下才不会出现「第 3 节比第 2 节还早」。
     override suspend fun insertLessonTime(lessonTime: LessonTimeEntity): Long =
-        dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = true)
+        dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = true).also {
+            reminderRefresher?.refreshIfCurrent(lessonTime.timetableId)
+        }
 
     override suspend fun updateLessonTime(lessonTime: LessonTimeEntity) {
         dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = false)
+        reminderRefresher?.refreshIfCurrent(lessonTime.timetableId)
     }
 
     override suspend fun deleteLessonTime(lessonTime: LessonTimeEntity) {
         dao.deleteLessonTimeAutoSort(lessonTime)
+        reminderRefresher?.refreshIfCurrent(lessonTime.timetableId)
     }
 
     override suspend fun getLessonTimeTemplateIdByName(name: String): Long? =

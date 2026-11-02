@@ -40,11 +40,15 @@ import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.ReminderEntity
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import com.star.schedule.feature.timetable.domain.ReminderScheduler
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
@@ -68,6 +72,9 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
 
         // 定期更新提醒的请求码
         const val DAILY_UPDATE_REQUEST_CODE = 9999
+
+        // 页面、广播和后台任务会创建不同实例，调度与取消必须共享同一把锁。
+        private val reminderLock = Mutex()
     }
 
     init {
@@ -460,18 +467,40 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-    override suspend fun enableRemindersForTimetable(timetableId: Long) {
+    override suspend fun enableRemindersForTimetable(timetableId: Long) = reminderLock.withLock {
         val dao = DatabaseProvider.dao()
         dao.setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, timetableId.toString())
 
         cancelAllReminders()
         scheduleRemindersForTimetable(timetableId)
+        scheduleDailyUpdate()
     }
 
-    suspend fun disableReminders() {
+    suspend fun disableReminders() = reminderLock.withLock {
+        disableRemindersLocked()
+    }
+
+    override suspend fun refreshRemindersForTimetable(timetableId: Long) = reminderLock.withLock {
+        val dao = DatabaseProvider.dao()
+        val currentId = dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE).first()?.toLongOrNull()
+        val enabledId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()?.toLongOrNull()
+        if (currentId != timetableId || enabledId != timetableId) return@withLock
+        cancelAllReminders()
+        scheduleRemindersForTimetable(timetableId)
+        scheduleDailyUpdate()
+    }
+
+    override suspend fun disableRemindersForTimetable(timetableId: Long) = reminderLock.withLock {
+        val enabledId = DatabaseProvider.dao()
+            .getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()?.toLongOrNull()
+        if (enabledId == timetableId) disableRemindersLocked()
+    }
+
+    private suspend fun disableRemindersLocked() {
         val dao = DatabaseProvider.dao()
         dao.setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, "")
         cancelAllReminders()
+        cancelDailyUpdate()
     }
 
     private suspend fun scheduleRemindersForTimetable(timetableId: Long) {
@@ -529,7 +558,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         }
     }
 
-    private fun scheduleReminderForCourse(
+    private suspend fun scheduleReminderForCourse(
         course: CourseEntity,
         lessonTime: LessonTimeEntity,
         date: LocalDate,
@@ -544,6 +573,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                 putExtra("course_name", course.name)
                 putExtra("course_location", course.location)
                 putExtra("course_time", lessonTime.startTime)
+                putExtra(CourseReminderReceiver.EXTRA_TIMETABLE_ID, course.timetableId)
             }
 
             val requestCode = generateRequestCode(course.id, date, lessonTime.period)
@@ -559,17 +589,22 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
 
             try {
 
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    pendingIntent
-                )
-
-                // ⚡️ 存储提醒记录
-                CoroutineScope(Dispatchers.IO).launch {
-                    DatabaseProvider.dao().insertReminder(
-                        ReminderEntity(requestCode, course.id, date.toString(), lessonTime.period)
+                // 系统闹钟与登记一起完成，不能在页面销毁取消协程时留下无法查询的闹钟。
+                withContext(NonCancellable) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent,
                     )
+                    try {
+                        DatabaseProvider.dao().insertReminder(
+                            ReminderEntity(requestCode, course.id, date.toString(), lessonTime.period),
+                        )
+                    } catch (error: Throwable) {
+                        alarmManager.cancel(pendingIntent)
+                        pendingIntent.cancel()
+                        throw error
+                    }
                 }
             } catch (_: SecurityException) {
                 CoroutineScope(Dispatchers.Main).launch {
@@ -706,7 +741,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
      * 在应用启动时检查并更新提醒
      * 这个方法应该在 MainActivity.onCreate() 中调用
      */
-    suspend fun initializeOnAppStart() {
+    suspend fun initializeOnAppStart() = reminderLock.withLock {
         try {
             Log.d("UnifiedNotification", "应用启动，初始化提醒系统")
 
@@ -734,6 +769,8 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                     }
                 }
             } ?: Log.d("UnifiedNotification", "未检测到启用的课表提醒")
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (e: Exception) {
             Log.e("UnifiedNotification", "初始化提醒系统失败", e)
         }
@@ -742,7 +779,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
     /**
      * 设备重启后恢复提醒
      */
-    suspend fun restoreRemindersAfterBoot() {
+    suspend fun restoreRemindersAfterBoot() = reminderLock.withLock {
         try {
             Log.d("UnifiedNotification", "设备重启，恢复提醒设置")
 
@@ -774,6 +811,8 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                     }
                 }
             }
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (e: Exception) {
             Log.e("UnifiedNotification", "重启后恢复提醒失败", e)
         }
@@ -783,31 +822,26 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
      * 定期更新即将到期的提醒
      * 清理过期提醒，添加新的提醒
      */
-    suspend fun updateUpcomingReminders() {
-        try {
-            Log.d("UnifiedNotification", "开始定期更新提醒")
+    suspend fun updateUpcomingReminders() = reminderLock.withLock {
+        val timetableId = DatabaseProvider.dao()
+            .getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE)
+            .first()
+            ?.toLongOrNull()
+            ?: return@withLock
+        cleanupExpiredReminders()
+        scheduleRemindersForTimetable(timetableId)
+        Log.d("UnifiedNotification", "定期更新提醒完成")
+    }
 
-            val dao = DatabaseProvider.dao()
-            val enabledTimetableId =
-                dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
-
-            enabledTimetableId?.let { idString ->
-                if (idString.isNotEmpty()) {
-                    val timetableId = idString.toLongOrNull()
-                    if (timetableId != null) {
-                        // 清理过期的提醒
-                        cleanupExpiredReminders()
-
-                        // 重新设置未来两周的提醒
-                        scheduleRemindersForTimetable(timetableId)
-
-                        Log.d("UnifiedNotification", "定期更新提醒完成")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("UnifiedNotification", "定期更新提醒失败", e)
-        }
+    private fun cancelDailyUpdate() {
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            DAILY_UPDATE_REQUEST_CODE,
+            Intent(context, DailyUpdateReceiver::class.java),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
     }
 
     /**

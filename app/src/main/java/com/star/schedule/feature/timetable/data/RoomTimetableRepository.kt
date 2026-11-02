@@ -38,8 +38,8 @@ class RoomTimetableRepository(
     }
 
     override suspend fun deleteTimetableWithReminders(timetable: TimetableEntity) {
+        reminderRefresher.disableIfEnabled(timetable.id)
         dao.deleteTimetableWithReminders(timetable)
-        reminderRefresher.refreshIfCurrent(timetable.id)
     }
 
     override suspend fun replaceCoursesForTimetable(

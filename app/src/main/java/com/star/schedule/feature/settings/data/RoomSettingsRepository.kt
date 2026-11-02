@@ -8,6 +8,7 @@ import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.domain.TimetablePreviewBlock
 import com.star.schedule.feature.settings.domain.TimetableSummary
 import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.platform.notification.ReminderRefresher
 import com.star.schedule.wakeup.WakeUpSupport
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -21,6 +22,7 @@ class RoomSettingsRepository(
 ) : SettingsRepository {
     private val appContext = context.applicationContext
     private val iconStore = LiveNotificationIconStore(context)
+    private val reminderRefresher = ReminderRefresher(dao, notificationManager)
     override fun observeTimetables(): Flow<List<TimetableSummary>> =
         dao.getAllTimetables().map { timetables ->
             timetables.map { timetable ->
@@ -108,6 +110,7 @@ class RoomSettingsRepository(
 
     override suspend fun deleteTimetable(timetableId: Long) {
         val timetable = dao.getAllTimetablesOnce().firstOrNull { it.id == timetableId } ?: return
+        reminderRefresher.disableIfEnabled(timetableId)
         dao.deleteTimetableWithReminders(timetable)
         // 删掉的正好是当前课表时，把当前指向挪到剩下的一份；没有剩下的就置空。
         dao.ensureValidCurrentTimetable()

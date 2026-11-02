@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.star.schedule.app.StarScheduleApp
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.feature.schedule.data.RoomScheduleRepository
@@ -12,14 +13,20 @@ import com.star.schedule.feature.settings.data.RoomStartupHintRepository
 import com.star.schedule.feature.settings.presentation.StartupHintViewModel
 import com.star.schedule.feature.settings.presentation.StartupHintViewModelFactory
 import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
+import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.platform.recents.RecentsTaskVisibility
 import com.star.schedule.platform.systembar.installEdgeToEdge
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         DatabaseProvider.init(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            UnifiedNotificationManager(applicationContext).initializeOnAppStart()
+        }
         installEdgeToEdge()
         val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
         val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.dao())

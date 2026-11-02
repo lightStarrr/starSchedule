@@ -11,6 +11,8 @@ import com.star.schedule.feature.schedule.data.RoomScheduleRepository
 import com.star.schedule.feature.timetable.presentation.LessonTimeSettingsRoute
 import com.star.schedule.feature.timetable.presentation.LessonTimeSettingsViewModel
 import com.star.schedule.feature.timetable.presentation.LessonTimeSettingsViewModelFactory
+import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.platform.notification.ReminderRefresher
 import com.star.schedule.platform.systembar.installEdgeToEdge
 
 /**
@@ -23,7 +25,11 @@ class LessonTimeSettingsActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val repository = RoomScheduleRepository(DatabaseProvider.dao())
+        val dao = DatabaseProvider.dao()
+        val repository = RoomScheduleRepository(
+            dao = dao,
+            reminderRefresher = ReminderRefresher(dao, UnifiedNotificationManager(applicationContext)),
+        )
         val viewModel = ViewModelProvider(
             this,
             LessonTimeSettingsViewModelFactory(repository),
