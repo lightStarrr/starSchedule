@@ -245,7 +245,7 @@
     <string name="notification_test_title">Notification test</string>
     <string name="notification_test_support_instant">Test notification (instant)</string>
     <string name="notification_test_support_delayed">Test notification (delayed)</string>
-    <string name="hide_from_recents_title">Hide app from recents</string>
+    <string name="hide_from_recents_title">Hide background card</string>
     <string name="hide_from_recents_support">If enabled, the app won\'t show in recent tasks</string>
     <string name="privacy_analytics_title">Anonymous usage statistics</string>
     <string name="privacy_analytics_support">Uploads launches and version info to improve the app. Turning this off also disables cloud AI, which needs a device ID.</string>

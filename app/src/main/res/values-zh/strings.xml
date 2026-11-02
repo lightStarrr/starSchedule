@@ -245,7 +245,7 @@
     <string name="notification_test_title">通知测试</string>
     <string name="notification_test_support_instant">测试通知功能（即时）</string>
     <string name="notification_test_support_delayed">测试通知功能（延迟）</string>
-    <string name="hide_from_recents_title">后台隐藏应用</string>
+    <string name="hide_from_recents_title">隐藏后台卡片</string>
     <string name="hide_from_recents_support">开启后应用将不在最近任务列表中显示</string>
     <string name="privacy_analytics_title">匿名使用统计</string>
     <string name="privacy_analytics_support">上传启动次数与版本信息用于改进应用。关闭后将同时停用云端 AI，因为它需要设备标识。</string>
