@@ -13,6 +13,7 @@ import com.star.schedule.feature.settings.domain.AiReasoningMode
 import com.star.schedule.feature.settings.domain.AiUsage
 import com.star.schedule.feature.settings.domain.AiUsageRepository
 import com.star.schedule.feature.settings.domain.SettingsRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -169,6 +170,8 @@ class AiSettingsViewModel(
 
     private val _usage = MutableStateFlow<AiUsageUiState>(AiUsageUiState.Hidden)
     val usage: StateFlow<AiUsageUiState> = _usage
+    private var modelRetry: Job? = null
+    private var usageRetry: Job? = null
 
     init {
         // 只有真的用云端时才去拉额度；切走或改成「无」就把这块收起来并取消在途请求
@@ -177,15 +180,12 @@ class AiSettingsViewModel(
                 .map { it.effectiveProviderId }
                 .distinctUntilChanged()
                 .collectLatest { providerId ->
+                    usageRetry?.cancel()
                     if (providerId != Constants.AI_PROVIDER_CLOUD) {
                         _usage.value = AiUsageUiState.Hidden
                         return@collectLatest
                     }
-                    _usage.value = AiUsageUiState.Loading
-                    _usage.value = usageRepository.fetchUsage().fold(
-                        onSuccess = { AiUsageUiState.Ready(it) },
-                        onFailure = { AiUsageUiState.Unavailable },
-                    )
+                    loadUsage()
                 }
         }
 
@@ -195,6 +195,7 @@ class AiSettingsViewModel(
                 .map { it.effectiveProviderId }
                 .distinctUntilChanged()
                 .collectLatest { providerId ->
+                    modelRetry?.cancel()
                     if (providerId != Constants.AI_PROVIDER_CLOUD) {
                         _models.value = AiModelUiState.Hidden
                         return@collectLatest
@@ -249,7 +250,23 @@ class AiSettingsViewModel(
         // 只有失败态才值得重试：列表已就绪时重复点行不该再打一次网络
         if (_models.value != AiModelUiState.Unavailable) return
         if (uiState.value.effectiveProviderId != Constants.AI_PROVIDER_CLOUD) return
-        viewModelScope.launch { loadModels() }
+        _models.value = AiModelUiState.Loading
+        modelRetry = viewModelScope.launch { loadModels() }
+    }
+
+    fun refreshUsage() {
+        if (_usage.value != AiUsageUiState.Unavailable) return
+        if (uiState.value.effectiveProviderId != Constants.AI_PROVIDER_CLOUD) return
+        _usage.value = AiUsageUiState.Loading
+        usageRetry = viewModelScope.launch { loadUsage() }
+    }
+
+    private suspend fun loadUsage() {
+        _usage.value = AiUsageUiState.Loading
+        _usage.value = usageRepository.fetchUsage().fold(
+            onSuccess = { AiUsageUiState.Ready(it) },
+            onFailure = { AiUsageUiState.Unavailable },
+        )
     }
 
     private suspend fun loadModels() {

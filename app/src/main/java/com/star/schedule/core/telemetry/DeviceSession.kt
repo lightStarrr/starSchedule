@@ -19,32 +19,64 @@ class DeviceSession(
     private val identity: DeviceIdentity,
     private val clientInfo: () -> ClientInfo,
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val enabled: () -> Boolean = { true },
 ) {
     private val mutex = Mutex()
+    @Volatile
+    private var registrationAttempt = 0L
+    private var lastRegistrationResult: ApiResult<String>? = null
 
-    suspend fun currentToken(): String? = credentials.token()
+    internal suspend fun requestError(): ApiError? = when {
+        !enabled() -> ApiError.Unauthorized("CLOUD_DISABLED")
+        isBannedNow() -> ApiError.Banned()
+        else -> null
+    }
+
+    suspend fun currentToken(): String? = if (!enabled() || isBannedNow()) null else credentials.token()
+
+    suspend fun markBanned() = credentials.markBanned()
+
+    internal suspend fun acceptRefreshedToken(sentToken: String?, refreshedToken: String) =
+        credentials.updateTokenIfCurrent(sentToken, refreshedToken)
 
     /** 保证有可用 token；没有就注册一次。 */
     suspend fun ensureRegistered(): ApiResult<String> {
-        if (isBannedNow()) return ApiResult.Failure(ApiError.Banned())
-        credentials.token()?.let { return ApiResult.Success(it) }
-        return registerAndStore()
+        val attempt = registrationAttempt
+        return mutex.withLock {
+            requestError()?.let { return@withLock ApiResult.Failure(it) }
+            credentials.token()?.let { return@withLock ApiResult.Success(it) }
+            if (attempt != registrationAttempt) return@withLock checkNotNull(lastRegistrationResult)
+            registerAndRemember()
+        }
     }
 
     /**
      * 401 后的续期入口。返回 null 表示放弃（被禁、注册失败、仍在冷却期）。
      * [failedToken] 是刚才被拒的那个 token，用来判断别人是否已经刷新过。
      */
-    suspend fun refreshAfter401(failedToken: String?): String? = mutex.withLock {
-        if (isBannedNow()) return@withLock null
+    suspend fun refreshAfter401(failedToken: String?): String? {
+        val attempt = registrationAttempt
+        return mutex.withLock {
+            if (requestError() != null) return@withLock null
 
-        val current = credentials.token()
-        if (current != null && current != failedToken) return@withLock current
+            val current = credentials.token()
+            if (current != null && current != failedToken) return@withLock current
 
-        when (val result = registerAndStore()) {
-            is ApiResult.Success -> result.value
-            is ApiResult.Failure -> null
+            // 同一批并发请求也共享注册失败结果，避免失败时逐个撞注册限流。
+            val result = if (attempt != registrationAttempt) {
+                checkNotNull(lastRegistrationResult)
+            } else {
+                registerAndRemember()
+            }
+            (result as? ApiResult.Success)?.value
         }
+    }
+
+    private suspend fun registerAndRemember(): ApiResult<String> {
+        val result = registerAndStore()
+        lastRegistrationResult = result
+        registrationAttempt++
+        return result
     }
 
     /** 校验设备状态；调用方负责控制频率，这里不做节流。 */

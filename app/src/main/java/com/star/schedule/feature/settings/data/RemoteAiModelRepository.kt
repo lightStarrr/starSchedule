@@ -1,6 +1,5 @@
 package com.star.schedule.feature.settings.data
 
-import android.content.Context
 import com.star.schedule.BuildConfig
 import com.star.schedule.core.network.ApiClient
 import com.star.schedule.core.network.ApiError
@@ -9,10 +8,7 @@ import com.star.schedule.core.network.ApiRequest
 import com.star.schedule.core.network.ApiResult
 import com.star.schedule.core.network.ApiUrlValidator
 import com.star.schedule.core.network.RetryPolicy
-import com.star.schedule.core.network.SharedApiHttpClient
-import com.star.schedule.core.telemetry.DeviceCredentialStore
-import com.star.schedule.core.telemetry.KeystoreAesGcmCipher
-import com.star.schedule.core.telemetry.SharedPreferencesStore
+import com.star.schedule.core.telemetry.Telemetry
 import com.star.schedule.feature.settings.domain.AiModel
 import com.star.schedule.feature.settings.domain.AiReasoning
 import com.star.schedule.feature.settings.domain.AiReasoningEffort
@@ -25,16 +21,15 @@ import kotlinx.serialization.Serializable
 /**
  * 从后端取「后台已启用」的模型列表。
  *
- * 与用量一样只读一次、不做 401 续期：列表是展示型数据，令牌失效就显示「暂时取不到」，
- * 不把设备注册流程牵扯进来。
+ * 使用启动统计共用的设备会话，令牌缺失或失效时由会话单飞重注册。
  */
 class RemoteAiModelRepository internal constructor(
     private val baseUrl: String,
     clientProvider: () -> ApiClient,
 ) : AiModelRepository {
-    constructor(context: Context) : this(
+    constructor() : this(
         baseUrl = BuildConfig.API_BASE_URL.trim(),
-        clientProvider = createClientProvider(context.applicationContext),
+        clientProvider = { Telemetry.apiClient() },
     )
 
     private val client by lazy(clientProvider)
@@ -68,21 +63,6 @@ class RemoteAiModelRepository internal constructor(
 
     private companion object {
         const val HTTP_SERVICE_UNAVAILABLE = 503
-
-        fun createClientProvider(context: Context): () -> ApiClient = {
-            val credentials = DeviceCredentialStore(
-                store = SharedPreferencesStore(
-                    context.getSharedPreferences(DeviceCredentialStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
-                ),
-                cipher = KeystoreAesGcmCipher(),
-            )
-            ApiClient(
-                httpClient = SharedApiHttpClient.get(),
-                baseUrl = BuildConfig.API_BASE_URL.trim(),
-                tokenProvider = { credentials.token() },
-                onUnauthorized = { null },
-            )
-        }
     }
 }
 
@@ -111,7 +91,7 @@ private fun AiReasoningDto?.toDomain(): AiReasoning {
 
 @Serializable
 private data class AiModelListDto(
-    val items: List<AiModelDto> = emptyList(),
+    val items: List<AiModelDto>,
     @SerialName("default") val defaultAlias: String = "",
 )
 

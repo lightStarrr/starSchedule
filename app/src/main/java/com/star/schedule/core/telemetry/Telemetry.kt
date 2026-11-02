@@ -13,8 +13,6 @@ import com.star.schedule.core.network.ServerClock
 import com.star.schedule.core.network.SharedApiHttpClient
 import com.star.schedule.core.network.buildApiHttpClient
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 /**
  * 启动统计的装配壳：只做接线，不含业务逻辑。
@@ -26,10 +24,13 @@ object Telemetry {
     private const val TAG = "Telemetry"
 
     private var recorder: LaunchRecorder? = null
+    private var client: ApiClient? = null
 
-    /** 默认开启；用户在设置页关掉后立即停止记录与上报。 */
-    @Volatile
-    private var dataCollectionEnabled = true
+    private val startup = TelemetryStartupGate(
+        onProcessStart = { recorder?.onProcessStart() },
+        onForeground = { recorder?.onForeground() },
+        onConsentChanged = { enabled -> recorder?.onDataCollectionChanged(enabled) },
+    )
 
     fun install(
         application: Application,
@@ -69,32 +70,26 @@ object Telemetry {
         )
         val clientInfo = { AndroidClientInfo.read() }
 
-        SharedApiHttpClient.install {
-            buildApiHttpClient(clientInfo, clock) { refreshedToken ->
-                // 拦截器线程上不能阻塞，落盘丢到 IO 协程
-                scope.launch(Dispatchers.IO) {
-                    runCatching { credentials.updateToken(refreshedToken) }
-                }
-            }
-        }
+        // Token 在挂起请求中落盘，保证本次调用返回后所有接口立即看到续期结果。
+        SharedApiHttpClient.install { buildApiHttpClient(clientInfo, clock) {} }
 
         // session 与 client 互相引用：401 的续期入口要回调 session，所以用可变持有者打破循环。
         var session: DeviceSession? = null
-        val api = HttpDeviceApi(
-            ApiClient(
-                httpClient = SharedApiHttpClient.get(),
-                baseUrl = baseUrl,
-                tokenProvider = { credentials.token() },
-                onUnauthorized = { failedToken -> session?.refreshAfter401(failedToken) },
-            ),
+        val apiClient = createDeviceApiClient(
+            httpClient = SharedApiHttpClient.get(),
+            baseUrl = baseUrl,
+            session = { session },
         )
+        val api = HttpDeviceApi(apiClient)
         val deviceSession = DeviceSession(
             api = api,
             credentials = credentials,
             identity = identity,
             clientInfo = clientInfo,
+            enabled = { startup.enabled },
         )
         session = deviceSession
+        client = apiClient
 
         recorder = LaunchRecorder(
             queue = queue,
@@ -106,7 +101,7 @@ object Telemetry {
             processStartElapsedMillis = processStartElapsedMillis,
             elapsedMillis = { SystemClock.elapsedRealtime() },
             log = { message -> Log.w(TAG, message) },
-            enabled = { dataCollectionEnabled },
+            enabled = { startup.enabled },
         )
     }
 
@@ -117,18 +112,18 @@ object Telemetry {
      * 关掉统计就等于关掉云端能力，所以这里不单独维护第二个状态。
      */
     fun setDataCollectionEnabled(enabled: Boolean) {
-        if (dataCollectionEnabled == enabled) return
-        dataCollectionEnabled = enabled
-        recorder?.onDataCollectionChanged(enabled)
+        startup.updateConsent(enabled)
     }
 
     fun onProcessStart() {
-        recorder?.onProcessStart()
+        startup.processStarted()
     }
 
     fun onForeground() {
-        recorder?.onForeground()
+        startup.foregrounded()
     }
 
     val isEnabled: Boolean get() = recorder != null
+
+    internal fun apiClient(): ApiClient = checkNotNull(client) { "设备网络会话未初始化" }
 }

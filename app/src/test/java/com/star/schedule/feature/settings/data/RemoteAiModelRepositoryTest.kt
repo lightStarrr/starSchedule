@@ -69,6 +69,11 @@ class RemoteAiModelRepositoryTest {
         assertEquals("模型甲", catalog.defaultModel?.displayName)
     }
 
+    @Test
+    fun `missing items is a parse failure rather than a successful empty catalog`() = runTest {
+        assertTrue(repository { responseOf(it, 200, "{}") }.fetchModels().isFailure)
+    }
+
     private fun TestScope.repository(transport: (Request) -> Response): RemoteAiModelRepository {
         val client = ApiClient(
             httpClient = OkHttpClient.Builder().addInterceptor(fakeTransport(transport)).build(),

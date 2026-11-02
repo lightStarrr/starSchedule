@@ -261,9 +261,12 @@
     <string name="ai_provider_new">New provider</string>
     <string name="ai_usage_title">Today\'s quota</string>
     <string name="ai_usage_remaining">%1$s left</string>
+    <string name="ai_usage_unlimited">Unlimited</string>
+    <string name="ai_usage_retry">Retry</string>
     <string name="ai_usage_loading">Loading…</string>
     <string name="ai_usage_unavailable">Usage unavailable</string>
     <string name="ai_usage_footer">%1$s tokens per day · %2$d requests</string>
+    <string name="ai_usage_unlimited_footer">No daily token limit · Request count: %1$d</string>
     <string name="ai_model_row_title">Current model</string>
     <string name="ai_section_model">Model</string>
     <string name="ai_model_follow_default">Server default</string>

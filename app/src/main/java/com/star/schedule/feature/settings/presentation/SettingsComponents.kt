@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,6 +35,7 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.star.schedule.R
 
 /**
  * 设置页共用的列表组件。
@@ -143,6 +145,7 @@ internal fun SettingsQuotaItem(
     fraction: Float?,
     shapeIndex: Int,
     shapeCount: Int,
+    onRetry: (() -> Unit)? = null,
 ) {
     SegmentedListItem(
         shapes = ListItemDefaults.segmentedShapes(shapeIndex, shapeCount),
@@ -174,6 +177,11 @@ internal fun SettingsQuotaItem(
                     Spacer(Modifier.height(6.dp))
                 }
                 Text(supporting)
+                if (onRetry != null) {
+                    TextButton(onClick = onRetry) {
+                        Text(stringResource(R.string.ai_usage_retry))
+                    }
+                }
             }
         },
     )

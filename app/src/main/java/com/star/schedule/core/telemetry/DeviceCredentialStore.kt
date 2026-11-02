@@ -36,6 +36,11 @@ class DeviceCredentialStore(
     /** 收到 `X-Refresh-Token` 时静默覆盖，不能动 install_id / device_id。 */
     suspend fun updateToken(token: String) = mutex.withLock { writeTokenLocked(token) }
 
+    /** 旧请求晚到的续期响应不能覆盖另一个请求刚取得的新令牌。 */
+    suspend fun updateTokenIfCurrent(sentToken: String?, refreshedToken: String) = mutex.withLock {
+        if (tokenLocked() == sentToken) writeTokenLocked(refreshedToken)
+    }
+
     suspend fun clearToken() = mutex.withLock {
         store.remove(KEY_TOKEN)
         cachedToken = null

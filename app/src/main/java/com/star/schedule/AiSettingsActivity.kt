@@ -34,8 +34,8 @@ class AiSettingsActivity : ComponentActivity() {
             this,
             AiSettingsViewModelFactory(
                 repository = settingsRepository,
-                usageRepository = RemoteAiUsageRepository(this),
-                modelRepository = RemoteAiModelRepository(this),
+                usageRepository = RemoteAiUsageRepository(),
+                modelRepository = RemoteAiModelRepository(),
             ),
         )[AiSettingsViewModel::class.java]
 

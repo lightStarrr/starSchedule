@@ -46,6 +46,9 @@ class ApiClient(
     private val tokenProvider: suspend () -> String?,
     private val onUnauthorized: suspend (failedToken: String?) -> String?,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val onBanned: suspend () -> Unit = {},
+    private val onRefreshedToken: suspend (sentToken: String?, refreshedToken: String) -> Unit = { _, _ -> },
+    private val requestError: suspend () -> ApiError? = { null },
 ) {
     private val normalizedBaseUrl = baseUrl.trimEnd('/') + "/"
 
@@ -60,6 +63,7 @@ class ApiClient(
         request: ApiRequest,
         deserialize: (String) -> T,
     ): ApiResult<T> {
+        requestError()?.let { return ApiResult.Failure(it) }
         var attempt = 0
         var authRetried = false
 
@@ -73,6 +77,7 @@ class ApiClient(
         }
 
         while (true) {
+            requestError()?.let { return ApiResult.Failure(it) }
             when (val outcome = executeOnce(request, token)) {
                 is Outcome.Success -> {
                     return try {
@@ -86,6 +91,7 @@ class ApiClient(
 
                 is Outcome.Failure -> {
                     val error = outcome.error
+                    if (error is ApiError.Banned) onBanned()
 
                     // 401：静默重注册后重放一次，且不消耗网络/5xx 的重试额度
                     if (error is ApiError.Http && error.status == 401 && request.authorized) {
@@ -160,6 +166,11 @@ class ApiClient(
 
         try {
             response.use { resp ->
+                if (request.authorized) {
+                    resp.header(ResponseMetadataInterceptor.HEADER_REFRESH_TOKEN)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { onRefreshedToken(token, it) }
+                }
                 val requestId = resp.header(CommonHeadersInterceptor.HEADER_REQUEST_ID)
                 val rawBody = resp.body?.string().orEmpty()
                 if (resp.isSuccessful) {

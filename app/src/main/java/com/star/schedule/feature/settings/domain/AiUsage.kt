@@ -7,14 +7,15 @@ package com.star.schedule.feature.settings.domain
  */
 data class AiUsage(
     val dailyQuota: Long,
+    val quotaUnlimited: Boolean,
     val usedTokens: Long,
-    val remainingTokens: Long,
+    val remainingTokens: Long?,
     val requestCount: Long,
     val resetAt: String?,
 ) {
-    /** 已用比例，0..1；配额为 0 时按 0 处理，避免除零。 */
+    /** 已用比例，0..1；不限量时界面不显示进度条。 */
     val usedFraction: Float
-        get() = if (dailyQuota <= 0L) 0f else (usedTokens.toFloat() / dailyQuota).coerceIn(0f, 1f)
+        get() = if (quotaUnlimited || dailyQuota <= 0L) 0f else (usedTokens.toFloat() / dailyQuota).coerceIn(0f, 1f)
 }
 
 interface AiUsageRepository {

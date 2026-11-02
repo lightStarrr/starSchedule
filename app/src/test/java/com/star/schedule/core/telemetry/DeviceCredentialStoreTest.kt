@@ -9,6 +9,18 @@ import org.junit.Test
 
 class DeviceCredentialStoreTest {
 
+    @Test
+    fun `late refresh response cannot overwrite another request registration`() = runTest {
+        val credentials = DeviceCredentialStore(TestKeyValueStore(), FakeCipher())
+        credentials.saveRegistration("device", "old-token")
+        credentials.updateTokenIfCurrent("old-token", "refreshed-token")
+        assertEquals("refreshed-token", credentials.token())
+
+        credentials.saveRegistration("device", "registered-token")
+        credentials.updateTokenIfCurrent("old-token", "late-token")
+        assertEquals("registered-token", credentials.token())
+    }
+
     private val store = TestKeyValueStore()
 
     private fun credentialStore(cipher: SecretCipher, now: () -> Long = { 1_000L }) =

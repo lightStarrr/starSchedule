@@ -25,6 +25,33 @@ class DeviceSessionTest {
     )
 
     @Test
+    fun `first registration and unauthorized refresh share one registration`() = runTest {
+        api.registerDelayMillis = 10
+
+        val registration = async { session.ensureRegistered() }
+        val refresh = async { session.refreshAfter401(null) }
+        val secondRegistration = async { session.ensureRegistered() }
+
+        assertTrue(registration.await() is ApiResult.Success)
+        assertEquals("token-1", refresh.await())
+        assertTrue(secondRegistration.await() is ApiResult.Success)
+        assertEquals(1, api.registerCalls)
+    }
+
+    @Test
+    fun `banned device hides its stored token until cooldown ends`() = runTest {
+        credentials.saveRegistration("device-1", "stored-token")
+        session.markBanned()
+
+        assertNull(session.currentToken())
+        assertNull(session.refreshAfter401(null))
+        assertEquals(0, api.registerCalls)
+
+        now += DeviceCredentialStore.BAN_COOLDOWN_MILLIS + 1
+        assertEquals("stored-token", session.currentToken())
+    }
+
+    @Test
     fun `concurrent refreshes register only once`() = runTest {
         api.registerDelayMillis = 10
 
@@ -32,6 +59,41 @@ class DeviceSessionTest {
 
         assertEquals(1, api.registerCalls)
         assertTrue(tokens.all { it == "token-1" })
+    }
+
+    @Test
+    fun `concurrent registration failures are shared and later requests can retry`() = runTest {
+        api.registerDelayMillis = 10
+        api.registerResult = { ApiResult.Failure(networkError()) }
+
+        val results = List(5) { async { session.refreshAfter401(null) } }.awaitAll()
+
+        assertTrue(results.all { it == null })
+        assertEquals(1, api.registerCalls)
+        api.registerResult = { ApiResult.Success(registerResponseOf()) }
+        assertEquals("token-1", session.refreshAfter401(null))
+        assertEquals(2, api.registerCalls)
+    }
+
+    @Test
+    fun `disabled cloud blocks stored token and registration until consent returns`() = runTest {
+        var enabled = false
+        val gated = DeviceSession(
+            api = api,
+            credentials = credentials,
+            identity = DeviceIdentity({ "9774d56d682e549c" }, { "install-fallback" }),
+            clientInfo = { telemetryClientInfo },
+            enabled = { enabled },
+        )
+        credentials.saveRegistration("device", "stored-token")
+
+        assertNull(gated.currentToken())
+        assertNull(gated.refreshAfter401(null))
+        assertTrue(gated.ensureRegistered() is ApiResult.Failure)
+        assertEquals(0, api.registerCalls)
+
+        enabled = true
+        assertEquals("stored-token", gated.currentToken())
     }
 
     @Test

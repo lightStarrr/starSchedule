@@ -67,6 +67,7 @@ fun AiSettingsRoute(
         onSelectModel = viewModel::selectModel,
         onSelectReasoningEffort = viewModel::selectReasoningEffort,
         onRefreshModels = viewModel::refreshModels,
+        onRefreshUsage = viewModel::refreshUsage,
         onNewProvider = onNewProvider,
     )
 }
@@ -81,6 +82,7 @@ private fun AiSettingsScreen(
     onSelectModel: (String) -> Unit,
     onSelectReasoningEffort: (AiReasoningEffort?) -> Unit,
     onRefreshModels: () -> Unit,
+    onRefreshUsage: () -> Unit,
     onNewProvider: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -174,7 +176,7 @@ private fun AiSettingsScreen(
                         ) {
                             // 收起动画期间这一行仍在树上，位置直接写死 1/2：
                             // 用「可见行」查位置会因为查不到而拿不到值
-                            QuotaRow(usage = usage, shapeIndex = 1, shapeCount = 2)
+                            QuotaRow(usage = usage, shapeIndex = 1, shapeCount = 2, onRetry = onRefreshUsage)
                         }
                     }
                 }
@@ -475,30 +477,44 @@ private fun ModelMenu(
  * 取不到时同样占位并说明，用户才能分清「没额度」和「没网络」。
  */
 @Composable
-private fun QuotaRow(usage: AiUsageUiState, shapeIndex: Int, shapeCount: Int) {
+private fun QuotaRow(
+    usage: AiUsageUiState,
+    shapeIndex: Int,
+    shapeCount: Int,
+    onRetry: () -> Unit,
+) {
     val ready = usage as? AiUsageUiState.Ready
     SettingsQuotaItem(
         title = stringResource(R.string.ai_usage_title),
         value = when (usage) {
-            is AiUsageUiState.Ready -> stringResource(
-                R.string.ai_usage_remaining,
-                formatTokens(ready!!.usage.remainingTokens),
-            )
+            is AiUsageUiState.Ready -> if (usage.usage.quotaUnlimited) {
+                stringResource(R.string.ai_usage_unlimited)
+            } else {
+                stringResource(
+                    R.string.ai_usage_remaining,
+                    formatTokens(usage.usage.remainingTokens ?: 0L),
+                )
+            }
             AiUsageUiState.Loading, AiUsageUiState.Hidden ->
                 stringResource(R.string.ai_usage_loading)
             AiUsageUiState.Unavailable -> stringResource(R.string.ai_usage_unavailable)
         },
         supporting = when (usage) {
-            is AiUsageUiState.Ready -> stringResource(
-                R.string.ai_usage_footer,
-                formatTokens(ready!!.usage.dailyQuota),
-                ready.usage.requestCount,
-            )
+            is AiUsageUiState.Ready -> if (usage.usage.quotaUnlimited) {
+                stringResource(R.string.ai_usage_unlimited_footer, usage.usage.requestCount)
+            } else {
+                stringResource(
+                    R.string.ai_usage_footer,
+                    formatTokens(usage.usage.dailyQuota),
+                    usage.usage.requestCount,
+                )
+            }
             AiUsageUiState.Loading, AiUsageUiState.Hidden ->
                 stringResource(R.string.ai_usage_loading_hint)
             AiUsageUiState.Unavailable -> stringResource(R.string.ai_usage_unavailable_hint)
         },
-        fraction = ready?.usage?.usedFraction,
+        fraction = ready?.usage?.takeUnless { it.quotaUnlimited }?.usedFraction,
+        onRetry = onRetry.takeIf { usage == AiUsageUiState.Unavailable },
         shapeIndex = shapeIndex,
         shapeCount = shapeCount,
     )

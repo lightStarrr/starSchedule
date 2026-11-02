@@ -18,11 +18,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -170,6 +172,68 @@ class AiSettingsViewModelTest {
         viewModel.refreshModels()
         advanceUntilIdle()
         assertEquals(2, modelRepository.fetchCount)
+    }
+
+    @Test
+    fun `repeated retry clicks start one model request and switching away cancels it`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        modelRepository.result = Result.failure(IllegalStateException("offline"))
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+
+        modelRepository.result = Result.success(sampleCatalog())
+        modelRepository.delayMillis = 1000
+        repeat(3) { viewModel.refreshModels() }
+        runCurrent()
+        assertEquals(2, modelRepository.fetchCount)
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_NONE)
+        advanceUntilIdle()
+
+        assertEquals(AiModelUiState.Hidden, state.value.models)
+        assertEquals(AiUsageUiState.Hidden, viewModel.usage.value)
+    }
+
+    @Test
+    fun `quota failure can retry once without repeating a ready request`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        usageRepository.fails = true
+        val viewModel = createViewModel()
+        collectState(viewModel)
+        advanceUntilIdle()
+        assertEquals(AiUsageUiState.Unavailable, viewModel.usage.value)
+
+        usageRepository.fails = false
+        repeat(3) { viewModel.refreshUsage() }
+        advanceUntilIdle()
+        assertTrue(viewModel.usage.value is AiUsageUiState.Ready)
+        assertEquals(2, usageRepository.fetchCount)
+
+        viewModel.refreshUsage()
+        advanceUntilIdle()
+        assertEquals(2, usageRepository.fetchCount)
+    }
+
+    @Test
+    fun `disabling privacy cancels quota retry and hides the result`() = runTest(dispatcher) {
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "true")
+        settings.set(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_CLOUD)
+        usageRepository.fails = true
+        val viewModel = createViewModel()
+        val state = collectState(viewModel)
+        advanceUntilIdle()
+
+        usageRepository.fails = false
+        usageRepository.delayMillis = 1000
+        viewModel.refreshUsage()
+        runCurrent()
+        settings.set(Constants.PREF_PRIVACY_DATA_ENABLED, "false")
+        advanceUntilIdle()
+
+        assertEquals(AiUsageUiState.Hidden, viewModel.usage.value)
+        assertEquals(AiModelUiState.Hidden, state.value.models)
     }
 
     @Test
@@ -384,23 +448,35 @@ private fun sampleCatalog() = AiModelCatalog(
 private class FakeModelRepository : AiModelRepository {
     var result: Result<AiModelCatalog> = Result.success(sampleCatalog())
     var fetchCount = 0
+    var delayMillis = 0L
 
     override suspend fun fetchModels(): Result<AiModelCatalog> {
         fetchCount++
+        delay(delayMillis)
         return result
     }
 }
 
 private class FakeUsageRepository : AiUsageRepository {
-    override suspend fun fetchUsage(): Result<AiUsage> = Result.success(
-        AiUsage(
-            dailyQuota = 200_000,
-            usedTokens = 0,
-            remainingTokens = 200_000,
-            requestCount = 0,
-            resetAt = null,
-        ),
-    )
+    var fetchCount = 0
+    var fails = false
+    var delayMillis = 0L
+
+    override suspend fun fetchUsage(): Result<AiUsage> {
+        fetchCount++
+        delay(delayMillis)
+        if (fails) return Result.failure(IllegalStateException("offline"))
+        return Result.success(
+            AiUsage(
+                dailyQuota = 200_000,
+                quotaUnlimited = false,
+                usedTokens = 0,
+                remainingTokens = 200_000,
+                requestCount = 0,
+                resetAt = null,
+            ),
+        )
+    }
 }
 
 private class FakeSettingsRepository : SettingsRepository {
