@@ -288,6 +288,7 @@
     <string name="ai_model_empty">服务端暂未提供模型</string>
     <string name="ai_usage_loading_hint">正在读取今日用量</string>
     <string name="ai_usage_unavailable_hint">稍后重试或检查网络</string>
+    <string name="update_entry_title">软件更新</string>
     <string name="about_app_title">关于应用</string>
     <string name="about_version_title">版本</string>
     <string name="about_build_title">构建</string>

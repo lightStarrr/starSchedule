@@ -48,6 +48,9 @@ class SettingsActivity : ComponentActivity() {
                     onOpenAbout = {
                         startActivity(Intent(this, AboutActivity::class.java))
                     },
+                    onOpenUpdatePage = {
+                        startActivity(Intent(this, SoftwareUpdateActivity::class.java))
+                    },
                     onRequestNotificationPermission = permissionGate::request,
                 )
             }

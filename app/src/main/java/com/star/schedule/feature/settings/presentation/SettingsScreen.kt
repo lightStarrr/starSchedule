@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Info
@@ -58,6 +59,7 @@ fun SettingsRoute(
     onOpenReminderSettings: () -> Unit,
     onOpenAiSettings: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenUpdatePage: () -> Unit,
     onRequestNotificationPermission: ((() -> Unit) -> Unit),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -67,6 +69,7 @@ fun SettingsRoute(
         onOpenReminderSettings = onOpenReminderSettings,
         onOpenAiSettings = onOpenAiSettings,
         onOpenAbout = onOpenAbout,
+        onOpenUpdatePage = onOpenUpdatePage,
         onReminderEnabledChange = viewModel::setReminderEnabled,
         onHideFromRecentsChange = viewModel::setHideFromRecents,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
@@ -91,6 +94,7 @@ private fun SettingsScreen(
     onOpenReminderSettings: () -> Unit,
     onOpenAiSettings: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenUpdatePage: () -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onHideFromRecentsChange: (Boolean) -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
@@ -266,6 +270,17 @@ private fun SettingsScreen(
                     item { SettingsSectionTitle(R.string.settings_section_about) }
                     item {
                         SettingsGroup {
+                            // 具体的检查与下载都在独立的软件更新页里，设置页只留入口。
+                            SettingsActionItem(
+                                title = stringResource(R.string.update_entry_title),
+                                onClick = onOpenUpdatePage,
+                                shapeIndex = 0,
+                                shapeCount = 2,
+                                leading = {
+                                    Icon(Icons.Rounded.Autorenew, contentDescription = null)
+                                },
+                                trailing = { SettingChevron() },
+                            )
                             // 设置页只留版本号，完整构建标识与联系方式都挪到关于页。
                             SettingsActionItem(
                                 title = stringResource(R.string.about_app_title),
@@ -274,8 +289,8 @@ private fun SettingsScreen(
                                     BuildConfig.VERSION_NAME,
                                 ),
                                 onClick = onOpenAbout,
-                                shapeIndex = 0,
-                                shapeCount = 1,
+                                shapeIndex = 1,
+                                shapeCount = 2,
                                 leading = { Icon(Icons.Rounded.Info, contentDescription = null) },
                                 trailing = { SettingChevron() },
                             )

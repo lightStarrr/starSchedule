@@ -88,7 +88,8 @@ private fun settingsItemColors(): ListItemColors {
 @Composable
 internal fun SettingsListItem(
     title: String,
-    supporting: String,
+    // 传 null 时不渲染支撑行，整行只剩标题，高度交给组件自己决定。
+    supporting: String? = null,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
@@ -102,6 +103,11 @@ internal fun SettingsListItem(
 ) {
     val colors = settingsItemColors()
     val resolvedShapes = shapes ?: ListItemDefaults.segmentedShapes(shapeIndex, shapeCount)
+    val supportingSlot: (@Composable () -> Unit)? = if (supporting == null) {
+        null
+    } else {
+        { Text(supporting) }
+    }
     if (onClick == null) {
         SegmentedListItem(
             modifier = modifier,
@@ -111,7 +117,7 @@ internal fun SettingsListItem(
             leadingContent = leading,
             verticalAlignment = Alignment.CenterVertically,
             content = { Text(title) },
-            supportingContent = { Text(supporting) },
+            supportingContent = supportingSlot,
             trailingContent = trailing,
         )
     } else {
@@ -124,7 +130,7 @@ internal fun SettingsListItem(
             leadingContent = leading,
             verticalAlignment = Alignment.CenterVertically,
             content = { Text(title) },
-            supportingContent = { Text(supporting) },
+            supportingContent = supportingSlot,
             trailingContent = trailing,
         )
     }
@@ -191,7 +197,7 @@ internal fun SettingsQuotaItem(
 @Composable
 internal fun SettingsActionItem(
     title: String,
-    supporting: String,
+    supporting: String? = null,
     onClick: () -> Unit,
     shapeIndex: Int,
     shapeCount: Int,
