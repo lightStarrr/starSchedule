@@ -24,7 +24,6 @@ import androidx.compose.material.icons.rounded.UnfoldMore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -145,16 +144,15 @@ private fun AiSettingsScreen(
                             shapeCount = providerPosition.count,
                             leading = { Icon(Icons.Rounded.Cloud, contentDescription = null) },
                             trailing = {
-                                // 菜单以这个图标为锚点展开，所以触发按钮与菜单必须同一层
+                                // 菜单以这个图标为锚点展开，所以图标与菜单必须同一层；
+                                // 图标本身不接点击，展开由整行的 onClick 触发
                                 Box {
-                                    IconButton(onClick = { menuExpanded = true }) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.UnfoldMore,
-                                            contentDescription = stringResource(
-                                                R.string.ai_provider_menu,
-                                            ),
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Rounded.UnfoldMore,
+                                        contentDescription = stringResource(
+                                            R.string.ai_provider_menu,
+                                        ),
+                                    )
                                     ProviderMenu(
                                         expanded = menuExpanded,
                                         cloudEnabled = state.cloudEnabled,
@@ -252,16 +250,12 @@ private fun ModelRow(
         shapeCount = shapeCount,
         leading = { Icon(Icons.Rounded.Memory, contentDescription = null) },
         trailing = {
+            // 纯图标只作指示，展开菜单走整行点击
             Box {
-                IconButton(
-                    onClick = onClick ?: {},
-                    enabled = onClick != null,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.UnfoldMore,
-                        contentDescription = stringResource(R.string.ai_model_menu),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Rounded.UnfoldMore,
+                    contentDescription = stringResource(R.string.ai_model_menu),
+                )
                 if (menuAvailable) {
                     ModelMenu(
                         expanded = expanded,
@@ -329,16 +323,12 @@ private fun ReasoningRow(
         shapeCount = shapeCount,
         leading = { Icon(Icons.Rounded.Psychology, contentDescription = null) },
         trailing = {
+            // 纯图标只作指示，展开菜单走整行点击
             Box {
-                IconButton(
-                    onClick = { expanded = true },
-                    enabled = adjustable,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.UnfoldMore,
-                        contentDescription = stringResource(R.string.ai_reasoning_menu),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Rounded.UnfoldMore,
+                    contentDescription = stringResource(R.string.ai_reasoning_menu),
+                )
                 if (adjustable && reasoning != null) {
                     ReasoningMenu(
                         expanded = expanded,
