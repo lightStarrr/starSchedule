@@ -3,6 +3,7 @@ package com.star.schedule.feature.update.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,32 +26,37 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.star.schedule.BuildConfig
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
-import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.navigationBarBottomInset
 
 @Composable
 fun SoftwareUpdateRoute(onBack: () -> Unit) {
+    var includeSnapshots by rememberSaveable { mutableStateOf(false) }
     SoftwareUpdateScreen(
         onBack = onBack,
         onCheckForUpdates = {},
+        includeSnapshots = includeSnapshots,
+        onIncludeSnapshotsChange = { includeSnapshots = it },
     )
 }
 
@@ -62,8 +68,10 @@ fun SoftwareUpdateRoute(onBack: () -> Unit) {
 private fun SoftwareUpdateScreen(
     onBack: () -> Unit,
     onCheckForUpdates: () -> Unit,
+    includeSnapshots: Boolean,
+    onIncludeSnapshotsChange: (Boolean) -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
 
     Scaffold(
@@ -71,31 +79,40 @@ private fun SoftwareUpdateScreen(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            PageTopBar(
+            CompactPageTopBar(
                 title = stringResource(R.string.update_entry_title),
                 onBack = onBack,
                 scrollBehavior = scrollBehavior,
-            )
+            ) {
+                SoftwareUpdateOverflowMenu(
+                    includeSnapshots = includeSnapshots,
+                    onIncludeSnapshotsChange = onIncludeSnapshotsChange,
+                )
+            }
         },
         bottomBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 16.dp + navigationBarInset),
-                contentAlignment = Alignment.Center,
-            ) {
-                Button(
-                    onClick = onCheckForUpdates,
+            Column {
+                UpdateContentFade(opaqueAtTop = false)
+                Box(
                     modifier = Modifier
-                        .widthIn(max = 720.dp)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .heightIn(min = 56.dp),
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .padding(bottom = 16.dp + navigationBarInset),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = stringResource(R.string.update_check_for_updates),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                    Button(
+                        onClick = onCheckForUpdates,
+                        modifier = Modifier
+                            .widthIn(max = 720.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .heightIn(min = 56.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.update_check_for_updates),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
                 }
             }
         },
@@ -103,22 +120,62 @@ private fun SoftwareUpdateScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                // 日志延伸到底部按钮后方，不能消费 Scaffold 的底部内边距。
+                .padding(top = innerPadding.calculateTopPadding()),
         ) {
             LazyColumn(
                 modifier = Modifier
                     .widthIn(max = 720.dp)
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .align(Alignment.TopCenter),
                 contentPadding = PaddingValues(
-                    top = PageContentTopSpacing,
-                    bottom = 24.dp,
+                    top = PageContentTopSpacing + HERO_CARD_HEIGHT + CONTENT_FADE_HEIGHT,
+                    bottom = innerPadding.calculateBottomPadding() + 16.dp,
                 ),
             ) {
-                item { UpdateHeroCard(currentVersion = BuildConfig.VERSION_NAME) }
+                item { UpdateChangelogSection() }
+            }
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth(),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .padding(top = PageContentTopSpacing),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    UpdateHeroCard(
+                        currentVersion = BuildConfig.VERSION_NAME,
+                        modifier = Modifier.widthIn(max = 720.dp),
+                    )
+                }
+                UpdateContentFade(opaqueAtTop = true)
             }
         }
     }
+}
+
+@Composable
+private fun UpdateContentFade(opaqueAtTop: Boolean) {
+    val background = MaterialTheme.colorScheme.surfaceContainer
+    val transparent = background.copy(alpha = 0f)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(CONTENT_FADE_HEIGHT)
+            .background(
+                Brush.verticalGradient(
+                    colors = if (opaqueAtTop) {
+                        listOf(background, transparent)
+                    } else {
+                        listOf(transparent, background)
+                    },
+                ),
+            ),
+    )
 }
 
 /**
@@ -233,3 +290,4 @@ private fun BoxScope.HeroShape(
 private val HERO_CARD_HEIGHT = 200.dp
 private val HERO_CONTENT_PADDING = 20.dp
 private val HERO_LOGO_SIZE = 40.dp
+private val CONTENT_FADE_HEIGHT = 32.dp

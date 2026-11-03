@@ -291,6 +291,19 @@
     <string name="update_entry_title">软件更新</string>
     <string name="update_latest_version">已是最新版</string>
     <string name="update_check_for_updates">检查更新</string>
+    <string name="update_include_snapshots">也检测快照更新</string>
+    <string name="update_more_options">更多选项</string>
+    <string name="update_changelog_added">新增</string>
+    <string name="update_changelog_improved">优化</string>
+    <string name="update_changelog_fixed">修复</string>
+    <!-- 示例正文模拟真实发布说明，保留其原始语言，不随界面语言翻译。 -->
+    <string name="update_changelog_sample_added">关于分组新增软件更新入口</string>
+    <string name="update_changelog_sample_improved_layout">后台隐藏应用更名为隐藏后台卡片</string>
+    <string name="update_changelog_sample_improved_dark_mode">菜单入口改用纯图标</string>
+    <string name="update_changelog_sample_improved_update_card">软件更新页顶部加入 M3E 图形卡片</string>
+    <string name="update_changelog_sample_improved_update_screen">完善软件更新页面静态界面</string>
+    <string name="update_changelog_sample_fixed">隔离后台任务的调度编号</string>
+    <string name="update_changelog_sample_fixed_switching">使用实际窗口尺寸计算预览与壁纸</string>
     <string name="about_app_title">关于应用</string>
     <string name="about_version_title">版本</string>
     <string name="about_build_title">构建</string>

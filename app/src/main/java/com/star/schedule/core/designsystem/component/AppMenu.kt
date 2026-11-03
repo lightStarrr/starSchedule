@@ -1,14 +1,23 @@
 package com.star.schedule.core.designsystem.component
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuPopup
@@ -28,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
@@ -105,7 +115,14 @@ fun AppMenuGroup(
                     text = { Text(entry.label) },
                     shapes = morph.itemShapes(index = index),
                     contentPadding = MENU_ITEM_CONTENT_PADDING,
-                    leadingIcon = leading,
+                    // 库在 selected 翻转时直接换 leading/selectedLeading 分支，勾的退出动画来不及跑；
+                    // 恒用同一个 leadingIcon 槽，槽宽固定，勾的进出动画在自己内部完成。
+                    leadingIcon = {
+                        MenuSelectionIcon(
+                            selected = entry.selected,
+                            unselectedIcon = leading,
+                        )
+                    },
                     modifier = itemModifier,
                 )
             } else {
@@ -118,6 +135,46 @@ fun AppMenuGroup(
                     modifier = itemModifier,
                 )
             }
+        }
+    }
+}
+
+/**
+ * 选择项头部槽：恒占 [MENU_SELECTION_ICON_SIZE]，选中时勾淡入放大、原图标淡出。
+ *
+ * 槽本身不做横向展开，行宽与文字位置在切换前后保持一致；没有原图标时就是一个固定宽度的空槽。
+ */
+@Composable
+private fun MenuSelectionIcon(
+    selected: Boolean,
+    unselectedIcon: (@Composable () -> Unit)?,
+) {
+    val spec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    Box(
+        modifier = Modifier.size(MENU_SELECTION_ICON_SIZE),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (unselectedIcon != null) {
+            AnimatedVisibility(
+                visible = !selected,
+                enter = fadeIn(animationSpec = spec),
+                exit = fadeOut(animationSpec = spec),
+            ) {
+                unselectedIcon()
+            }
+        }
+        AnimatedVisibility(
+            visible = selected,
+            enter = fadeIn(animationSpec = spec) +
+                scaleIn(animationSpec = spec, initialScale = 0.8f),
+            exit = fadeOut(animationSpec = spec) +
+                scaleOut(animationSpec = spec, targetScale = 0.8f),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                modifier = Modifier.size(MENU_CHECK_ICON_SIZE),
+            )
         }
     }
 }
@@ -307,3 +364,9 @@ private val MENU_ITEM_INSET = 4.dp
 
 /** 相邻两项之间的接缝圆角。 */
 private val MENU_ITEM_SEAM_RADIUS = 4.dp
+
+/** 选择项头部槽的固定尺寸。 */
+private val MENU_SELECTION_ICON_SIZE = 24.dp
+
+/** 勾选图标本体尺寸，小于槽宽，四周留出呼吸空间。 */
+private val MENU_CHECK_ICON_SIZE = 18.dp

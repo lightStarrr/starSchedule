@@ -18,7 +18,10 @@ local.properties
 .kotlin
 app/build
 app/release
-app/src/androidTest
+# androidTest 默认忽略，只放行更新页菜单的回归用例
+app/src/androidTest/**
+!app/src/androidTest/**/
+!app/src/androidTest/java/com/star/schedule/feature/update/presentation/SoftwareUpdateOverflowMenuTest.kt
 /gradle
 
 # 智能体本地工作数据与本机构建环境，不纳入提交
