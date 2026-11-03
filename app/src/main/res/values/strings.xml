@@ -289,6 +289,8 @@
     <string name="ai_usage_loading_hint">Fetching today\'s usage</string>
     <string name="ai_usage_unavailable_hint">Try again later or check your network</string>
     <string name="update_entry_title">Software update</string>
+    <string name="update_latest_version">Up to date</string>
+    <string name="update_check_for_updates">Check for updates</string>
     <string name="about_app_title">About the app</string>
     <string name="about_version_title">Version</string>
     <string name="about_build_title">Build</string>
