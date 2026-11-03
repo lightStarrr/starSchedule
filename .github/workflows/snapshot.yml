@@ -32,6 +32,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 检查更新日志脚本
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_generate_changelog.py' -v
+
+      - name: 生成更新日志
+        run: |
+          python3 -B .github/scripts/generate_changelog.py \
+            --mode snapshot \
+            --ref "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/changelog.md"
+
       - name: 配置 JDK
         uses: actions/setup-java@v4
         with:
@@ -141,9 +151,11 @@ jobs:
           {
             echo "> 本页每次向 \`master\` 推送后重建，始终指向最新一次构建；需要稳定版本请到 [最新正式版](../../releases/latest)。"
             echo
+            cat "$RUNNER_TEMP/changelog.md"
+            echo
             echo "| 项目 | 值 |"
             echo "| --- | --- |"
-            echo "| 提交 | \`$SHORT_SHA\` $(git log -1 --pretty=format:'%s') |"
+            echo "| 提交 | \`$SHORT_SHA\` |"
             echo "| 版本 | \`$VERSION\` ($VERSION_CODE) |"
             echo "| 构建标识 | \`$BUILD_ID\` |"
             echo "| 构建时间 | $BUILD_TIME |"

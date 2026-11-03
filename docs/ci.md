@@ -95,7 +95,37 @@ retrace mapping-81bca3b-202610241840.txt stacktrace.txt
 
 单元测试在构建前跑，`WakeUpShareSourceLiveTest` 这类需要真机或口令的用例在 CI 上会自动跳过。
 
-## 六、常见问题
+## 六、更新日志怎么生成
+
+两条流水线在检出代码后、配置 JDK 前都会先做两件事：跑 `.github/scripts/test_generate_changelog.py` 的单元测试，再用 `generate_changelog.py` 从**提交首行 + `Changelog` footer** 生成 `changelog.md`。正式版用它作为 Release 正文（不再用 GitHub 自动生成的 release notes），快照把它插在发布说明的横幅和元信息表之间；脚本必须在旧的 `snapshot` 标签被删除前运行，工作流的步骤顺序已经保证了这一点。
+
+提交要进更新日志，在提交信息末尾加一个标准 Git trailer（用 `git interpret-trailers` 解析）：
+
+```text
+fix(schedule): 修复偶发的课程时间错位
+
+Changelog: fixed
+```
+
+| footer 值 | 展示分组 |
+| --- | --- |
+| `Changelog: added` | 新增 |
+| `Changelog: changed` | 优化 |
+| `Changelog: fixed` | 修复 |
+| `Changelog: none` | 明确不进入更新日志 |
+
+- 没有 `Changelog` footer 的提交直接跳过，不算错误。
+- footer 值不是上面四种之一，或者同一条提交出现多个 `Changelog` footer，生成直接失败、流水线中止——写错的标记不该被悄悄吞掉。
+- 对外只取提交首行并去掉 `type(scope): ` 前缀，所以标为 `added`、`changed`、`fixed` 的提交必须遵守这个格式，否则同样失败；提交正文不会出现在发布页。
+- 描述按纯文本做 Markdown 转义，同一分类内相同描述只保留一条；范围内一个条目都没有时显示「本版本暂无更新说明。」
+
+基线（本次从哪个点开始统计）的选取规则：
+
+- **正式版**：推送的标签必须是 `vX.Y.Z` 且指向本次构建的提交，基线是版本号低于当前标签的最高可达稳定 `vX.Y.Z` 标签。同一提交被打了多个版本标签时，较新的版本允许产生空日志。
+- **快照**：基线是上一个 `snapshot` 标签——标签存在且是当前提交的祖先（包括就是同一个提交）时，只统计两次快照之间的增量。`snapshot` 标签不存在（首次构建）或因历史重写变得不可达时，回退到最高的可达稳定 `vX.Y.Z` 标签；不可达时会额外输出 warning。
+- 稳定标签候选只认 `vX.Y.Z` 格式，`snapshot` 和预发布标签不参与；没有任何可用基线时统计全部历史。合并提交的总结行忽略，但支线上的实际提交都计入。
+
+## 七、常见问题
 
 **`./gradlew: Permission denied`**：`gradlew` 在 git 里必须是 755。仓库里已经用 `git update-index --chmod=+x gradlew` 修过；如果重新导入过文件导致又变回 644，再执行一次。
 

@@ -26,6 +26,17 @@ jobs:
           # 生成发布说明要读历史提交和已有标签，浅克隆拿不到。
           fetch-depth: 0
 
+      - name: 检查更新日志脚本
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_generate_changelog.py' -v
+
+      - name: 生成更新日志
+        run: |
+          python3 -B .github/scripts/generate_changelog.py \
+            --mode release \
+            --ref "$GITHUB_SHA" \
+            --tag "$GITHUB_REF_NAME" \
+            --output "$RUNNER_TEMP/changelog.md"
+
       - name: 配置 JDK
         uses: actions/setup-java@v4
         with:
@@ -139,7 +150,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/changelog.md
+          generate_release_notes: false
           draft: false
           prerelease: false
           make_latest: "true"
