@@ -9,27 +9,29 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,25 +40,60 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.star.schedule.BuildConfig
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.component.CountdownSnackbar
+import com.star.schedule.core.designsystem.component.MESSAGE_SNACKBAR_TIMEOUT_MILLIS
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.feature.update.domain.UpdateDownloadState
+import com.star.schedule.feature.update.domain.UpdateRelease
 
 @Composable
-fun SoftwareUpdateRoute(onBack: () -> Unit) {
-    var includeSnapshots by rememberSaveable { mutableStateOf(false) }
+fun SoftwareUpdateRoute(
+    viewModel: SoftwareUpdateViewModel,
+    onBack: () -> Unit,
+    onOpenRelease: (UpdateRelease) -> Unit,
+    onOpenInstallSettings: () -> Unit,
+    onStartInstall: (String, String) -> Unit,
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val downloadState by viewModel.downloadState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner, viewModel) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            viewModel.effects.collect { effect ->
+                when (effect) {
+                    SoftwareUpdateEffect.OpenInstallSettings -> onOpenInstallSettings()
+                    is SoftwareUpdateEffect.StartInstall ->
+                        onStartInstall(effect.identity, effect.localPath)
+                }
+            }
+        }
+    }
     SoftwareUpdateScreen(
+        state = state,
+        downloadState = downloadState,
         onBack = onBack,
-        onCheckForUpdates = {},
-        includeSnapshots = includeSnapshots,
-        onIncludeSnapshotsChange = { includeSnapshots = it },
+        onCheckForUpdates = viewModel::checkNow,
+        onIncludeSnapshotsChange = viewModel::setIncludeSnapshots,
+        onDownload = viewModel::download,
+        onCancelDownload = viewModel::cancelDownload,
+        onInstall = viewModel::install,
+        onOpenRelease = onOpenRelease,
+        onConfirmInstallPermission = viewModel::confirmInstallPermission,
+        onDismissInstallPermission = viewModel::dismissInstallPermission,
+        onDownloadFailureShown = viewModel::onDownloadFailureShown,
     )
 }
 
@@ -65,16 +102,73 @@ fun SoftwareUpdateRoute(onBack: () -> Unit) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SoftwareUpdateScreen(
+internal fun SoftwareUpdateScreen(
+    state: SoftwareUpdateUiState,
+    downloadState: UpdateDownloadState,
     onBack: () -> Unit,
     onCheckForUpdates: () -> Unit,
-    includeSnapshots: Boolean,
     onIncludeSnapshotsChange: (Boolean) -> Unit,
+    onDownload: (UpdateRelease) -> Unit,
+    onCancelDownload: () -> Unit,
+    onInstall: () -> Unit,
+    onOpenRelease: (UpdateRelease) -> Unit,
+    onConfirmInstallPermission: () -> Unit,
+    onDismissInstallPermission: () -> Unit,
+    onDownloadFailureShown: (Long) -> Unit,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val failure = state.downloadFailureMessage
+    val failureText = failure?.let { stringResource(downloadFailureText(it.reason)) }
+    LaunchedEffect(failure?.token) {
+        if (failure != null && failureText != null) {
+            snackbarHostState.showSnackbar(
+                message = failureText,
+                duration = SnackbarDuration.Indefinite,
+            )
+            onDownloadFailureShown(failure.token)
+        }
+    }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
+    val result = state.result
+    val downloadTarget = when (downloadState) {
+        is UpdateDownloadState.Starting -> downloadState.target
+        is UpdateDownloadState.Downloading -> downloadState.target
+        is UpdateDownloadState.Verifying -> downloadState.target
+        is UpdateDownloadState.Ready -> downloadState.target
+        is UpdateDownloadState.Failed -> downloadState.target
+        UpdateDownloadState.Idle -> null
+    }
+    val target = result?.target
+    val displayedRelease = downloadTarget ?: result?.displayedRelease
+
+    if (state.showInstallPermissionPrompt) {
+        AlertDialog(
+            onDismissRequest = onDismissInstallPermission,
+            title = { Text(stringResource(R.string.update_install_permission_title)) },
+            text = { Text(stringResource(R.string.update_install_permission_message)) },
+            confirmButton = {
+                TextButton(onClick = onConfirmInstallPermission) {
+                    Text(stringResource(R.string.update_install_permission_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissInstallPermission) {
+                    Text(stringResource(R.string.update_prompt_later))
+                }
+            },
+        )
+    }
 
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                CountdownSnackbar(
+                    data = data,
+                    timeoutMillis = MESSAGE_SNACKBAR_TIMEOUT_MILLIS,
+                )
+            }
+        },
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -85,7 +179,7 @@ private fun SoftwareUpdateScreen(
                 scrollBehavior = scrollBehavior,
             ) {
                 SoftwareUpdateOverflowMenu(
-                    includeSnapshots = includeSnapshots,
+                    includeSnapshots = state.includeSnapshots,
                     onIncludeSnapshotsChange = onIncludeSnapshotsChange,
                 )
             }
@@ -100,17 +194,30 @@ private fun SoftwareUpdateScreen(
                         .padding(bottom = 16.dp + navigationBarInset),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Button(
-                        onClick = onCheckForUpdates,
+                    Column(
                         modifier = Modifier
                             .widthIn(max = 720.dp)
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .heightIn(min = 56.dp),
+                            .padding(horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(
-                            text = stringResource(R.string.update_check_for_updates),
-                            style = MaterialTheme.typography.titleMedium,
+                        if (state.preferenceWriteFailed) {
+                            Text(
+                                text = stringResource(R.string.update_pref_save_failed),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
+                        UpdateActionArea(
+                            state = state,
+                            downloadState = downloadState,
+                            target = target,
+                            onCheckForUpdates = onCheckForUpdates,
+                            onDownload = onDownload,
+                            onCancelDownload = onCancelDownload,
+                            onInstall = onInstall,
+                            onOpenRelease = onOpenRelease,
                         )
                     }
                 }
@@ -125,6 +232,7 @@ private fun SoftwareUpdateScreen(
         ) {
             LazyColumn(
                 modifier = Modifier
+                    .testTag("update-content")
                     .widthIn(max = 720.dp)
                     .fillMaxSize()
                     .align(Alignment.TopCenter),
@@ -133,7 +241,15 @@ private fun SoftwareUpdateScreen(
                     bottom = innerPadding.calculateBottomPadding() + 16.dp,
                 ),
             ) {
-                item { UpdateChangelogSection() }
+                item {
+                    UpdateIssueArea(result = result)
+                }
+                item {
+                    UpdateChangelogSection(
+                        release = displayedRelease,
+                        isLoading = state.isChecking && result == null,
+                    )
+                }
             }
             Column(
                 modifier = Modifier
@@ -148,7 +264,14 @@ private fun SoftwareUpdateScreen(
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     UpdateHeroCard(
-                        currentVersion = BuildConfig.VERSION_NAME,
+                        versionName = downloadTarget?.versionName
+                            ?: target?.versionName
+                            ?: state.installed.versionName,
+                        statusText = updateStatusText(
+                            state,
+                            downloadTarget,
+                            downloadState is UpdateDownloadState.Failed,
+                        ),
                         modifier = Modifier.widthIn(max = 720.dp),
                     )
                 }
@@ -187,7 +310,8 @@ private fun UpdateContentFade(opaqueAtTop: Boolean) {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UpdateHeroCard(
-    currentVersion: String,
+    versionName: String,
+    statusText: String,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -246,7 +370,7 @@ private fun UpdateHeroCard(
                 .size(HERO_LOGO_SIZE),
         )
         Text(
-            text = currentVersion,
+            text = versionName,
             style = MaterialTheme.typography.headlineLargeEmphasized,
             fontWeight = FontWeight.Bold,
             color = colors.onPrimaryContainer,
@@ -254,15 +378,17 @@ private fun UpdateHeroCard(
                 .align(Alignment.TopStart)
                 .padding(HERO_CONTENT_PADDING),
         )
-        Text(
-            text = stringResource(R.string.update_latest_version),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.onPrimaryContainer,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 10.dp),
-        )
+        if (statusText.isNotEmpty()) {
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onPrimaryContainer,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 10.dp),
+            )
+        }
     }
 }
 

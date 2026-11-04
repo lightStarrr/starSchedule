@@ -21,6 +21,16 @@ val gitShortSha: String = runCatching {
     providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }
         .standardOutput.asText.get().trim()
 }.getOrDefault("nogit")
+val gitFullSha: String = runCatching {
+    providers.exec { commandLine("git", "rev-parse", "HEAD") }
+        .standardOutput.asText.get().trim()
+}.getOrDefault("")
+val buildChannel: String =
+    if (versionNameValue.removePrefix(baseVersionName).startsWith("-snapshot.")) {
+        "snapshot"
+    } else {
+        "stable"
+    }
 val buildTime: String = LocalDateTime.now()
     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 val buildId: String = "$gitShortSha-${buildTime.replace("-", "").replace(" ", "").replace(":", "")}"
@@ -70,6 +80,8 @@ android {
         buildConfigField("String", "BUILD_ID", "\"$buildId\"")
         // 构建标识拆成两段：关于页要把「版本」和「提交哈希 + 构建时间」分成两行展示
         buildConfigField("String", "GIT_SHA", "\"$gitShortSha\"")
+        buildConfigField("String", "GIT_FULL_SHA", "\"$gitFullSha\"")
+        buildConfigField("String", "BUILD_CHANNEL", "\"$buildChannel\"")
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         buildConfigField(
             "String",

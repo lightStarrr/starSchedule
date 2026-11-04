@@ -6,6 +6,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
+import com.star.schedule.app.UpdateDependencies
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.telemetry.Telemetry
@@ -34,6 +35,10 @@ class ScheduleApplication : Application(), Configuration.Provider {
 
     // 进程起点，用于冷启动耗时统计。属性初始化早于 onCreate，不掺杂任何初始化开销。
     private val processStartElapsedMillis = SystemClock.elapsedRealtime()
+
+    val updateDependencies: UpdateDependencies by lazy {
+        UpdateDependencies(this, applicationScope)
+    }
 
     override fun onCreate() {
         super.onCreate()

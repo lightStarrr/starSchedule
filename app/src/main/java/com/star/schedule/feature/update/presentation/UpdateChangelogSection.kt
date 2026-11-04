@@ -17,12 +17,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
+import com.star.schedule.feature.update.domain.UpdateRelease
 
 /**
  * 更新日志分区：静态示例，模拟远端发布说明的展示形态，尚未接入真实更新源。
  */
 @Composable
 internal fun UpdateChangelogSection(
+    release: UpdateRelease?,
+    isLoading: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -31,28 +34,52 @@ internal fun UpdateChangelogSection(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        UpdateChangelogGroup(
-            title = stringResource(R.string.update_changelog_added),
-            entries = listOf(
-                stringResource(R.string.update_changelog_sample_added),
-            ),
-        )
-        UpdateChangelogGroup(
-            title = stringResource(R.string.update_changelog_improved),
-            entries = listOf(
-                stringResource(R.string.update_changelog_sample_improved_layout),
-                stringResource(R.string.update_changelog_sample_improved_dark_mode),
-                stringResource(R.string.update_changelog_sample_improved_update_card),
-                stringResource(R.string.update_changelog_sample_improved_update_screen),
-            ),
-        )
-        UpdateChangelogGroup(
-            title = stringResource(R.string.update_changelog_fixed),
-            entries = listOf(
-                stringResource(R.string.update_changelog_sample_fixed),
-                stringResource(R.string.update_changelog_sample_fixed_switching),
-            ),
-        )
+        when {
+            release == null -> Text(
+                text = stringResource(
+                    if (isLoading) {
+                        R.string.update_changelog_loading
+                    } else {
+                        R.string.update_changelog_unavailable
+                    },
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            else -> {
+                val changelog = release.changelog
+                if (changelog.added.isEmpty() &&
+                    changelog.changed.isEmpty() &&
+                    changelog.fixed.isEmpty()
+                ) {
+                    Text(
+                        text = stringResource(R.string.update_changelog_empty),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    if (changelog.added.isNotEmpty()) {
+                        UpdateChangelogGroup(
+                            title = stringResource(R.string.update_changelog_added),
+                            entries = changelog.added,
+                        )
+                    }
+                    if (changelog.changed.isNotEmpty()) {
+                        UpdateChangelogGroup(
+                            title = stringResource(R.string.update_changelog_improved),
+                            entries = changelog.changed,
+                        )
+                    }
+                    if (changelog.fixed.isNotEmpty()) {
+                        UpdateChangelogGroup(
+                            title = stringResource(R.string.update_changelog_fixed),
+                            entries = changelog.fixed,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

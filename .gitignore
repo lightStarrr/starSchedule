@@ -22,6 +22,9 @@ app/release
 app/src/androidTest/**
 !app/src/androidTest/**/
 !app/src/androidTest/java/com/star/schedule/feature/update/presentation/SoftwareUpdateOverflowMenuTest.kt
+!app/src/androidTest/java/com/star/schedule/feature/update/presentation/SoftwareUpdateScreenTest.kt
+!app/src/androidTest/java/com/star/schedule/feature/update/presentation/StartupUpdatePromptTest.kt
+!app/src/androidTest/java/com/star/schedule/feature/update/presentation/SoftwareUpdatePlatformTest.kt
 /gradle
 
 # 智能体本地工作数据与本机构建环境，不纳入提交

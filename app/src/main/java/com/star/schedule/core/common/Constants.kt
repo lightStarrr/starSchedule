@@ -10,6 +10,7 @@ object Constants {
     const val PREF_FLYME_LIVE_TEMPLATE = "flyme_live_template"
     const val PREF_HIDE_FROM_RECENTS = "hide_from_recents"
     const val PREF_STARTUP_HINT_CLOSED = "startup_hint_closed"
+    const val PREF_UPDATE_INCLUDE_SNAPSHOTS = "update_include_snapshots"
 
     /**
      * 是否允许上传匿名使用统计。

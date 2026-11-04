@@ -12,6 +12,8 @@ import com.star.schedule.feature.schedule.data.RoomScheduleRepository
 import com.star.schedule.feature.settings.data.RoomStartupHintRepository
 import com.star.schedule.feature.settings.presentation.StartupHintViewModel
 import com.star.schedule.feature.settings.presentation.StartupHintViewModelFactory
+import com.star.schedule.feature.update.presentation.StartupUpdateViewModel
+import com.star.schedule.feature.update.presentation.StartupUpdateViewModelFactory
 import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.platform.recents.RecentsTaskVisibility
@@ -34,16 +36,28 @@ class MainActivity : ComponentActivity() {
             this,
             StartupHintViewModelFactory(RoomStartupHintRepository(DatabaseProvider.dao())),
         )[StartupHintViewModel::class.java]
+        val updateDependencies = (application as ScheduleApplication).updateDependencies
+        val startupUpdateViewModel = ViewModelProvider(
+            this,
+            StartupUpdateViewModelFactory(
+                updateDependencies.startupGate,
+                updateDependencies.repository,
+            ),
+        )[StartupUpdateViewModel::class.java]
         setContent {
             StarScheduleApp(
                 scheduleRepository = scheduleRepository,
                 wallpaperRepository = wallpaperRepository,
                 startupHintViewModel = startupHintViewModel,
+                startupUpdateViewModel = startupUpdateViewModel,
                 onTimetableSettingsClick = {
                     startActivity(Intent(this, TimetableSettingsActivity::class.java))
                 },
                 onSettingsClick = {
                     startActivity(Intent(this, SettingsActivity::class.java))
+                },
+                onSoftwareUpdateClick = {
+                    startActivity(Intent(this, SoftwareUpdateActivity::class.java))
                 },
             )
         }

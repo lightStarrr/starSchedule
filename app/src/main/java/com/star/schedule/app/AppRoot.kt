@@ -9,11 +9,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.schedule.presentation.ScheduleHomeRoute
 import com.star.schedule.feature.settings.presentation.StartupHintRoute
 import com.star.schedule.feature.settings.presentation.StartupHintViewModel
+import com.star.schedule.feature.update.presentation.StartupUpdateRoute
+import com.star.schedule.feature.update.presentation.StartupUpdateViewModel
 import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import kotlinx.coroutines.flow.flowOf
@@ -26,13 +29,16 @@ fun StarScheduleApp(
     scheduleRepository: ScheduleRepository,
     wallpaperRepository: WallpaperRepository,
     startupHintViewModel: StartupHintViewModel,
+    startupUpdateViewModel: StartupUpdateViewModel,
     onTimetableSettingsClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onSoftwareUpdateClick: () -> Unit,
 ) {
     val selection by remember(scheduleRepository) {
         scheduleRepository.observeCurrentTimetableId().map(::SelectedTimetable)
     }.collectAsState(initial = null)
     val timetableId = selection?.id
+    val startupHintState by startupHintViewModel.uiState.collectAsStateWithLifecycle()
     key(selection) {
         val wallpaperState by remember(timetableId) {
             timetableId?.let(wallpaperRepository::observe) ?: flowOf(WallpaperState.None)
@@ -55,6 +61,11 @@ fun StarScheduleApp(
                     onSettingsClick = onSettingsClick,
                 )
                 StartupHintRoute(viewModel = startupHintViewModel)
+                StartupUpdateRoute(
+                    viewModel = startupUpdateViewModel,
+                    startupHintState = startupHintState,
+                    onOpenUpdate = onSoftwareUpdateClick,
+                )
             }
         }
     }

@@ -4,6 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
@@ -16,9 +18,23 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.AppMenu
 import com.star.schedule.core.designsystem.component.MenuEntry
+import com.star.schedule.feature.update.domain.CurrentInstallation
+import com.star.schedule.feature.update.domain.UpdateChannel
+import com.star.schedule.feature.update.domain.UpdateCheckResult
+import com.star.schedule.feature.update.domain.UpdateCheckTrigger
+import com.star.schedule.feature.update.domain.UpdateDownloadRepository
+import com.star.schedule.feature.update.domain.UpdateDownloadState
+import com.star.schedule.feature.update.domain.UpdateInstallPreparation
+import com.star.schedule.feature.update.domain.UpdateRelease
+import com.star.schedule.feature.update.domain.UpdateRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -92,9 +108,32 @@ class SoftwareUpdateOverflowMenuTest {
     @Test
     fun selectedStateRestoredAfterRecreation() {
         val restorationTester = StateRestorationTester(composeRule)
+        val repository = FakeUpdateRepository()
+        val installed = CurrentInstallation(
+            versionName = "1.2.0",
+            versionCode = 120,
+            commitSha = "",
+            channel = UpdateChannel.Stable,
+        )
         restorationTester.setContent {
             MaterialTheme {
-                SoftwareUpdateRoute(onBack = {})
+                val store = remember { ViewModelStore() }
+                DisposableEffect(store) {
+                    onDispose { store.clear() }
+                }
+                val viewModel = remember {
+                    ViewModelProvider(
+                        store,
+                        SoftwareUpdateViewModelFactory(repository, repository, installed),
+                    )[SoftwareUpdateViewModel::class.java]
+                }
+                SoftwareUpdateRoute(
+                    viewModel = viewModel,
+                    onBack = {},
+                    onOpenRelease = {},
+                    onOpenInstallSettings = {},
+                    onStartInstall = { _, _ -> },
+                )
             }
         }
 
@@ -197,6 +236,38 @@ class SoftwareUpdateOverflowMenuTest {
 
         assertEquals("selected label left", labelLeft("Action"), labelLeft("Choice"), 0.5)
         assertEquals("selectable row width", widthBefore, choiceRowWidth(), 0.5)
+    }
+
+    private class FakeUpdateRepository : UpdateRepository, UpdateDownloadRepository {
+        private val includeSnapshots = MutableStateFlow(false)
+
+        override suspend fun check(trigger: UpdateCheckTrigger) = UpdateCheckResult(
+            target = null,
+            displayedRelease = null,
+            issues = emptyList(),
+            checkedAtEpochMillis = 0,
+            includeSnapshots = includeSnapshots.value,
+            isStale = false,
+        )
+
+        override fun observeIncludeSnapshots() = includeSnapshots
+
+        override suspend fun setIncludeSnapshots(enabled: Boolean) {
+            includeSnapshots.value = enabled
+        }
+
+        override fun observe(): Flow<UpdateDownloadState> = flowOf(UpdateDownloadState.Idle)
+
+        override suspend fun restore() = Unit
+
+        override suspend fun start(target: UpdateRelease) = Unit
+
+        override suspend fun cancel() = Unit
+
+        override suspend fun prepareInstallation() =
+            UpdateInstallPreparation.Failure(
+                com.star.schedule.feature.update.domain.UpdateDownloadFailure.Unknown,
+            )
     }
 
     private fun assertRectEqual(what: String, expected: Rect, actual: Rect) {
