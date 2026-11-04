@@ -239,3 +239,8 @@ java -version
 ```
 
 若命令行构建与 Android Studio 结果不一致，先对比 `java -version`、Gradle JVM、`JAVA_HOME`、`GRADLE_USER_HOME`、Gradle wrapper 发行包和 `local.properties`，再判断是否为代码问题。Android Studio 能编译而命令行失败时，优先检查两边是否使用了不同的 Gradle 缓存或未完成的离线依赖缓存。
+
+### 更新功能验证与 APK 位置
+
+- 更新逻辑定向单测：`.\gradlew :app:testDebugUnitTest --tests "com.star.schedule.feature.update.*" --offline`；设备测试包构建：`.\gradlew :app:assembleDebugAndroidTest --offline`。
+- 主 debug APK 可能出现在 `app/build/outputs/apk/debug/app-debug.apk` 或 `app/build/intermediates/apk/debug/app-debug.apk`，设备测试 APK 通常位于 `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`。以本次构建的 APK listing、`output-metadata.json`、文件时间与实际 Manifest 为准；不能仅凭路径存在就安装可能残留的旧包，也不能仅因其中一个目录不存在就判断打包失败。
