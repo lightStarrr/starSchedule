@@ -33,14 +33,15 @@ jobs:
           fetch-depth: 0
 
       - name: 检查更新日志脚本
-        run: python3 -B -m unittest discover -s .github/scripts -p 'test_generate_changelog.py' -v
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_*.py' -v
 
       - name: 生成更新日志
         run: |
           python3 -B .github/scripts/generate_changelog.py \
             --mode snapshot \
             --ref "$GITHUB_SHA" \
-            --output "$RUNNER_TEMP/changelog.md"
+            --output "$RUNNER_TEMP/changelog.md" \
+            --json-output "$RUNNER_TEMP/changelog.json"
 
       - name: 配置 JDK
         uses: actions/setup-java@v4
@@ -140,6 +141,17 @@ jobs:
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           ls -lh dist
 
+      - name: 生成更新元数据
+        run: |
+          python3 -B .github/scripts/generate_update_metadata.py \
+            --channel snapshot \
+            --version-name "${{ steps.dist.outputs.version }}" \
+            --version-code "${{ steps.dist.outputs.version_code }}" \
+            --commit-sha "$GITHUB_SHA" \
+            --apk "dist/starSchedule-snapshot-${{ steps.info.outputs.short_sha }}.apk" \
+            --changelog "$RUNNER_TEMP/changelog.json" \
+            --output dist/update.json
+
       - name: 写发布说明
         env:
           SHORT_SHA: ${{ steps.info.outputs.short_sha }}
@@ -180,6 +192,7 @@ jobs:
           path: |
             dist/starSchedule-snapshot-*.apk
             dist/SHA256SUMS.txt
+            dist/update.json
           retention-days: 14
 
       - name: 归档快照 mapping
@@ -211,3 +224,4 @@ jobs:
             dist/starSchedule-snapshot-*.apk
             dist/SHA256SUMS.txt
             dist/mapping-*.txt.gz
+            dist/update.json

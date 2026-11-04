@@ -2,6 +2,7 @@
 
 import argparse
 import html
+import json
 import re
 import subprocess
 import sys
@@ -125,6 +126,13 @@ def markdown_text(text):
     return re.sub(r"([\\`*_{}\[\]()#+.!|~-])", r"\\\1", html.escape(text, quote=False))
 
 
+def structured_changelog(entries):
+    return {
+        kind: [text for category, text in entries if category == kind]
+        for kind, _ in GROUPS
+    }
+
+
 def render_changelog(entries):
     lines = ["## \u66f4\u65b0\u65e5\u5fd7", ""]
     for kind, title in GROUPS:
@@ -144,12 +152,19 @@ def main():
     parser.add_argument("--ref", default="HEAD")
     parser.add_argument("--tag")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--json-output", type=Path)
     args = parser.parse_args()
     try:
         target, base = select_base(args.ref, args.mode, args.tag)
         entries = collect_entries(target, base)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(render_changelog(entries), encoding="utf-8")
+        if args.json_output is not None:
+            args.json_output.parent.mkdir(parents=True, exist_ok=True)
+            args.json_output.write_text(
+                json.dumps(structured_changelog(entries), ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         print(f"Changelog range: {base or '(initial commit)'}..{target}", file=sys.stderr)
     except (ValueError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f"Changelog generation failed: {error}", file=sys.stderr)

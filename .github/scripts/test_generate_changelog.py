@@ -1,9 +1,18 @@
+import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from generate_changelog import collect_entries, git, parse_message, render_changelog, select_base
+from generate_changelog import (
+    collect_entries,
+    git,
+    parse_message,
+    render_changelog,
+    select_base,
+    structured_changelog,
+)
 
 
 def message(title, kind):
@@ -38,6 +47,31 @@ class MessageTests(unittest.TestCase):
         self.assertIn(r"&lt;b&gt;\*value\*&lt;/b&gt;", result)
         self.assertNotIn("### \u65b0\u589e", result)
         self.assertIn("\u6682\u65e0\u66f4\u65b0\u8bf4\u660e", render_changelog([]))
+
+
+class StructuredChangelogTests(unittest.TestCase):
+    def test_groups_are_fixed_and_keep_raw_text(self):
+        entries = [
+            ("added", "\u65b0\u529f\u80fd *\u7c97\u4f53* <\u6807\u7b7e> \"\u5f15\u53f7\" & \u5176\u4ed6"),
+            ("changed", "\u4f18\u5316 [\u94fe\u63a5](url) \u4f53\u9a8c"),
+            ("fixed", "\u4fee\u590d `\u4ee3\u7801` \u5d29\u6e83"),
+        ]
+        grouped = structured_changelog(entries)
+        self.assertEqual(list(grouped), ["added", "changed", "fixed"])
+        self.assertEqual(grouped["added"], ["\u65b0\u529f\u80fd *\u7c97\u4f53* <\u6807\u7b7e> \"\u5f15\u53f7\" & \u5176\u4ed6"])
+        self.assertEqual(grouped["changed"], ["\u4f18\u5316 [\u94fe\u63a5](url) \u4f53\u9a8c"])
+        self.assertEqual(grouped["fixed"], ["\u4fee\u590d `\u4ee3\u7801` \u5d29\u6e83"])
+        markdown = render_changelog(entries)
+        self.assertIn("\\*\u7c97\u4f53\\*", markdown)
+        self.assertIn("&lt;\u6807\u7b7e&gt;", markdown)
+        self.assertIn("*\u7c97\u4f53*", grouped["added"][0])
+
+    def test_missing_groups_become_empty_arrays(self):
+        grouped = structured_changelog([("fixed", "\u4fee\u590d\u663e\u793a")])
+        self.assertEqual(grouped, {"added": [], "changed": [], "fixed": ["\u4fee\u590d\u663e\u793a"]})
+        self.assertEqual(
+            structured_changelog([]), {"added": [], "changed": [], "fixed": []}
+        )
 
 
 class HistoryTests(unittest.TestCase):
@@ -157,6 +191,39 @@ class HistoryTests(unittest.TestCase):
                 select_base("HEAD", "release", tag, cwd=self.repo)
         with self.assertRaises(subprocess.CalledProcessError):
             select_base("missing-ref", "snapshot", cwd=self.repo)
+
+    def test_cli_writes_markdown_and_json_from_the_same_collection(self):
+        self.tag("v1.0.0")
+        self.commit(message("\u65b0\u589e <b>*\u7ec4\u4ef6*</b>", "added"))
+        self.commit(message("\u4f18\u5316\u5217\u8868", "changed"))
+        script = Path(__file__).resolve().parent / "generate_changelog.py"
+        markdown_path = self.repo / "changelog.md"
+        json_path = self.repo / "changelog.json"
+        result = subprocess.run(
+            [
+                sys.executable, "-B", str(script),
+                "--mode", "snapshot", "--ref", "HEAD",
+                "--output", str(markdown_path),
+                "--json-output", str(json_path),
+            ],
+            cwd=self.repo,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        grouped = json.loads(json_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            grouped,
+            {
+                "added": ["\u65b0\u589e <b>*\u7ec4\u4ef6*</b>"],
+                "changed": ["\u4f18\u5316\u5217\u8868"],
+                "fixed": [],
+            },
+        )
+        markdown = markdown_path.read_text(encoding="utf-8")
+        self.assertIn("\\*\u7ec4\u4ef6\\*", markdown)
+        self.assertIn("&lt;b&gt;", markdown)
 
 
 if __name__ == "__main__":

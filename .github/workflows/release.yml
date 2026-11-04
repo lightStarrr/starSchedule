@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: 检查更新日志脚本
-        run: python3 -B -m unittest discover -s .github/scripts -p 'test_generate_changelog.py' -v
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_*.py' -v
 
       - name: 生成更新日志
         run: |
@@ -35,7 +35,8 @@ jobs:
             --mode release \
             --ref "$GITHUB_SHA" \
             --tag "$GITHUB_REF_NAME" \
-            --output "$RUNNER_TEMP/changelog.md"
+            --output "$RUNNER_TEMP/changelog.md" \
+            --json-output "$RUNNER_TEMP/changelog.json"
 
       - name: 配置 JDK
         uses: actions/setup-java@v4
@@ -137,6 +138,17 @@ jobs:
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           ls -lh dist
 
+      - name: 生成更新元数据
+        run: |
+          python3 -B .github/scripts/generate_update_metadata.py \
+            --channel stable \
+            --version-name "${{ steps.verify.outputs.version }}" \
+            --version-code "${{ steps.verify.outputs.version_code }}" \
+            --commit-sha "$GITHUB_SHA" \
+            --apk "dist/starSchedule-$GITHUB_REF_NAME.apk" \
+            --changelog "$RUNNER_TEMP/changelog.json" \
+            --output dist/update.json
+
       - name: 归档 mapping
         uses: actions/upload-artifact@v4
         with:
@@ -160,3 +172,4 @@ jobs:
             dist/starSchedule-*.apk
             dist/mapping-*.txt
             dist/SHA256SUMS.txt
+            dist/update.json
