@@ -133,7 +133,7 @@ internal fun UpdateMetaballActions(
         animationSpec = effects,
         label = "fill",
     )
-    val fillContentColor by animateColorAsState(
+    val fillContentColor = animateColorAsState(
         targetValue = when (pill) {
             is UpdatePillContent.Label ->
                 if (pill.enabled) colorScheme.onPrimary else disabledContent
@@ -416,15 +416,7 @@ internal fun UpdateMetaballActions(
                 animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
                 label = "textStyle",
             )
-            val textPaint = remember {
-                Paint().apply {
-                    colorFilter = ColorFilter.tint(
-                        Color.Black,
-                        BlendMode.SrcIn,
-                    )
-                }
-            }
-            textPaint.colorFilter = ColorFilter.tint(fillContentColor, BlendMode.SrcIn)
+            val textPaint = remember { Paint() }
             Text(
                 text = when (pill) {
                     is UpdatePillContent.Label -> pill.text
@@ -446,6 +438,11 @@ internal fun UpdateMetaballActions(
                         clipRect(left = edge) {
                             this@drawWithContent.drawContent()
                         }
+                        // 颜色必须在绘制阶段读取，否则颜色动画不会触发文字重绘。
+                        textPaint.colorFilter = ColorFilter.tint(
+                            fillContentColor.value,
+                            BlendMode.SrcIn,
+                        )
                         clipRect(right = edge) {
                             drawIntoCanvas { canvas ->
                                 canvas.saveLayer(
