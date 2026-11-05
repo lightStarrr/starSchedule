@@ -29,16 +29,20 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.layout
@@ -47,6 +51,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -132,7 +137,7 @@ internal fun UpdateMetaballActions(
         targetValue = when (pill) {
             is UpdatePillContent.Label ->
                 if (pill.enabled) colorScheme.onPrimary else disabledContent
-            is UpdatePillContent.Progress -> colorScheme.onPrimaryContainer
+            is UpdatePillContent.Progress -> colorScheme.onPrimary
         },
         animationSpec = effects,
         label = "fillContent",
@@ -397,62 +402,63 @@ internal fun UpdateMetaballActions(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            when (pill) {
-                is UpdatePillContent.Label -> Text(
-                    text = pill.text,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = fillContentColor,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+            if (pill is UpdatePillContent.Progress && pill.progress == null) {
+                LinearProgressIndicator(
+                    color = fill.copy(alpha = 0.20f),
+                    trackColor = track,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clearAndSetSemantics { },
                 )
-
-                is UpdatePillContent.Progress -> {
-                    if (progress == null) {
-                        LinearProgressIndicator(
-                            color = fill.copy(alpha = 0.20f),
-                            trackColor = track,
-                            modifier = Modifier
-                                .matchParentSize()
-                                .clearAndSetSemantics { },
-                        )
-                    }
-                    Text(
-                        text = pill.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colorScheme.onPrimaryContainer,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+            }
+            val styleFraction by animateFloatAsState(
+                targetValue = if (pill is UpdatePillContent.Label) 0f else 1f,
+                animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+                label = "textStyle",
+            )
+            val textPaint = remember {
+                Paint().apply {
+                    colorFilter = ColorFilter.tint(
+                        Color.Black,
+                        BlendMode.SrcIn,
                     )
-                    if (progress != null) {
-                        Text(
-                            text = pill.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colorScheme.onPrimary,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .drawWithContent {
-                                    clipRect(
-                                        right = size.width *
-                                            fillFraction.value.coerceIn(0f, 1f),
-                                    ) {
-                                        this@drawWithContent.drawContent()
-                                    }
-                                }
-                                .clearAndSetSemantics { }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                        )
-                    }
                 }
             }
+            textPaint.colorFilter = ColorFilter.tint(fillContentColor, BlendMode.SrcIn)
+            Text(
+                text = when (pill) {
+                    is UpdatePillContent.Label -> pill.text
+                    is UpdatePillContent.Progress -> pill.label
+                },
+                style = lerp(
+                    MaterialTheme.typography.titleMedium,
+                    MaterialTheme.typography.bodyMedium,
+                    styleFraction,
+                ),
+                color = colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawWithContent {
+                        val edge = size.width * fillFraction.value.coerceIn(0f, 1f)
+                        clipRect(left = edge) {
+                            this@drawWithContent.drawContent()
+                        }
+                        clipRect(right = edge) {
+                            drawIntoCanvas { canvas ->
+                                canvas.saveLayer(
+                                    Rect(0f, 0f, size.width, size.height),
+                                    textPaint,
+                                )
+                                this@drawWithContent.drawContent()
+                                canvas.restore()
+                            }
+                        }
+                    }
+                    .padding(horizontal = 16.dp),
+            )
         }
     }
 }
