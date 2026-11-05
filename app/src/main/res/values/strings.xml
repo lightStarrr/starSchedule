@@ -311,7 +311,7 @@
     <string name="update_prompt_title">Update available</string>
     <string name="update_prompt_message">Version %1$s is available. View the update?</string>
     <string name="update_prompt_view">View update</string>
-    <string name="update_download_starting">Starting download…</string>
+    <string name="update_download_starting">Preparing download…</string>
     <string name="update_download_waiting">Waiting for network</string>
     <string name="update_download_progress">Downloaded %1$s / %2$s</string>
     <string name="update_download_progress_unknown">Downloaded %1$s</string>

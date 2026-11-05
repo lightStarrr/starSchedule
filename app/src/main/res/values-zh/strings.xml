@@ -311,7 +311,7 @@
     <string name="update_prompt_title">发现新版本</string>
     <string name="update_prompt_message">发现新版本 %1$s，是否查看更新？</string>
     <string name="update_prompt_view">查看更新</string>
-    <string name="update_download_starting">正在开始下载…</string>
+    <string name="update_download_starting">准备下载中…</string>
     <string name="update_download_waiting">等待网络</string>
     <string name="update_download_progress">已下载 %1$s / %2$s</string>
     <string name="update_download_progress_unknown">已下载 %1$s</string>
