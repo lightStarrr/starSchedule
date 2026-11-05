@@ -52,11 +52,18 @@ internal fun UpdateActionArea(
 ) {
     val checking = state.isChecking || state.isRestoringDownloads
     when (downloadState) {
-        is UpdateDownloadState.Starting -> Text(
-            text = stringResource(R.string.update_download_starting),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(vertical = 16.dp),
-        )
+        is UpdateDownloadState.Starting -> Button(
+            onClick = {},
+            enabled = false,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.update_download_starting),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
 
         is UpdateDownloadState.Downloading -> {
             val total = downloadState.totalBytes
