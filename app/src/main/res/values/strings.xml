@@ -292,7 +292,6 @@
     <string name="update_latest_version">Up to date</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_check_for_updates">Check for updates</string>
-    <string name="update_retry">Retry</string>
     <string name="update_recheck">Recheck</string>
     <string name="update_download">Download update</string>
     <string name="update_include_snapshots">Also check for snapshot updates</string>
@@ -301,15 +300,8 @@
     <string name="update_status_new_stable">New version available</string>
     <string name="update_status_new_snapshot">New snapshot available</string>
     <string name="update_open_github_download">Open GitHub download page</string>
-    <string name="update_status_no_newer_stable">No newer stable release</string>
     <string name="update_status_check_failed_network">Check failed; check your network and try again</string>
-    <string name="update_status_rate_limited">Too many requests; try again later</string>
-    <string name="update_status_release_unavailable">Update info is temporarily unavailable</string>
-    <string name="update_status_metadata_unavailable">This release lacks update metadata</string>
-    <string name="update_status_unknown_relation">Cannot determine whether the snapshot is newer</string>
     <string name="update_status_storage">Update storage is unavailable</string>
-    <string name="update_status_partial">Some channels could not be checked</string>
-    <string name="update_status_cached">Result may be outdated</string>
     <string name="update_pref_save_failed">Failed to save the setting; please try again</string>
     <string name="update_release_notes_title">What\'s new in %1$s</string>
     <string name="update_changelog_added">Added</string>
@@ -330,12 +322,7 @@
     <string name="update_prompt_message">Version %1$s is available. View the update?</string>
     <string name="update_prompt_view">View update</string>
 
-    <string name="update_channel_stable">Stable</string>
-    <string name="update_channel_snapshot">Snapshot</string>
     <string name="update_target_version">Update target: %1$s</string>
-    <string name="update_channel_issue">%1$s: %2$s</string>
-    <string name="update_issue_with_retry">%1$s (%2$s)</string>
-    <string name="update_status_retry_at">Retry available after %1$s</string>
     <string name="update_release_notes_snapshot">Snapshot notes for %1$s (incremental since last snapshot)</string>
     <string name="update_view_release_page">View release page</string>
     <string name="update_download_starting">Starting download…</string>

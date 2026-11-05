@@ -166,11 +166,10 @@ internal fun UpdateActionArea(
                 ) {
                     Text(
                         text = stringResource(
-                            when {
-                                checking -> R.string.update_checking
-                                state.result != null && state.result.issues.isNotEmpty() ->
-                                    R.string.update_retry
-                                else -> R.string.update_check_for_updates
+                            if (checking) {
+                                R.string.update_checking
+                            } else {
+                                R.string.update_check_for_updates
                             },
                         ),
                     style = MaterialTheme.typography.titleMedium,

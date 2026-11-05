@@ -242,9 +242,6 @@ internal fun SoftwareUpdateScreen(
                 ),
             ) {
                 item {
-                    UpdateIssueArea(result = result)
-                }
-                item {
                     UpdateChangelogSection(
                         release = displayedRelease,
                         isLoading = state.isChecking && result == null,

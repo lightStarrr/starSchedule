@@ -37,9 +37,6 @@ import com.star.schedule.feature.update.domain.UpdateDownloadFailure
 import com.star.schedule.feature.update.domain.UpdateIssue
 import com.star.schedule.feature.update.domain.UpdateIssueReason
 import com.star.schedule.feature.update.domain.UpdateRelease
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -215,7 +212,7 @@ class SoftwareUpdateScreenTest {
     }
 
     @Test
-    fun issuesAreVisibleAlongsideTarget() {
+    fun channelIssuesDoNotSurfaceWhenTargetExists() {
         screen(
             state = SoftwareUpdateUiState(
                 installed = installed,
@@ -235,17 +232,56 @@ class SoftwareUpdateScreenTest {
                 ),
             ),
         )
-        val retry = string(
-            R.string.update_status_retry_at,
-            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(1_800_000_000_000L)),
-        )
-        val issue = string(
-            R.string.update_channel_issue,
-            string(R.string.update_channel_snapshot),
-            string(R.string.update_status_rate_limited),
-        )
-        showLog(string(R.string.update_issue_with_retry, issue, retry))
+        composeRule.onNodeWithText(
+            string(R.string.update_status_new_stable),
+        ).assertIsDisplayed()
+        button(R.string.update_download).assertIsDisplayed()
         showLog("New thing")
+        composeRule.onAllNodesWithText("Retry", substring = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun upToDateShowsLatestTextAndCheckButton() {
+        screen(
+            state = SoftwareUpdateUiState(
+                installed = installed,
+                result = UpdateCheckResult(
+                    target = null,
+                    displayedRelease = release(),
+                    issues = emptyList(),
+                    checkedAtEpochMillis = 1,
+                    includeSnapshots = false,
+                    isStale = false,
+                ),
+            ),
+        )
+        composeRule.onNodeWithText(
+            string(R.string.update_latest_version),
+        ).assertIsDisplayed()
+        button(R.string.update_check_for_updates).assertIsDisplayed()
+    }
+
+    @Test
+    fun totalCheckFailureShowsFailedTextAndCheckButton() {
+        screen(
+            state = SoftwareUpdateUiState(
+                installed = installed,
+                result = UpdateCheckResult(
+                    target = null,
+                    displayedRelease = null,
+                    issues = listOf(
+                        UpdateIssue(null, UpdateIssueReason.Network),
+                    ),
+                    checkedAtEpochMillis = 1,
+                    includeSnapshots = false,
+                    isStale = false,
+                ),
+            ),
+        )
+        composeRule.onNodeWithText(
+            string(R.string.update_status_check_failed_network),
+        ).assertIsDisplayed()
+        button(R.string.update_check_for_updates).assertIsDisplayed()
     }
 
     @Test
