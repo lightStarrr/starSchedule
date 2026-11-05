@@ -247,7 +247,6 @@ class SoftwareUpdateOverflowMenuTest {
             issues = emptyList(),
             checkedAtEpochMillis = 0,
             includeSnapshots = includeSnapshots.value,
-            isStale = false,
         )
 
         override fun observeIncludeSnapshots() = includeSnapshots

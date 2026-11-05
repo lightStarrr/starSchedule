@@ -73,7 +73,7 @@ class StartupUpdatePromptTest {
             val preference = MutableStateFlow(false)
 
             override suspend fun check(trigger: UpdateCheckTrigger) = UpdateCheckResult(
-                release(), release(), emptyList(), 1, false, false,
+                release(), release(), emptyList(), 1, false,
             )
 
             override fun observeIncludeSnapshots() = preference

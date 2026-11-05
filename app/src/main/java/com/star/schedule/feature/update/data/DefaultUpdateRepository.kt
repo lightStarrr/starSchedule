@@ -67,14 +67,13 @@ class DefaultUpdateRepository(
         }
 
         val issues = mutableListOf<UpdateIssue>()
-        var stale = false
         fun releaseOf(outcome: UpdateFetchOutcome): UpdateRelease? {
             issues += outcome.issues
             return when (outcome) {
                 is UpdateFetchOutcome.Success -> outcome.release
                 is UpdateFetchOutcome.Failure -> {
                     issues += outcome.issue
-                    outcome.staleRelease?.also { stale = true }
+                    null
                 }
             }
         }
@@ -119,7 +118,6 @@ class DefaultUpdateRepository(
             issues = issues + selection.issues,
             checkedAtEpochMillis = clock(),
             includeSnapshots = includeSnapshots,
-            isStale = stale,
         )
     }
 }

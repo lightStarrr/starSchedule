@@ -3,7 +3,6 @@ package com.star.schedule.feature.update.data
 import com.star.schedule.core.network.fakeTransport
 import com.star.schedule.core.network.responseOf
 import com.star.schedule.feature.update.domain.CommitRelation
-import com.star.schedule.feature.update.domain.UpdateCacheStore
 import com.star.schedule.feature.update.domain.UpdateChannel
 import com.star.schedule.feature.update.domain.UpdateFetchOutcome
 import com.star.schedule.feature.update.domain.UpdateIssueReason
@@ -30,17 +29,6 @@ class GitHubReleaseSourceTest {
     private var now = 1_000_000L
     private val requests = mutableListOf<Request>()
     private var handler: (Request) -> Response = { responseOf(it, 404) }
-    private val cache = FakeCacheStore()
-
-    private class FakeCacheStore : UpdateCacheStore {
-        val entries = mutableMapOf<String, String>()
-
-        override suspend fun read(key: String): String? = entries[key]
-
-        override suspend fun write(key: String, value: String) {
-            entries[key] = value
-        }
-    }
 
     private fun source() = GitHubReleaseSource(
         httpClient = OkHttpClient.Builder()
@@ -50,7 +38,6 @@ class GitHubReleaseSourceTest {
                 handler(request)
             })
             .build(),
-        cacheStore = cache,
         clock = { now },
         snapshotRetryDelayMillis = 0,
     )
@@ -190,59 +177,20 @@ class GitHubReleaseSourceTest {
     }
 
     @Test
-    fun `etag revalidation reuses cached release on 304`() = runTest {
+    fun `every fetch requests the release and metadata again`() = runTest {
         val source = source()
-        respondStable(headers = mapOf("ETag" to "\"stable-1\""))
-        val first = source.fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Success
-
-        respondStable(code = 304)
-        val second = source.fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Success
-
-        assertEquals(first.release, second.release)
-        val releaseRequests = requests.filter { it.url.encodedPath.endsWith("/latest") }
-        assertEquals(2, releaseRequests.size)
-        assertEquals("\"stable-1\"", releaseRequests[1].header("If-None-Match"))
-        val metadataRequests = requests.count {
-            it.url.encodedPath.contains("/releases/download/")
-        }
-        assertEquals(1, metadataRequests)
-    }
-
-    @Test
-    fun `304 without a cached body is not a success`() = runTest {
-        respondStable(code = 304)
-        val outcome = source().fetchRelease(UpdateChannel.Stable)
-        assertTrue(outcome is UpdateFetchOutcome.Failure)
+        respondStable()
+        source.fetchRelease(UpdateChannel.Stable)
+        source.fetchRelease(UpdateChannel.Stable)
         assertEquals(
             2,
             requests.count { it.url.encodedPath.endsWith("/latest") },
         )
-    }
-
-    @Test
-    fun `304 with unusable cache refetches without the etag`() = runTest {
-        val etags = mutableListOf<String?>()
-        handler = { request ->
-            when {
-                request.url.encodedPath.endsWith("/releases/latest") -> {
-                    etags += request.header("If-None-Match")
-                    if (etags.size == 1) {
-                        responseOf(request, 304)
-                    } else {
-                        responseOf(request, 200, stableReleaseBody(), mapOf("ETag" to "\"x\""))
-                    }
-                }
-
-                else -> responseOf(request, 200, metadataBody())
-            }
-        }
-        cache.write(
-            "release.stable",
-            """{"releaseEtag":"\"stale\"","releaseBody":"","metadataAssetId":0,"metadataEtag":null,"metadataBody":""}""",
+        assertEquals(
+            2,
+            requests.count { it.url.encodedPath.contains("/releases/download/") },
         )
-        val outcome = source().fetchRelease(UpdateChannel.Stable)
-        assertTrue(outcome is UpdateFetchOutcome.Success)
-        assertEquals(listOf("\"stale\"", null), etags)
+        assertTrue(requests.all { it.header("If-None-Match") == null })
     }
 
     @Test
@@ -268,7 +216,6 @@ class GitHubReleaseSourceTest {
             httpClient = OkHttpClient.Builder()
                 .addInterceptor(fakeTransport { requests += it; handler(it) })
                 .build(),
-            cacheStore = FakeCacheStore(),
             clock = { now },
             snapshotRetryDelayMillis = 0,
         ).fetchRelease(UpdateChannel.Snapshot)
@@ -305,7 +252,7 @@ class GitHubReleaseSourceTest {
     }
 
     @Test
-    fun `rate limit headers produce a retry window served from cache`() = runTest {
+    fun `rate limit headers suppress fetches until the retry window ends`() = runTest {
         val source = source()
         respondStable()
         source.fetchRelease(UpdateChannel.Stable)
@@ -329,7 +276,6 @@ class GitHubReleaseSourceTest {
         val inWindow = source.fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Failure
         assertEquals(UpdateIssueReason.RateLimited, inWindow.issue.reason)
         assertEquals(before, requests.size)
-        assertTrue(inWindow.staleRelease != null)
 
         now = resetSeconds * 1000 + 1
         respondStable()
@@ -363,7 +309,6 @@ class GitHubReleaseSourceTest {
                         }
                     })
                     .build(),
-                cacheStore = FakeCacheStore(),
                 clock = { now },
                 snapshotRetryDelayMillis = 0,
             )
@@ -490,7 +435,6 @@ class GitHubReleaseSourceTest {
                 httpClient = OkHttpClient.Builder()
                     .addInterceptor(fakeTransport { requests += it; handler(it) })
                     .build(),
-                cacheStore = FakeCacheStore(),
                 clock = { now },
                 snapshotRetryDelayMillis = 0,
             ).fetchRelease(UpdateChannel.Stable)
@@ -517,7 +461,6 @@ class GitHubReleaseSourceTest {
                         },
                     )
                     .build(),
-                cacheStore = FakeCacheStore(),
                 clock = { now },
                 snapshotRetryDelayMillis = 0,
             )
@@ -558,7 +501,6 @@ class GitHubReleaseSourceTest {
                         },
                     )
                     .build(),
-                cacheStore = FakeCacheStore(),
                 clock = { now },
                 snapshotRetryDelayMillis = 0,
             )
@@ -584,73 +526,17 @@ class GitHubReleaseSourceTest {
     }
 
     @Test
-    fun `cache read and write failures still produce a release plus storage issue`() = runTest {
-        val failing = object : UpdateCacheStore {
-            var data: String? = null
-
-            override suspend fun read(key: String): String? = error("read fail")
-
-            override suspend fun write(key: String, value: String) {
-                error("write fail")
-            }
-        }
-        respondStable()
-        val local = GitHubReleaseSource(
-            httpClient = OkHttpClient.Builder()
-                .addInterceptor(fakeTransport { requests += it; handler(it) })
-                .build(),
-            cacheStore = failing,
-            clock = { now },
-            snapshotRetryDelayMillis = 0,
-        )
-        val outcome = local.fetchRelease(UpdateChannel.Stable)
-        assertTrue(outcome is UpdateFetchOutcome.Success)
-        assertTrue(
-            (outcome as UpdateFetchOutcome.Success).issues.any {
-                it.reason == UpdateIssueReason.Storage
-            },
-        )
-    }
-
-    @Test
-    fun `a cached entry with a different release id does not reuse metadata`() = runTest {
-        respondStable(headers = mapOf("ETag" to "\"old\""))
-        source().fetchRelease(UpdateChannel.Stable)
-        val metadataCallsBefore = requests.count {
-            it.url.encodedPath.contains("/releases/download/")
-        }
-        requests.clear()
-        respondStable(
-            body = stableReleaseBody(id = 99),
-            headers = mapOf("ETag" to "\"new\""),
-        )
-        source().fetchRelease(UpdateChannel.Stable)
-        val metadataCalls = requests.count {
-            it.url.encodedPath.contains("/releases/download/")
-        }
-        assertTrue(metadataCalls >= 1)
-    }
-
-    @Test
-    fun `rate limit persists across source instances and compare honors it`() = runTest {
-        val shared = FakeCacheStore()
-        fun local() = GitHubReleaseSource(
-            httpClient = OkHttpClient.Builder()
-                .addInterceptor(fakeTransport { requests += it; handler(it) })
-                .build(),
-            cacheStore = shared,
-            clock = { now },
-            snapshotRetryDelayMillis = 0,
-        )
+    fun `rate limit suppresses fetches and compare calls on the same instance`() = runTest {
+        val source = source()
         handler = { responseOf(it, 429, "", mapOf("Retry-After" to "120")) }
-        local().fetchRelease(UpdateChannel.Stable)
+        source.fetchRelease(UpdateChannel.Stable)
         val calls = requests.size
-        val second = local().fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Failure
+        val second = source.fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Failure
         assertEquals(UpdateIssueReason.RateLimited, second.issue.reason)
         assertEquals(calls, requests.size)
         assertEquals(
             CommitRelation.Unknown,
-            local().compareCommits(SHA_LOCAL, SHA_REMOTE),
+            source.compareCommits(SHA_LOCAL, SHA_REMOTE),
         )
         assertEquals(calls, requests.size)
     }
@@ -691,7 +577,6 @@ class GitHubReleaseSourceTest {
             httpClient = OkHttpClient.Builder()
                 .addInterceptor(fakeTransport { requests += it; handler(it) })
                 .build(),
-            cacheStore = FakeCacheStore(),
             clock = { now },
             snapshotRetryDelayMillis = 0,
         ).fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Failure

@@ -130,7 +130,6 @@ class SoftwareUpdateScreenTest {
                     issues = emptyList(),
                     checkedAtEpochMillis = 1,
                     includeSnapshots = false,
-                    isStale = false,
                 ),
             ),
         )
@@ -158,7 +157,7 @@ class SoftwareUpdateScreenTest {
                 result = UpdateCheckResult(
                     target = release(), displayedRelease = release(),
                     issues = emptyList(), checkedAtEpochMillis = 1,
-                    includeSnapshots = false, isStale = false,
+                    includeSnapshots = false,
                 ),
             ),
             onDownload = { downloaded = it },
@@ -183,7 +182,7 @@ class SoftwareUpdateScreenTest {
                 result = UpdateCheckResult(
                     target = release(), displayedRelease = release(),
                     issues = emptyList(), checkedAtEpochMillis = 1,
-                    includeSnapshots = false, isStale = false,
+                    includeSnapshots = false,
                 ),
             ),
             narrow = true,
@@ -228,7 +227,6 @@ class SoftwareUpdateScreenTest {
                     ),
                     checkedAtEpochMillis = 1,
                     includeSnapshots = true,
-                    isStale = true,
                 ),
             ),
         )
@@ -251,7 +249,6 @@ class SoftwareUpdateScreenTest {
                     issues = emptyList(),
                     checkedAtEpochMillis = 1,
                     includeSnapshots = false,
-                    isStale = false,
                 ),
             ),
         )
@@ -274,7 +271,6 @@ class SoftwareUpdateScreenTest {
                     ),
                     checkedAtEpochMillis = 1,
                     includeSnapshots = false,
-                    isStale = false,
                 ),
             ),
         )
@@ -310,7 +306,7 @@ class SoftwareUpdateScreenTest {
                 result = UpdateCheckResult(
                     target = release(), displayedRelease = release(),
                     issues = emptyList(), checkedAtEpochMillis = 1,
-                    includeSnapshots = false, isStale = false,
+                    includeSnapshots = false,
                 ),
             ),
             downloadState = UpdateDownloadState.Ready(release()),
@@ -337,7 +333,7 @@ class SoftwareUpdateScreenTest {
                 result = UpdateCheckResult(
                     target = release(), displayedRelease = release(),
                     issues = emptyList(), checkedAtEpochMillis = 1,
-                    includeSnapshots = false, isStale = false,
+                    includeSnapshots = false,
                 ),
             ),
             downloadState = UpdateDownloadState.Ready(release()),
@@ -369,7 +365,7 @@ class SoftwareUpdateScreenTest {
         screen(
             SoftwareUpdateUiState(
                 installed,
-                result = UpdateCheckResult(target, target, emptyList(), 1, false, false),
+                result = UpdateCheckResult(target, target, emptyList(), 1, false),
             ),
         )
         showLog(string(R.string.update_changelog_empty))
@@ -417,7 +413,7 @@ class SoftwareUpdateScreenTest {
         screen(
             SoftwareUpdateUiState(
                 installed,
-                result = UpdateCheckResult(newer, newer, emptyList(), 1, false, false),
+                result = UpdateCheckResult(newer, newer, emptyList(), 1, false),
             ),
             UpdateDownloadState.Downloading(active, 7, 10, 100, false),
         )
@@ -663,7 +659,7 @@ class SoftwareUpdateScreenTest {
             SoftwareUpdateUiState(
                 installed,
                 result = UpdateCheckResult(
-                    newer, newer, emptyList(), 1, false, false,
+                    newer, newer, emptyList(), 1, false,
                 ),
             ),
             UpdateDownloadState.Failed(release(), UpdateDownloadFailure.HashMismatch),
@@ -701,7 +697,7 @@ class SoftwareUpdateScreenTest {
             SoftwareUpdateUiState(
                 installed,
                 result = UpdateCheckResult(
-                    release(), release(), emptyList(), 1, false, false,
+                    release(), release(), emptyList(), 1, false,
                 ),
                 downloadFailureMessage = UpdateDownloadFailureMessage(
                     1L, UpdateDownloadFailure.HashMismatch,
@@ -755,7 +751,7 @@ class SoftwareUpdateScreenTest {
             SoftwareUpdateUiState(
                 installed,
                 result = UpdateCheckResult(
-                    release(), release(), emptyList(), 1, false, false,
+                    release(), release(), emptyList(), 1, false,
                 ),
                 downloadFailureMessage = UpdateDownloadFailureMessage(
                     1L, UpdateDownloadFailure.HashMismatch,

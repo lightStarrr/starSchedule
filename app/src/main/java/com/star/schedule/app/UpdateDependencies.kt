@@ -54,7 +54,6 @@ class UpdateDependencies(
 
     private val source = GitHubReleaseSource(
         httpClient = httpClient,
-        cacheStore = cacheStore,
         ioDispatcher = ioDispatcher,
     )
 

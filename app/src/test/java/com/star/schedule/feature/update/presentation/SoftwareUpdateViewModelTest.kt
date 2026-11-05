@@ -62,7 +62,6 @@ class SoftwareUpdateViewModelTest {
             issues = listOf(UpdateIssue(null, UpdateIssueReason.Network)),
             checkedAtEpochMillis = 1,
             includeSnapshots = false,
-            isStale = false,
         )
 
         override suspend fun check(trigger: UpdateCheckTrigger): UpdateCheckResult {

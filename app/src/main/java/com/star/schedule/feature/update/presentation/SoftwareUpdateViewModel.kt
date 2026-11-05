@@ -357,7 +357,6 @@ class SoftwareUpdateViewModel(
                     issues = listOf(UpdateIssue(null, UpdateIssueReason.Network)),
                     checkedAtEpochMillis = System.currentTimeMillis(),
                     includeSnapshots = _uiState.value.includeSnapshots,
-                    isStale = false,
                 )
             }
             val stale = result.includeSnapshots != _uiState.value.includeSnapshots

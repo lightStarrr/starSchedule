@@ -1,7 +1,6 @@
 package com.star.schedule.feature.update.data
 
 import com.star.schedule.feature.update.domain.CommitRelation
-import com.star.schedule.feature.update.domain.UpdateCacheStore
 import com.star.schedule.feature.update.domain.UpdateChannel
 import com.star.schedule.feature.update.domain.UpdateChangelog
 import com.star.schedule.feature.update.domain.UpdateFetchOutcome
@@ -24,7 +23,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -44,7 +42,6 @@ import okio.Buffer
 
 class GitHubReleaseSource(
     private val httpClient: OkHttpClient,
-    private val cacheStore: UpdateCacheStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val snapshotRetryDelayMillis: Long = 1_000,
@@ -53,65 +50,33 @@ class GitHubReleaseSource(
     private val json = Json { ignoreUnknownKeys = true }
     private val rateLimitMutex = Mutex()
 
-    private var rateLimitedUntilMillis = -1L
+    private var rateLimitedUntilMillis = 0L
 
     override suspend fun fetchRelease(channel: UpdateChannel): UpdateFetchOutcome =
         withContext(ioDispatcher) {
-            val cacheKey = cacheKey(channel)
-            val issues = mutableListOf<UpdateIssue>()
-            val cached = readCache(cacheKey, channel, issues)
-            val retryAt = currentRateLimit(channel, issues)
+            val retryAt = currentRateLimit()
             if (clock() < retryAt) {
                 return@withContext UpdateFetchOutcome.Failure(
                     issue = UpdateIssue(channel, UpdateIssueReason.RateLimited, retryAt),
-                    staleRelease = rebuildRelease(channel, cached),
-                    issues = issues,
                 )
             }
             try {
-                val fetched = requestRelease(channel, cached?.releaseEtag, issues)
-                if (fetched != null) {
-                    UpdateFetchOutcome.Success(
-                        release = buildRelease(channel, fetched, cacheKey, cached, issues),
-                        issues = issues,
-                    )
-                } else {
-                    val rebuilt = rebuildRelease(channel, cached)
-                    if (rebuilt != null) {
-                        UpdateFetchOutcome.Success(rebuilt, issues = issues)
-                    } else {
-                        val refetched = requestRelease(channel, null, issues)
-                        if (refetched != null) {
-                            UpdateFetchOutcome.Success(
-                                release = buildRelease(channel, refetched, cacheKey, cached, issues),
-                                issues = issues,
-                            )
-                        } else {
-                            UpdateFetchOutcome.Failure(
-                                issue = UpdateIssue(channel, UpdateIssueReason.ReleaseUnavailable),
-                            )
-                        }
-                    }
-                }
+                UpdateFetchOutcome.Success(
+                    release = buildRelease(channel, requestRelease(channel)),
+                )
             } catch (error: CancellationException) {
                 throw error
             } catch (error: SourceFailure) {
                 UpdateFetchOutcome.Failure(
                     issue = UpdateIssue(channel, error.reason, error.retryAtEpochMillis),
-                    staleRelease = rebuildRelease(channel, cached),
-                    issues = issues,
                 )
             } catch (_: IOException) {
                 UpdateFetchOutcome.Failure(
                     issue = UpdateIssue(channel, UpdateIssueReason.Network),
-                    staleRelease = rebuildRelease(channel, cached),
-                    issues = issues,
                 )
             } catch (_: Exception) {
                 UpdateFetchOutcome.Failure(
                     issue = UpdateIssue(channel, UpdateIssueReason.Network),
-                    staleRelease = rebuildRelease(channel, cached),
-                    issues = issues,
                 )
             }
         }
@@ -121,7 +86,7 @@ class GitHubReleaseSource(
             if (!FULL_SHA.matches(baseSha) || !FULL_SHA.matches(headSha)) {
                 return@withContext CommitRelation.Unknown
             }
-            if (clock() < currentRateLimit(null, mutableListOf())) {
+            if (clock() < currentRateLimit()) {
                 return@withContext CommitRelation.Unknown
             }
             try {
@@ -130,7 +95,7 @@ class GitHubReleaseSource(
                 ).use { response ->
                     if (response.code == 403 || response.code == 429) {
                         rateLimitRetryAt(response)
-                            ?.let { recordRateLimit(null, it, mutableListOf()) }
+                            ?.let { recordRateLimit(it) }
                         return@withContext CommitRelation.Unknown
                     }
                     if (response.code != 200) return@withContext CommitRelation.Unknown
@@ -152,11 +117,7 @@ class GitHubReleaseSource(
             }
         }
 
-    private suspend fun requestRelease(
-        channel: UpdateChannel,
-        etag: String?,
-        issues: MutableList<UpdateIssue>,
-    ): ReleasePayload? {
+    private suspend fun requestRelease(channel: UpdateChannel): String {
         val url = when (channel) {
             UpdateChannel.Stable -> "$API_ROOT/releases/latest"
             UpdateChannel.Snapshot -> "$API_ROOT/releases/tags/snapshot"
@@ -164,18 +125,11 @@ class GitHubReleaseSource(
         var attempt = 0
         while (true) {
             attempt++
-            val decision = execute(
-                apiRequest(url, etag = if (attempt == 1) etag else null),
-            ).use { response ->
+            val decision = execute(apiRequest(url)).use { response ->
                 when {
                     response.code == 200 -> ReleaseResult.Payload(
-                        ReleasePayload(
-                            etag = response.header("ETag"),
-                            body = readBodyCapped(response, API_BODY_LIMIT),
-                        ),
+                        readBodyCapped(response, API_BODY_LIMIT),
                     )
-
-                    response.code == 304 -> ReleaseResult.NotModified
 
                     response.code == 404 || response.code == 410 ->
                         if (channel == UpdateChannel.Snapshot && attempt == 1) {
@@ -185,115 +139,42 @@ class GitHubReleaseSource(
                         }
 
                     response.code == 403 || response.code == 429 ->
-                        throw rateLimitedOrUnavailable(response, channel, issues)
+                        throw rateLimitedOrUnavailable(response)
 
                     else -> throw SourceFailure(UpdateIssueReason.ReleaseUnavailable)
                 }
             }
             when (decision) {
-                is ReleaseResult.Payload -> return decision.payload
-                ReleaseResult.NotModified -> return null
+                is ReleaseResult.Payload -> return decision.body
                 ReleaseResult.Retry -> delay(snapshotRetryDelayMillis)
             }
         }
     }
 
-    private suspend fun requestMetadata(
-        url: String,
-        etag: String?,
-        channel: UpdateChannel,
-        issues: MutableList<UpdateIssue>,
-    ): ReleasePayload? {
-        val decision = execute(apiRequest(url, etag = etag)).use { response ->
-            when {
-                response.code == 200 -> ReleaseResult.Payload(
-                    ReleasePayload(
-                        etag = response.header("ETag"),
-                        body = readBodyCapped(response, METADATA_BODY_LIMIT),
-                    ),
-                )
+    private suspend fun requestMetadata(url: String): String =
+        execute(apiRequest(url)).use { response ->
+        when {
+            response.code == 200 -> readBodyCapped(response, METADATA_BODY_LIMIT)
 
-                response.code == 304 -> ReleaseResult.NotModified
+            response.code == 403 || response.code == 429 ->
+                throw rateLimitedOrUnavailable(response)
 
-                response.code == 403 || response.code == 429 ->
-                    throw rateLimitedOrUnavailable(response, channel, issues)
-
-                else -> throw SourceFailure(UpdateIssueReason.InvalidMetadata)
-            }
-        }
-        return when (decision) {
-            is ReleaseResult.Payload -> decision.payload
-            ReleaseResult.NotModified -> null
-            ReleaseResult.Retry -> null
+            else -> throw SourceFailure(UpdateIssueReason.InvalidMetadata)
         }
     }
 
     private suspend fun buildRelease(
         channel: UpdateChannel,
-        fetched: ReleasePayload,
-        cacheKey: String,
-        cached: CacheEntry?,
-        issues: MutableList<UpdateIssue>,
+        releaseBody: String,
     ): UpdateRelease {
-        val root = parseObject(fetched.body)
-        val releaseId = requiredId(root, "id")
-        val metadataAssetId = findMetadataAssetId(root)
-        val cachedMetadata = cached?.takeIf {
-            it.releaseId == releaseId && it.metadataAssetId == metadataAssetId
-        }
-        val metadataUrl = metadataDownloadUrl(root, metadataAssetId)
+        val root = parseObject(releaseBody)
+        val metadataUrl = metadataDownloadUrl(root, findMetadataAssetId(root))
 
-        val retryAt = currentRateLimit(channel, issues)
+        val retryAt = currentRateLimit()
         if (clock() < retryAt) {
             throw SourceFailure(UpdateIssueReason.RateLimited, retryAt)
         }
-        var metadataEtag = cachedMetadata?.metadataEtag
-        var metadataBody = requestMetadata(metadataUrl, metadataEtag, channel, issues)?.let {
-            metadataEtag = it.etag
-            it.body
-        } ?: cachedMetadata?.metadataBody
-        if (metadataBody == null) {
-            val refetched = requestMetadata(metadataUrl, null, channel, issues)
-            metadataBody = refetched?.body
-                ?: throw SourceFailure(UpdateIssueReason.MetadataUnavailable)
-            metadataEtag = refetched.etag
-        }
-
-        val release = assembleRelease(channel, root, metadataBody)
-        try {
-            cacheStore.write(
-                cacheKey,
-                json.encodeToString(
-                    CacheEntry(
-                        releaseEtag = fetched.etag,
-                        releaseBody = fetched.body,
-                        releaseId = releaseId,
-                        metadataAssetId = metadataAssetId,
-                        metadataEtag = metadataEtag,
-                        metadataBody = metadataBody,
-                    ),
-                ),
-            )
-        } catch (error: CancellationException) {
-            throw error
-        } catch (_: Exception) {
-            issues += UpdateIssue(channel, UpdateIssueReason.Storage)
-        }
-        return release
-    }
-
-    private fun rebuildRelease(channel: UpdateChannel, cached: CacheEntry?): UpdateRelease? {
-        cached ?: return null
-        if (cached.releaseBody.isEmpty() || cached.metadataBody.isEmpty()) return null
-        return runCatching {
-            val release = assembleRelease(channel, parseObject(cached.releaseBody), cached.metadataBody)
-            if (release.metadataAssetId != cached.metadataAssetId ||
-                release.releaseId != cached.releaseId
-            ) {
-                error("asset id drift")
-            }
-            release
-        }.getOrNull()
+        return assembleRelease(channel, root, requestMetadata(metadataUrl))
     }
 
     private fun assembleRelease(
@@ -550,90 +431,35 @@ class GitHubReleaseSource(
         return raw.coerceIn(clock() + MIN_RETRY_BACKOFF_MILLIS, Long.MAX_VALUE)
     }
 
-    private suspend fun rateLimitedOrUnavailable(
-        response: Response,
-        channel: UpdateChannel?,
-        issues: MutableList<UpdateIssue>,
-    ): SourceFailure {
+    private suspend fun rateLimitedOrUnavailable(response: Response): SourceFailure {
         val retryAt = rateLimitRetryAt(response)
         return if (retryAt != null) {
-            recordRateLimit(channel, retryAt, issues)
+            recordRateLimit(retryAt)
             SourceFailure(UpdateIssueReason.RateLimited, retryAt)
         } else {
             SourceFailure(UpdateIssueReason.ReleaseUnavailable)
         }
     }
 
-    private suspend fun currentRateLimit(
-        channel: UpdateChannel?,
-        issues: MutableList<UpdateIssue>,
-    ): Long = rateLimitMutex.withLock {
-        if (rateLimitedUntilMillis < 0) {
-            val persisted = try {
-                cacheStore.read(RATE_LIMIT_KEY)?.toLongOrNull()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                issues += UpdateIssue(channel, UpdateIssueReason.Storage)
-                null
-            }
-            if (rateLimitedUntilMillis < 0) {
-                rateLimitedUntilMillis = persisted ?: 0L
-            }
-        }
-        rateLimitedUntilMillis
-    }
+    private suspend fun currentRateLimit(): Long =
+        rateLimitMutex.withLock { rateLimitedUntilMillis }
 
-    private suspend fun recordRateLimit(
-        channel: UpdateChannel?,
-        retryAt: Long,
-        issues: MutableList<UpdateIssue>,
-    ) {
+    private suspend fun recordRateLimit(retryAt: Long) {
         rateLimitMutex.withLock {
             rateLimitedUntilMillis = maxOf(rateLimitedUntilMillis, retryAt)
-            try {
-                cacheStore.write(RATE_LIMIT_KEY, rateLimitedUntilMillis.toString())
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                issues += UpdateIssue(channel, UpdateIssueReason.Storage)
-            }
         }
     }
 
-    private suspend fun readCache(
-        cacheKey: String,
-        channel: UpdateChannel,
-        issues: MutableList<UpdateIssue>,
-    ): CacheEntry? = try {
-        cacheStore.read(cacheKey)
-            ?.takeIf { it.length <= CACHE_ENTRY_LIMIT }
-            ?.let { raw -> runCatching { json.decodeFromString<CacheEntry>(raw) }.getOrNull() }
-    } catch (error: CancellationException) {
-        throw error
-    } catch (_: Exception) {
-        issues += UpdateIssue(channel, UpdateIssueReason.Storage)
-        null
-    }
-
-    private fun cacheKey(channel: UpdateChannel) = when (channel) {
-        UpdateChannel.Stable -> "release.stable"
-        UpdateChannel.Snapshot -> "release.snapshot"
-    }
-
-    private fun apiRequest(url: String, etag: String? = null): Request =
+    private fun apiRequest(url: String): Request =
         Request.Builder()
             .url(url)
             .header("User-Agent", USER_AGENT)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .apply {
-                if (etag != null) header("If-None-Match", etag)
-            }
             .build()
 
     private suspend fun execute(request: Request): Response {
-        val retryAt = currentRateLimit(null, mutableListOf())
+        val retryAt = currentRateLimit()
         if (clock() < retryAt) {
             throw SourceFailure(UpdateIssueReason.RateLimited, retryAt)
         }
@@ -685,14 +511,10 @@ class GitHubReleaseSource(
     ) : Exception()
 
     private sealed interface ReleaseResult {
-        data class Payload(val payload: ReleasePayload) : ReleaseResult
-
-        data object NotModified : ReleaseResult
+        data class Payload(val body: String) : ReleaseResult
 
         data object Retry : ReleaseResult
     }
-
-    private class ReleasePayload(val etag: String?, val body: String)
 
     private class MetadataContent(
         val versionName: String,
@@ -702,16 +524,6 @@ class GitHubReleaseSource(
         val apkSize: Long,
         val apkSha256: String,
         val changelog: UpdateChangelog,
-    )
-
-    @Serializable
-    private data class CacheEntry(
-        val releaseEtag: String? = null,
-        val releaseBody: String = "",
-        val releaseId: Long = 0,
-        val metadataAssetId: Long = 0,
-        val metadataEtag: String? = null,
-        val metadataBody: String = "",
     )
 
     private fun string(obj: JsonObject, name: String): String? =
@@ -745,12 +557,10 @@ class GitHubReleaseSource(
         const val USER_AGENT = "starSchedule-android"
         const val API_BODY_LIMIT = 1024L * 1024
         const val METADATA_BODY_LIMIT = 256L * 1024
-        const val CACHE_ENTRY_LIMIT = 2L * 1024 * 1024
         const val BODY_CHUNK = 8 * 1024L
         const val DEFAULT_RATE_LIMIT_WINDOW_MILLIS = 60_000L
         const val MIN_RETRY_BACKOFF_MILLIS = 1_000L
         const val MAX_VERSION_CODE = 2_100_000_000L
-        const val RATE_LIMIT_KEY = "github.ratelimit"
         val FULL_SHA = Regex("[0-9a-f]{40}")
         val SHA256 = Regex("[0-9a-f]{64}")
         val STABLE_VERSION = Regex("\\d+\\.\\d+\\.\\d+")

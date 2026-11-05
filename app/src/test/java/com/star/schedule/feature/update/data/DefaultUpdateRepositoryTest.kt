@@ -175,25 +175,6 @@ class DefaultUpdateRepositoryTest {
     }
 
     @Test
-    fun `stale cached release still feeds selection and marks the result`() = runTest {
-        val source = FakeSource()
-        val preferences = FakePreferences()
-        source.outcomes[UpdateChannel.Stable] = UpdateFetchOutcome.Failure(
-            UpdateIssue(UpdateChannel.Stable, UpdateIssueReason.RateLimited, retryAtEpochMillis = 9),
-            staleRelease = release(UpdateChannel.Stable, 130),
-        )
-        val repository = repository(source, preferences, testScope(), StandardTestDispatcher(testScheduler))
-
-        val result = repository.check(UpdateCheckTrigger.Manual)
-        assertEquals(130L, result.target?.versionCode)
-        assertTrue(result.isStale)
-        assertEquals(
-            UpdateIssueReason.RateLimited,
-            result.issues.single().reason,
-        )
-    }
-
-    @Test
     fun `same code snapshot asks for the commit relation before updating`() = runTest {
         val source = FakeSource()
         val preferences = FakePreferences()

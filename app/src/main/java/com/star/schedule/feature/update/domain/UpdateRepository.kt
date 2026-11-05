@@ -26,7 +26,6 @@ sealed interface UpdateFetchOutcome {
 
     data class Failure(
         val issue: UpdateIssue,
-        val staleRelease: UpdateRelease? = null,
         override val issues: List<UpdateIssue> = emptyList(),
     ) : UpdateFetchOutcome
 }
