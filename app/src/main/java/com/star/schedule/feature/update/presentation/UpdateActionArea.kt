@@ -1,40 +1,13 @@
 package com.star.schedule.feature.update.presentation
 
 import android.text.format.Formatter
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.progressSemantics
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.feature.update.domain.UpdateDownloadState
 import com.star.schedule.feature.update.domain.UpdateRelease
@@ -51,161 +24,98 @@ internal fun UpdateActionArea(
     onOpenRelease: (UpdateRelease) -> Unit,
 ) {
     val checking = state.isChecking || state.isRestoringDownloads
-    when (downloadState) {
-        is UpdateDownloadState.Starting -> Button(
-            onClick = {},
-            enabled = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.update_download_starting),
-                style = MaterialTheme.typography.titleMedium,
+    var leftCircle: UpdateCircleAction? = null
+    var rightCircle: UpdateCircleAction? = null
+    val cancelCircle = UpdateCircleAction(
+        icon = rememberVectorPainter(Icons.Rounded.Close),
+        contentDescription = stringResource(R.string.update_cancel),
+        enabled = true,
+        onClick = onCancelDownload,
+    )
+    val pill: UpdatePillContent = when (downloadState) {
+        is UpdateDownloadState.Starting -> {
+            rightCircle = cancelCircle
+            UpdatePillContent.Progress(
+                progress = 0f,
+                label = stringResource(R.string.update_download_starting),
             )
         }
 
         is UpdateDownloadState.Downloading -> {
             val total = downloadState.totalBytes
-            val progress = if (total != null && total > 0) {
-                (downloadState.bytesDownloaded.toFloat() / total).coerceIn(0f, 1f)
-            } else {
-                null
-            }
-            UpdateProgressActions(
-                progress = progress,
+            rightCircle = cancelCircle
+            UpdatePillContent.Progress(
+                progress = if (total != null && total > 0) {
+                    (downloadState.bytesDownloaded.toFloat() / total).coerceIn(0f, 1f)
+                } else {
+                    null
+                },
                 label = downloadProgressLabel(downloadState),
-                onCancel = onCancelDownload,
             )
         }
 
-        is UpdateDownloadState.Verifying -> UpdateProgressActions(
-            progress = 1f,
-            label = stringResource(R.string.update_download_verifying),
-            onCancel = onCancelDownload,
-        )
+        is UpdateDownloadState.Verifying -> {
+            rightCircle = cancelCircle
+            UpdatePillContent.Progress(
+                progress = 1f,
+                label = stringResource(R.string.update_download_verifying),
+            )
+        }
 
-        is UpdateDownloadState.Ready -> Button(
-            onClick = onInstall,
+        is UpdateDownloadState.Ready -> UpdatePillContent.Label(
+            text = stringResource(
+                if (state.isPreparingInstall) {
+                    R.string.update_download_verifying
+                } else {
+                    R.string.update_install
+                },
+            ),
             enabled = !state.isPreparingInstall,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp),
-        ) {
-            Text(
-                text = stringResource(
-                    if (state.isPreparingInstall) {
-                        R.string.update_download_verifying
-                    } else {
-                        R.string.update_install
-                    },
-                ),
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
+            onClick = onInstall,
+        )
 
         is UpdateDownloadState.Failed, UpdateDownloadState.Idle -> {
             val availableTarget = (downloadState as? UpdateDownloadState.Failed)
                 ?.target ?: target
             if (availableTarget != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    FilledIconButton(
-                        onClick = { onOpenRelease(availableTarget) },
-                        enabled = !checking,
-                        modifier = Modifier.size(56.dp),
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_github),
-                            contentDescription = stringResource(
-                                R.string.update_open_github_download,
-                            ),
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                    Button(
-                        onClick = { onDownload(availableTarget) },
-                        enabled = !checking,
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 56.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.update_download),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                }
-            } else {
-                Button(
-                    onClick = onCheckForUpdates,
+                leftCircle = UpdateCircleAction(
+                    icon = painterResource(R.drawable.ic_github),
+                    contentDescription = stringResource(
+                        R.string.update_open_github_download,
+                    ),
                     enabled = !checking,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp),
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (checking) {
-                                R.string.update_checking
-                            } else {
-                                R.string.update_check_for_updates
-                            },
-                        ),
-                    style = MaterialTheme.typography.titleMedium,
+                    onClick = { onOpenRelease(availableTarget) },
                 )
-            }
+                UpdatePillContent.Label(
+                    text = stringResource(R.string.update_download),
+                    enabled = !checking,
+                    onClick = { onDownload(availableTarget) },
+                )
+            } else {
+                UpdatePillContent.Label(
+                    text = stringResource(
+                        if (checking) {
+                            R.string.update_checking
+                        } else {
+                            R.string.update_check_for_updates
+                        },
+                    ),
+                    enabled = !checking,
+                    onClick = onCheckForUpdates,
+                )
             }
         }
     }
+    UpdateMetaballActions(
+        pill = pill,
+        leftCircle = leftCircle,
+        rightCircle = rightCircle,
+    )
 }
-
 
 @Composable
 private fun formatBytes(bytes: Long): String =
     Formatter.formatShortFileSize(LocalContext.current, bytes.coerceAtLeast(0))
-
-@Composable
-private fun UpdateProgressActions(
-    progress: Float?,
-    label: String,
-    onCancel: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        UpdateProgressCapsule(
-            progress = progress,
-            label = label,
-            modifier = Modifier.weight(1f),
-        )
-        FilledIconButton(
-            onClick = onCancel,
-            modifier = Modifier.size(56.dp),
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Close,
-                contentDescription = stringResource(R.string.update_cancel),
-                modifier = Modifier.size(24.dp),
-            )
-        }
-    }
-}
 
 @Composable
 private fun downloadProgressLabel(
@@ -224,84 +134,5 @@ private fun downloadProgressLabel(
             R.string.update_download_progress_unknown,
             formatBytes(downloadState.bytesDownloaded),
         )
-    }
-}
-
-@Composable
-private fun UpdateProgressCapsule(
-    progress: Float?,
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    val track = MaterialTheme.colorScheme.primaryContainer
-    val fill = MaterialTheme.colorScheme.primary
-    if (progress != null) {
-        Box(
-            modifier = modifier
-                .heightIn(min = 56.dp)
-                .progressSemantics(progress)
-                .clip(CircleShape)
-                .background(track)
-                .drawBehind {
-                    drawRect(fill, size = Size(size.width * progress, size.height))
-                },
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .drawWithContent {
-                        clipRect(right = size.width * progress) { this@drawWithContent.drawContent() }
-                    }
-                    .clearAndSetSemantics { }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-        }
-    } else {
-        Box(
-            modifier = modifier
-                .heightIn(min = 56.dp)
-                .progressSemantics()
-                .clip(CircleShape)
-                .background(track),
-        ) {
-            LinearProgressIndicator(
-                color = fill.copy(alpha = 0.20f),
-                trackColor = track,
-                modifier = Modifier
-                    .matchParentSize()
-                    .clearAndSetSemantics { },
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-        }
     }
 }
