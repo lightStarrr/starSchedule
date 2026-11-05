@@ -1,10 +1,12 @@
 package com.star.schedule.feature.update.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,6 +46,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -357,24 +360,32 @@ private fun UpdateHeroCard(
             color = colors.primary.copy(alpha = 0.30f),
         )
 
-        Icon(
-            painter = painterResource(R.drawable.ic_logo),
-            contentDescription = null,
-            tint = colors.onPrimaryContainer,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(HERO_CONTENT_PADDING)
-                .size(HERO_LOGO_SIZE),
-        )
-        Text(
-            text = versionName,
-            style = MaterialTheme.typography.headlineLargeEmphasized,
-            fontWeight = FontWeight.Bold,
-            color = colors.onPrimaryContainer,
+        Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
+                .fillMaxWidth()
                 .padding(HERO_CONTENT_PADDING),
-        )
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                text = versionName,
+                style = MaterialTheme.typography.headlineLargeEmphasized,
+                fontWeight = FontWeight.Bold,
+                color = colors.onPrimaryContainer,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                painter = painterResource(R.drawable.ic_logo),
+                contentDescription = null,
+                tint = colors.onPrimaryContainer,
+                modifier = Modifier
+                    .testTag("update-hero-logo")
+                    .size(HERO_LOGO_SIZE),
+            )
+        }
         if (statusText.isNotEmpty()) {
             Text(
                 text = statusText,
