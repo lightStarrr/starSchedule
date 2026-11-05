@@ -17,7 +17,6 @@ import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,8 +51,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.lerp
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -417,7 +414,7 @@ internal fun UpdateMetaballActions(
                 label = "textStyle",
             )
             val textPaint = remember { Paint() }
-            Text(
+            RollingText(
                 text = when (pill) {
                     is UpdatePillContent.Label -> pill.text
                     is UpdatePillContent.Progress -> pill.label
@@ -428,9 +425,6 @@ internal fun UpdateMetaballActions(
                     styleFraction,
                 ),
                 color = colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
                     .drawWithContent {
