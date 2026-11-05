@@ -3,7 +3,6 @@ package com.star.schedule
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.net.toUri
@@ -44,22 +43,14 @@ class SoftwareUpdateActivity : ComponentActivity() {
                                 Intent(Intent.ACTION_VIEW, release.htmlUrl.toUri()),
                             )
                         } catch (_: Exception) {
-                            Toast.makeText(
-                                this,
-                                R.string.update_open_release_failed,
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            viewModel.notifyOpenReleaseFailed()
                         }
                     },
                     onOpenInstallSettings = {
                         try {
                             startActivity(dependencies.installer.unknownSourcesIntent())
                         } catch (_: Exception) {
-                            Toast.makeText(
-                                this,
-                                R.string.update_open_settings_failed,
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            viewModel.notifyOpenSettingsFailed()
                         }
                     },
                     onStartInstall = { identity, localPath ->
@@ -71,11 +62,6 @@ class SoftwareUpdateActivity : ComponentActivity() {
                             viewModel.notifyInstallLaunched(identity)
                         } catch (_: Exception) {
                             viewModel.notifyInstallLaunchFailed(identity)
-                            Toast.makeText(
-                                this,
-                                R.string.update_open_installer_failed,
-                                Toast.LENGTH_SHORT,
-                            ).show()
                         }
                     },
                 )

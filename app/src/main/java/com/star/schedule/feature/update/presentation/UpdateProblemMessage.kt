@@ -1,15 +1,24 @@
 package com.star.schedule.feature.update.presentation
 
+import androidx.annotation.StringRes
 import com.star.schedule.R
 import com.star.schedule.feature.update.domain.UpdateDownloadFailure
 
-data class UpdateDownloadFailureMessage(
+sealed interface UpdateProblem {
+    data class Download(val reason: UpdateDownloadFailure) : UpdateProblem
+    data object InstallerUnavailable : UpdateProblem
+    data object ReleasePageUnavailable : UpdateProblem
+    data object SettingsUnavailable : UpdateProblem
+}
+
+data class UpdateProblemMessage(
     val token: Long,
-    val reason: UpdateDownloadFailure,
+    val problem: UpdateProblem,
 )
 
-internal fun downloadFailureText(reason: UpdateDownloadFailure) =
-    when (reason) {
+@StringRes
+internal fun UpdateProblem.messageRes(): Int = when (this) {
+    is UpdateProblem.Download -> when (reason) {
         UpdateDownloadFailure.Unavailable ->
             R.string.update_download_failed_unavailable
         UpdateDownloadFailure.Network ->
@@ -35,3 +44,11 @@ internal fun downloadFailureText(reason: UpdateDownloadFailure) =
         UpdateDownloadFailure.Unknown ->
             R.string.update_download_failed_unknown
     }
+
+    UpdateProblem.InstallerUnavailable ->
+        R.string.update_open_installer_failed
+    UpdateProblem.ReleasePageUnavailable ->
+        R.string.update_open_release_failed
+    UpdateProblem.SettingsUnavailable ->
+        R.string.update_open_settings_failed
+}

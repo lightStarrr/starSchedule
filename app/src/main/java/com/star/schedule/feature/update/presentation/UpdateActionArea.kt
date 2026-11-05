@@ -2,7 +2,6 @@ package com.star.schedule.feature.update.presentation
 
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -79,41 +78,23 @@ internal fun UpdateActionArea(
             onCancel = onCancelDownload,
         )
 
-        is UpdateDownloadState.Ready -> Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
+        is UpdateDownloadState.Ready -> Button(
+            onClick = onInstall,
+            enabled = !state.isPreparingInstall,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp),
         ) {
-            Button(
-                onClick = onInstall,
-                enabled = !state.isPreparingInstall,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp),
-            ) {
-                Text(
-                    text = stringResource(
-                        if (state.isPreparingInstall) {
-                            R.string.update_download_verifying
-                        } else {
-                            R.string.update_install
-                        },
-                    ),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            if (state.installLaunched) {
-                Text(
-                    text = stringResource(R.string.update_install_launched),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (state.installLaunchFailed) {
-                Text(
-                    text = stringResource(R.string.update_open_installer_failed),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+            Text(
+                text = stringResource(
+                    if (state.isPreparingInstall) {
+                        R.string.update_download_verifying
+                    } else {
+                        R.string.update_install
+                    },
+                ),
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
 
         is UpdateDownloadState.Failed, UpdateDownloadState.Idle -> {

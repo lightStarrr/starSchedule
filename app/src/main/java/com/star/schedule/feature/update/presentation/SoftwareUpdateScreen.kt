@@ -96,7 +96,7 @@ fun SoftwareUpdateRoute(
         onOpenRelease = onOpenRelease,
         onConfirmInstallPermission = viewModel::confirmInstallPermission,
         onDismissInstallPermission = viewModel::dismissInstallPermission,
-        onDownloadFailureShown = viewModel::onDownloadFailureShown,
+        onProblemMessageShown = viewModel::onProblemMessageShown,
     )
 }
 
@@ -114,18 +114,18 @@ internal fun SoftwareUpdateScreen(
     onOpenRelease: (UpdateRelease) -> Unit,
     onConfirmInstallPermission: () -> Unit,
     onDismissInstallPermission: () -> Unit,
-    onDownloadFailureShown: (Long) -> Unit,
+    onProblemMessageShown: (Long) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val failure = state.downloadFailureMessage
-    val failureText = failure?.let { stringResource(downloadFailureText(it.reason)) }
-    LaunchedEffect(failure?.token) {
-        if (failure != null && failureText != null) {
+    val problem = state.problemMessage
+    val problemText = problem?.let { stringResource(it.problem.messageRes()) }
+    LaunchedEffect(problem?.token) {
+        if (problem != null && problemText != null) {
             snackbarHostState.showSnackbar(
-                message = failureText,
+                message = problemText,
                 duration = SnackbarDuration.Indefinite,
             )
-            onDownloadFailureShown(failure.token)
+            onProblemMessageShown(problem.token)
         }
     }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()

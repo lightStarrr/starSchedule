@@ -330,11 +330,14 @@ class SoftwareUpdateViewModelTest {
                 UpdateDownloadFailure.HashMismatch,
             )
             runCurrent()
-            val message = viewModel.uiState.value.downloadFailureMessage
-            assertEquals(UpdateDownloadFailure.HashMismatch, message?.reason)
-            viewModel.onDownloadFailureShown(message!!.token)
+            val message = viewModel.uiState.value.problemMessage
+            assertEquals(
+                UpdateProblem.Download(UpdateDownloadFailure.HashMismatch),
+                message?.problem,
+            )
+            viewModel.onProblemMessageShown(message!!.token)
             runCurrent()
-            assertNull(viewModel.uiState.value.downloadFailureMessage)
+            assertNull(viewModel.uiState.value.problemMessage)
             assertEquals(
                 release(130).identity,
                 (viewModel.downloadState.value as UpdateDownloadState.Failed)
@@ -343,7 +346,7 @@ class SoftwareUpdateViewModelTest {
             viewModel.setPageActive(false)
             viewModel.setPageActive(true)
             runCurrent()
-            assertNull(viewModel.uiState.value.downloadFailureMessage)
+            assertNull(viewModel.uiState.value.problemMessage)
         }
 
     @Test
@@ -356,18 +359,21 @@ class SoftwareUpdateViewModelTest {
             UpdateDownloadFailure.HashMismatch,
         )
         runCurrent()
-        val first = viewModel.uiState.value.downloadFailureMessage
+        val first = viewModel.uiState.value.problemMessage
         viewModel.download(release(130))
         runCurrent()
-        assertNull(viewModel.uiState.value.downloadFailureMessage)
+        assertNull(viewModel.uiState.value.problemMessage)
         assertTrue(viewModel.downloadState.value is UpdateDownloadState.Starting)
         downloadRepository.state.value = UpdateDownloadState.Failed(
             release(130),
             UpdateDownloadFailure.HashMismatch,
         )
         runCurrent()
-        val second = viewModel.uiState.value.downloadFailureMessage
-        assertEquals(UpdateDownloadFailure.HashMismatch, second?.reason)
+        val second = viewModel.uiState.value.problemMessage
+        assertEquals(
+            UpdateProblem.Download(UpdateDownloadFailure.HashMismatch),
+            second?.problem,
+        )
         assertTrue(second!!.token > first!!.token)
     }
 
@@ -378,18 +384,21 @@ class SoftwareUpdateViewModelTest {
             downloadRepository.failure = "start"
             viewModel.download(release(130))
             runCurrent()
-            val first = viewModel.uiState.value.downloadFailureMessage
-            assertEquals(UpdateDownloadFailure.Unknown, first?.reason)
+            val first = viewModel.uiState.value.problemMessage
+            assertEquals(
+                UpdateProblem.Download(UpdateDownloadFailure.Unknown),
+                first?.problem,
+            )
             viewModel.download(release(130))
             runCurrent()
-            val second = viewModel.uiState.value.downloadFailureMessage
+            val second = viewModel.uiState.value.problemMessage
             assertTrue(second!!.token > first!!.token)
-            viewModel.onDownloadFailureShown(first.token)
+            viewModel.onProblemMessageShown(first.token)
             runCurrent()
-            assertEquals(second, viewModel.uiState.value.downloadFailureMessage)
-            viewModel.onDownloadFailureShown(second.token)
+            assertEquals(second, viewModel.uiState.value.problemMessage)
+            viewModel.onProblemMessageShown(second.token)
             runCurrent()
-            assertNull(viewModel.uiState.value.downloadFailureMessage)
+            assertNull(viewModel.uiState.value.problemMessage)
         }
 
     @Test
@@ -398,8 +407,8 @@ class SoftwareUpdateViewModelTest {
         val viewModel = createViewModel()
         runCurrent()
         assertEquals(
-            UpdateDownloadFailure.Storage,
-            viewModel.uiState.value.downloadFailureMessage?.reason,
+            UpdateProblem.Download(UpdateDownloadFailure.Storage),
+            viewModel.uiState.value.problemMessage?.problem,
         )
 
         downloadRepository.failure = null
@@ -412,8 +421,8 @@ class SoftwareUpdateViewModelTest {
         ready.install()
         runCurrent()
         assertEquals(
-            UpdateDownloadFailure.Unknown,
-            ready.uiState.value.downloadFailureMessage?.reason,
+            UpdateProblem.Download(UpdateDownloadFailure.Unknown),
+            ready.uiState.value.problemMessage?.problem,
         )
     }
 
@@ -449,11 +458,10 @@ class SoftwareUpdateViewModelTest {
         downloadRepository.prepareGate!!.complete(Unit)
         runCurrent()
         val event = events.single() as SoftwareUpdateEffect.StartInstall
-        assertFalse(viewModel.uiState.value.installLaunched)
         assertEquals(event.localPath, viewModel.consumeInstallRequest(event.identity, event.localPath))
         assertNull(viewModel.consumeInstallRequest(event.identity, event.localPath))
         viewModel.notifyInstallLaunched(event.identity)
-        assertTrue(viewModel.uiState.value.installLaunched)
+        assertNull(viewModel.uiState.value.problemMessage)
     }
 
     @Test
@@ -510,8 +518,8 @@ class SoftwareUpdateViewModelTest {
         viewModel.cancelDownload()
         runCurrent()
         assertNull(viewModel.consumeInstallRequest(event.identity, event.localPath))
-        viewModel.notifyInstallLaunched(event.identity)
-        assertFalse(viewModel.uiState.value.installLaunched)
+        viewModel.notifyInstallLaunchFailed(event.identity)
+        assertNull(viewModel.uiState.value.problemMessage)
     }
 
     @Test
@@ -537,8 +545,22 @@ class SoftwareUpdateViewModelTest {
         val event = events.single() as SoftwareUpdateEffect.StartInstall
         viewModel.consumeInstallRequest(event.identity, event.localPath)
         viewModel.notifyInstallLaunchFailed(event.identity)
-        assertFalse(viewModel.uiState.value.installLaunched)
-        assertTrue(viewModel.uiState.value.installLaunchFailed)
+        assertEquals(
+            UpdateProblem.InstallerUnavailable,
+            viewModel.uiState.value.problemMessage?.problem,
+        )
+    }
+
+    @Test
+    fun `open release and settings failures produce distinct messages`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        viewModel.notifyOpenReleaseFailed()
+        val first = viewModel.uiState.value.problemMessage
+        assertEquals(UpdateProblem.ReleasePageUnavailable, first?.problem)
+        viewModel.notifyOpenSettingsFailed()
+        val second = viewModel.uiState.value.problemMessage
+        assertEquals(UpdateProblem.SettingsUnavailable, second?.problem)
+        assertTrue(second!!.token > first!!.token)
     }
 
     private companion object {

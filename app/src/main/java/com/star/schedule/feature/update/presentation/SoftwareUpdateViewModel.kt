@@ -35,9 +35,7 @@ data class SoftwareUpdateUiState(
     val canInstallPackages: Boolean = false,
     val showInstallPermissionPrompt: Boolean = false,
     val isPreparingInstall: Boolean = false,
-    val installLaunched: Boolean = false,
-    val installLaunchFailed: Boolean = false,
-    val downloadFailureMessage: UpdateDownloadFailureMessage? = null,
+    val problemMessage: UpdateProblemMessage? = null,
 )
 
 sealed interface SoftwareUpdateEffect {
@@ -144,13 +142,7 @@ class SoftwareUpdateViewModel(
 
     fun download(target: UpdateRelease) {
         invalidateInstallation()
-        _uiState.update {
-            it.copy(
-                installLaunched = false,
-                installLaunchFailed = false,
-                downloadFailureMessage = null,
-            )
-        }
+        _uiState.update { it.copy(problemMessage = null) }
         viewModelScope.launch {
             try {
                 downloadRepository.start(target)
@@ -166,10 +158,8 @@ class SoftwareUpdateViewModel(
         invalidateInstallation()
         _uiState.update {
             it.copy(
-                installLaunched = false,
-                installLaunchFailed = false,
                 showInstallPermissionPrompt = false,
-                downloadFailureMessage = null,
+                problemMessage = null,
             )
         }
         viewModelScope.launch {
@@ -212,21 +202,17 @@ class SoftwareUpdateViewModel(
     fun notifyInstallLaunched(identity: String) {
         if (consumedInstallIdentity != identity) return
         consumedInstallIdentity = null
-        _uiState.update {
-            it.copy(
-                installLaunched = true,
-                installLaunchFailed = false,
-            )
-        }
     }
 
     fun notifyInstallLaunchFailed(identity: String) {
         if (consumedInstallIdentity != identity) return
         consumedInstallIdentity = null
-        _uiState.update {
-            it.copy(installLaunched = false, installLaunchFailed = true)
-        }
+        postProblem(UpdateProblem.InstallerUnavailable)
     }
+
+    fun notifyOpenReleaseFailed() = postProblem(UpdateProblem.ReleasePageUnavailable)
+
+    fun notifyOpenSettingsFailed() = postProblem(UpdateProblem.SettingsUnavailable)
 
     fun consumeInstallRequest(identity: String, localPath: String): String? {
         if (pendingInstallIdentity != identity ||
@@ -250,9 +236,7 @@ class SoftwareUpdateViewModel(
     }
 
     private fun launchInstall(target: UpdateRelease) {
-        _uiState.update {
-            it.copy(isPreparingInstall = true, installLaunchFailed = false)
-        }
+        _uiState.update { it.copy(isPreparingInstall = true) }
         val generation = ++installGeneration
         prepareJob = viewModelScope.launch {
             val clickedIdentity = target.identity
@@ -305,21 +289,25 @@ class SoftwareUpdateViewModel(
         reason: UpdateDownloadFailure,
     ) {
         _downloadState.value = UpdateDownloadState.Failed(target, reason)
+        postProblem(UpdateProblem.Download(reason))
+    }
+
+    private fun postProblem(problem: UpdateProblem) {
         nextFailureToken += 1
         _uiState.update {
             it.copy(
-                downloadFailureMessage = UpdateDownloadFailureMessage(
+                problemMessage = UpdateProblemMessage(
                     nextFailureToken,
-                    reason,
+                    problem,
                 ),
             )
         }
     }
 
-    fun onDownloadFailureShown(token: Long) {
+    fun onProblemMessageShown(token: Long) {
         _uiState.update {
-            if (it.downloadFailureMessage?.token == token) {
-                it.copy(downloadFailureMessage = null)
+            if (it.problemMessage?.token == token) {
+                it.copy(problemMessage = null)
             } else {
                 it
             }

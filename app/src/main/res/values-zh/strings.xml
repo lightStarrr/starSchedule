@@ -318,7 +318,6 @@
     <string name="update_download_verifying">正在校验安装包…</string>
     <string name="update_cancel">取消</string>
     <string name="update_install">安装更新</string>
-    <string name="update_install_launched">已打开系统安装器，等待确认</string>
     <string name="update_install_permission_title">需要安装授权</string>
     <string name="update_install_permission_message">安装更新需要允许本应用安装未知来源应用，请前往系统设置授权。</string>
     <string name="update_install_permission_confirm">前往设置</string>

@@ -318,7 +318,6 @@
     <string name="update_download_verifying">Verifying package…</string>
     <string name="update_cancel">Cancel</string>
     <string name="update_install">Install update</string>
-    <string name="update_install_launched">Installer opened; awaiting confirmation</string>
     <string name="update_install_permission_title">Install permission required</string>
     <string name="update_install_permission_message">Allow this app to install unknown apps to continue the update.</string>
     <string name="update_install_permission_confirm">Open settings</string>
