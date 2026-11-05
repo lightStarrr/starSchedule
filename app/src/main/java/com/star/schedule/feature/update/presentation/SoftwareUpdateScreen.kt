@@ -100,9 +100,6 @@ fun SoftwareUpdateRoute(
     )
 }
 
-/**
- * 软件更新页，目前只有骨架；检查与下载的具体内容后续再填。
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SoftwareUpdateScreen(

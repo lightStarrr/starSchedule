@@ -19,9 +19,6 @@ import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.feature.update.domain.UpdateRelease
 
-/**
- * 更新日志分区：静态示例，模拟远端发布说明的展示形态，尚未接入真实更新源。
- */
 @Composable
 internal fun UpdateChangelogSection(
     release: UpdateRelease?,

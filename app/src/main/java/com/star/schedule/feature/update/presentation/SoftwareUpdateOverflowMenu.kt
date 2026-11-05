@@ -15,9 +15,6 @@ import com.star.schedule.core.designsystem.component.AppMenu
 import com.star.schedule.core.designsystem.component.CircleIconButton
 import com.star.schedule.core.designsystem.component.MenuEntry
 
-/**
- * 更新页右上角的更多菜单：目前只有「也检测快照更新」开关，只保存界面状态，未接实际检查逻辑。
- */
 @Composable
 internal fun SoftwareUpdateOverflowMenu(
     includeSnapshots: Boolean,
