@@ -46,7 +46,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -365,13 +364,13 @@ private fun UpdateHeroCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Text(
+            RollingText(
                 text = versionName,
-                style = MaterialTheme.typography.headlineLargeEmphasized,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineLargeEmphasized
+                    .copy(fontWeight = FontWeight.Bold),
                 color = colors.onPrimaryContainer,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+                horizontalBias = -1f,
+                fallbackMaxLines = 2,
                 modifier = Modifier.weight(1f),
             )
             Icon(
@@ -383,17 +382,16 @@ private fun UpdateHeroCard(
                     .size(HERO_LOGO_SIZE),
             )
         }
-        if (statusText.isNotEmpty()) {
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.onPrimaryContainer,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 10.dp),
-            )
-        }
+        RollingText(
+            text = statusText,
+            style = MaterialTheme.typography.titleMedium
+                .copy(fontWeight = FontWeight.SemiBold),
+            color = colors.onPrimaryContainer,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 10.dp)
+                .padding(horizontal = HERO_CONTENT_PADDING),
+        )
     }
 }
 
