@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,7 +46,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.lerp
@@ -64,7 +62,7 @@ internal sealed interface UpdatePillContent {
     ) : UpdatePillContent
 
     data class Progress(
-        val progress: Float?,
+        val progress: Float,
         val label: String,
     ) : UpdatePillContent
 }
@@ -115,7 +113,7 @@ internal fun UpdateMetaballActions(
     val fillFraction = remember { Animatable(1f) }
     val fillTarget = when (pill) {
         is UpdatePillContent.Label -> 1f
-        is UpdatePillContent.Progress -> pill.progress ?: 0f
+        is UpdatePillContent.Progress -> pill.progress
     }
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     LaunchedEffect(fillTarget) {
@@ -186,8 +184,6 @@ internal fun UpdateMetaballActions(
         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
         label = "pR",
     )
-    val progress = (pill as? UpdatePillContent.Progress)?.progress
-
     val height = METABALL_HEIGHT
     val step = METABALL_HEIGHT + METABALL_SPACING
     val density = LocalDensity.current
@@ -201,7 +197,6 @@ internal fun UpdateMetaballActions(
             .clipToBounds(),
     ) {
         val track = colorScheme.primaryContainer
-        val fill = colorScheme.primary
         val widthPx = constraints.maxWidth.toFloat()
         Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = size.height / 2f
@@ -390,24 +385,11 @@ internal fun UpdateMetaballActions(
                         )
 
                         is UpdatePillContent.Progress ->
-                            if (progress != null) {
-                                Modifier.progressSemantics(progress)
-                            } else {
-                                Modifier.progressSemantics()
-                            }
+                            Modifier.progressSemantics(pill.progress)
                     },
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            if (pill is UpdatePillContent.Progress && pill.progress == null) {
-                LinearProgressIndicator(
-                    color = fill.copy(alpha = 0.20f),
-                    trackColor = track,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clearAndSetSemantics { },
-                )
-            }
             val styleFraction by animateFloatAsState(
                 targetValue = if (pill is UpdatePillContent.Label) 0f else 1f,
                 animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),

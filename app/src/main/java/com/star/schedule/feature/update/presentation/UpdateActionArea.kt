@@ -42,14 +42,9 @@ internal fun UpdateActionArea(
         }
 
         is UpdateDownloadState.Downloading -> {
-            val total = downloadState.totalBytes
             rightCircle = cancelCircle
             UpdatePillContent.Progress(
-                progress = if (total != null && total > 0) {
-                    (downloadState.bytesDownloaded.toFloat() / total).coerceIn(0f, 1f)
-                } else {
-                    null
-                },
+                progress = downloadState.progressFraction(),
                 label = downloadProgressLabel(downloadState),
             )
         }
@@ -113,6 +108,19 @@ internal fun UpdateActionArea(
     )
 }
 
+// 服务器还没回响应头时 totalBytes 是 null，但发布元数据里一定有 apkSize。
+internal fun UpdateDownloadState.Downloading.effectiveTotalBytes(): Long =
+    totalBytes?.takeIf { it > 0 } ?: target.apkSize
+
+internal fun UpdateDownloadState.Downloading.progressFraction(): Float {
+    val total = effectiveTotalBytes()
+    return if (total > 0) {
+        (bytesDownloaded.toFloat() / total).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+}
+
 @Composable
 private fun formatBytes(bytes: Long): String =
     Formatter.formatShortFileSize(LocalContext.current, bytes.coerceAtLeast(0))
@@ -121,10 +129,10 @@ private fun formatBytes(bytes: Long): String =
 private fun downloadProgressLabel(
     downloadState: UpdateDownloadState.Downloading,
 ): String {
-    val total = downloadState.totalBytes
+    val total = downloadState.effectiveTotalBytes()
     return when {
         downloadState.waiting -> stringResource(R.string.update_download_waiting)
-        total != null && total > 0 -> stringResource(
+        total > 0 -> stringResource(
             R.string.update_download_progress,
             formatBytes(downloadState.bytesDownloaded),
             formatBytes(total),
