@@ -10,7 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
@@ -24,7 +24,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Job
@@ -59,13 +58,15 @@ internal fun RollingText(
     style: TextStyle,
     color: Color,
     modifier: Modifier = Modifier,
+    horizontalBias: Float = 0f,
+    fallbackMaxLines: Int = 1,
 ) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val rollStyle = style.copy(fontFeatureSettings = "tnum")
     val fontSize = if (style.fontSize.isUnspecified) 14.sp else style.fontSize
     val dyPx = with(density) { fontSize.toPx() * 0.5f }
-    val maxBlurPx = with(density) { 8.dp.toPx() }
+    val maxBlurPx = with(density) { fontSize.toPx() * 0.5f }
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val scope = rememberCoroutineScope()
@@ -121,9 +122,11 @@ internal fun RollingText(
 
     BoxWithConstraints(
         modifier = modifier.clearAndSetSemantics {
-            this.text = AnnotatedString(text)
+            if (text.isNotEmpty()) {
+                this.text = AnnotatedString(text)
+            }
         },
-        contentAlignment = Alignment.Center,
+        contentAlignment = BiasAlignment(horizontalBias, 0f),
     ) {
         val fits = measurer.measure(
             AnnotatedString(text),
@@ -155,68 +158,67 @@ internal fun RollingText(
             } else {
                 current.toList()
             }
-            val oldText = state.lastText.orEmpty()
+            val oldParts = oldList.map { it.text }
             val newParts = text.rollGlyphs()
-            val plan = planTextRoll(oldList.map { it.text }, newParts)
-            val oldW = measurer.measure(
-                AnnotatedString(oldText),
-                rollStyle,
-                maxLines = 1,
-                softWrap = false,
-            ).size.width.toFloat()
-            val newW = measurer.measure(
-                AnnotatedString(text),
-                rollStyle,
-                maxLines = 1,
-                softWrap = false,
-            ).size.width.toFloat()
-
-            if (plan.wholeChange) {
-                launchExitLine(
-                    glyphs = oldList,
-                    exitingIds = oldList.mapTo(HashSet()) { it.id },
-                )
-                current.clear()
-                newParts.forEach { current.add(newGlyph(it)) }
-                val delays = rollStaggerDelays(current.size)
-                current.forEachIndexed { i, glyph ->
-                    glyph.job = scope.launch { glyph.enter(delays[i]) }
+            val plan = planTextRoll(oldParts, newParts)
+            val glyphWidths = HashMap<String, Float>()
+            fun widthOf(glyph: String) = glyphWidths.getOrPut(glyph) {
+                measurer.measure(
+                    AnnotatedString(glyph),
+                    rollStyle,
+                    maxLines = 1,
+                    softWrap = false,
+                ).size.width.toFloat()
+            }
+            val oldX = FloatArray(oldParts.size)
+            val newX = FloatArray(newParts.size)
+            var oldW = 0f
+            oldParts.forEachIndexed { i, g ->
+                oldX[i] = oldW
+                oldW += widthOf(g)
+            }
+            var newW = 0f
+            newParts.forEachIndexed { i, g ->
+                newX[i] = newW
+                newW += widthOf(g)
+            }
+            val keptByNew = HashMap<Int, Int>()
+            val keptOld = HashSet<Int>()
+            plan.kept.forEach { (oldI, newI) ->
+                keptByNew[newI] = oldI
+                keptOld += oldI
+            }
+            val exiting = oldList.filterIndexed { i, _ -> i !in keptOld }
+            launchExitLine(
+                glyphs = oldList,
+                exitingIds = exiting.mapTo(HashSet()) { it.id },
+            )
+            val entering = ArrayList<RollGlyph>()
+            current.clear()
+            newParts.forEachIndexed { newI, g ->
+                val oldI = keptByNew[newI]
+                if (oldI != null) {
+                    current.add(oldList[oldI])
+                } else {
+                    val glyph = newGlyph(g)
+                    current.add(glyph)
+                    entering.add(glyph)
                 }
-            } else {
-                val prefix = plan.prefixLength
-                val suffix = plan.suffixLength
-                val exiting = oldList.subList(prefix, oldList.size - suffix)
-                launchExitLine(
-                    glyphs = oldList,
-                    exitingIds = exiting.mapTo(HashSet()) { it.id },
-                )
-                val middle = newParts
-                    .subList(prefix, newParts.size - suffix)
-                    .map { newGlyph(it) }
-                current.clear()
-                current.addAll(
-                    oldList.subList(0, prefix) +
-                        middle +
-                        oldList.subList(oldList.size - suffix, oldList.size),
-                )
-                val delaysIn = rollStaggerDelays(middle.size)
-                middle.forEachIndexed { i, glyph ->
-                    glyph.job = scope.launch { glyph.enter(delaysIn[i]) }
+            }
+            val delaysIn = rollStaggerDelays(entering.size)
+            entering.forEachIndexed { i, glyph ->
+                glyph.job = scope.launch { glyph.enter(delaysIn[i]) }
+            }
+            // 保留的字可能还在入场途中，平移单独起协程，不能打断入场动画。
+            plan.kept.forEach { (oldI, newI) ->
+                val glyph = oldList[oldI]
+                glyph.shiftJob?.cancel()
+                glyph.shiftJob = scope.launch {
+                    glyph.shiftBy(
+                        (newW - oldW) * (1f + horizontalBias) / 2f +
+                            oldX[oldI] - newX[newI],
+                    )
                 }
-                // 保留的字可能还在入场途中，平移单独起协程，不能打断入场动画。
-                oldList.subList(0, prefix).forEach { glyph ->
-                    glyph.shiftJob?.cancel()
-                    glyph.shiftJob = scope.launch {
-                        glyph.shiftBy((newW - oldW) / 2f)
-                    }
-                }
-                oldList.subList(oldList.size - suffix, oldList.size)
-                    .forEach { glyph ->
-                        glyph.shiftJob?.cancel()
-                        glyph.shiftJob = scope.launch {
-                            glyph.shiftBy((oldW - newW) / 2f)
-                        }
-                    }
             }
             state.inFallback = false
             state.lastText = text
@@ -254,9 +256,13 @@ internal fun RollingText(
                 text = text,
                 style = rollStyle,
                 color = color,
-                maxLines = 1,
+                maxLines = fallbackMaxLines,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
+                textAlign = when {
+                    horizontalBias < 0f -> TextAlign.Start
+                    horizontalBias > 0f -> TextAlign.End
+                    else -> TextAlign.Center
+                },
             )
         }
     }
