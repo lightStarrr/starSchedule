@@ -41,7 +41,6 @@ enum class UpdateIssueReason {
     ReleaseUnavailable,
     MetadataUnavailable,
     InvalidMetadata,
-    UnknownCommitRelation,
 }
 
 data class UpdateIssue(
@@ -59,5 +58,3 @@ data class UpdateCheckResult(
     val checkedAtEpochMillis: Long,
     val includeSnapshots: Boolean,
 )
-
-enum class CommitRelation { Ahead, Behind, Identical, Diverged, Unknown }

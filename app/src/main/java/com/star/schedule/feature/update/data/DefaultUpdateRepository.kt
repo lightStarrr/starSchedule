@@ -1,6 +1,5 @@
 package com.star.schedule.feature.update.data
 
-import com.star.schedule.feature.update.domain.CommitRelation
 import com.star.schedule.feature.update.domain.CurrentInstallation
 import com.star.schedule.feature.update.domain.UpdateChannel
 import com.star.schedule.feature.update.domain.UpdateCheckResult
@@ -81,41 +80,16 @@ class DefaultUpdateRepository(
         val stable = releaseOf(stableDeferred.await())
         val snapshot = snapshotDeferred?.await()?.let(::releaseOf)
 
-        val snapshotVsInstalled = if (
-            snapshot != null &&
-            snapshot.versionCode == installed.versionCode &&
-            snapshot.commitSha != installed.commitSha &&
-            installed.commitSha.isNotBlank() &&
-            snapshot.commitSha.isNotBlank()
-        ) {
-            source.compareCommits(installed.commitSha, snapshot.commitSha)
-        } else {
-            null
-        }
-        val snapshotVsStable = if (
-            snapshot != null &&
-            stable != null &&
-            snapshot.versionCode == stable.versionCode &&
-            snapshot.commitSha != stable.commitSha &&
-            snapshot.versionCode > installed.versionCode
-        ) {
-            source.compareCommits(stable.commitSha, snapshot.commitSha)
-        } else {
-            null
-        }
-
         val selection = UpdateSelectionPolicy.select(
             installed = installed,
             includeSnapshots = includeSnapshots,
             stable = stable,
             snapshot = snapshot,
-            snapshotVsInstalled = snapshotVsInstalled,
-            snapshotVsStable = snapshotVsStable,
         )
         UpdateCheckResult(
             target = selection.target,
             displayedRelease = selection.displayedRelease,
-            issues = issues + selection.issues,
+            issues = issues,
             checkedAtEpochMillis = clock(),
             includeSnapshots = includeSnapshots,
         )

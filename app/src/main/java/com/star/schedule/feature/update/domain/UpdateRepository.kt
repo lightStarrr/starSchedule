@@ -32,8 +32,6 @@ sealed interface UpdateFetchOutcome {
 
 interface UpdateReleaseSource {
     suspend fun fetchRelease(channel: UpdateChannel): UpdateFetchOutcome
-
-    suspend fun compareCommits(baseSha: String, headSha: String): CommitRelation
 }
 
 interface UpdateCacheStore {

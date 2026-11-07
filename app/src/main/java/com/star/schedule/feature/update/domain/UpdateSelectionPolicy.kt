@@ -7,39 +7,28 @@ object UpdateSelectionPolicy {
         includeSnapshots: Boolean,
         stable: UpdateRelease?,
         snapshot: UpdateRelease?,
-        snapshotVsInstalled: CommitRelation?,
-        snapshotVsStable: CommitRelation?,
     ): SelectionResult {
-        val issues = mutableListOf<UpdateIssue>()
         val stableEligible = stable != null && stable.versionCode > installed.versionCode
-        val snapshotEligible = snapshotEligible(
-            installed = installed,
-            includeSnapshots = includeSnapshots,
-            snapshot = snapshot,
-            snapshotVsInstalled = snapshotVsInstalled,
-            issues = issues,
-        )
+        val snapshotEligible = includeSnapshots && snapshot != null && when {
+            snapshot.versionCode != installed.versionCode ->
+                snapshot.versionCode > installed.versionCode
+
+            // 版本号相同就不分谁新谁旧：sha 不同就是另一个构建，当成新版。
+            else -> snapshot.commitSha != installed.commitSha
+        }
 
         val target = when {
             stableEligible && snapshotEligible -> {
                 requireNotNull(stable)
                 requireNotNull(snapshot)
-                if (snapshot.versionCode != stable.versionCode) {
-                    if (snapshot.versionCode > stable.versionCode) snapshot else stable
-                } else if (snapshot.commitSha == stable.commitSha) {
-                    stable
-                } else {
-                    when (snapshotVsStable ?: CommitRelation.Unknown) {
-                        CommitRelation.Ahead -> snapshot
-                        CommitRelation.Behind, CommitRelation.Identical -> stable
-                        CommitRelation.Diverged, CommitRelation.Unknown -> {
-                            issues += UpdateIssue(
-                                channel = UpdateChannel.Snapshot,
-                                reason = UpdateIssueReason.UnknownCommitRelation,
-                            )
-                            stable
-                        }
-                    }
+                when {
+                    snapshot.versionCode != stable.versionCode ->
+                        if (snapshot.versionCode > stable.versionCode) snapshot else stable
+
+                    // 同一个版本号下 sha 相同就是同一份代码，优先给正式版；
+                    // 不同则快照走开发线，用户已勾选检测快照。
+                    snapshot.commitSha == stable.commitSha -> stable
+                    else -> snapshot
                 }
             }
 
@@ -51,45 +40,11 @@ object UpdateSelectionPolicy {
         return SelectionResult(
             target = target,
             displayedRelease = target ?: stable ?: snapshot,
-            issues = issues,
         )
-    }
-
-    private fun snapshotEligible(
-        installed: CurrentInstallation,
-        includeSnapshots: Boolean,
-        snapshot: UpdateRelease?,
-        snapshotVsInstalled: CommitRelation?,
-        issues: MutableList<UpdateIssue>,
-    ): Boolean {
-        if (!includeSnapshots || snapshot == null) return false
-        if (snapshot.versionCode != installed.versionCode) {
-            return snapshot.versionCode > installed.versionCode
-        }
-        if (snapshot.commitSha == installed.commitSha) return false
-        if (installed.commitSha.isBlank() || snapshot.commitSha.isBlank()) {
-            issues += UpdateIssue(
-                channel = UpdateChannel.Snapshot,
-                reason = UpdateIssueReason.UnknownCommitRelation,
-            )
-            return false
-        }
-        return when (snapshotVsInstalled ?: CommitRelation.Unknown) {
-            CommitRelation.Ahead -> true
-            CommitRelation.Identical, CommitRelation.Behind -> false
-            CommitRelation.Diverged, CommitRelation.Unknown -> {
-                issues += UpdateIssue(
-                    channel = UpdateChannel.Snapshot,
-                    reason = UpdateIssueReason.UnknownCommitRelation,
-                )
-                false
-            }
-        }
     }
 
     data class SelectionResult(
         val target: UpdateRelease?,
         val displayedRelease: UpdateRelease?,
-        val issues: List<UpdateIssue>,
     )
 }

@@ -2,7 +2,6 @@ package com.star.schedule.feature.update.domain
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UpdateSelectionPolicyTest {
@@ -48,15 +47,11 @@ class UpdateSelectionPolicyTest {
         includeSnapshots: Boolean = false,
         stable: UpdateRelease? = null,
         snapshot: UpdateRelease? = null,
-        snapshotVsInstalled: CommitRelation? = null,
-        snapshotVsStable: CommitRelation? = null,
     ) = UpdateSelectionPolicy.select(
         installed,
         includeSnapshots,
         stable,
         snapshot,
-        snapshotVsInstalled,
-        snapshotVsStable,
     )
 
     @Test
@@ -90,44 +85,16 @@ class UpdateSelectionPolicyTest {
     }
 
     @Test
-    fun `same code snapshot requires a different commit that is ahead`() {
+    fun `same code snapshot updates whenever the build differs`() {
         val remote = release(UpdateChannel.Snapshot, 120, sha = SHA_B)
-        val ahead = select(
-            installed = installedSnapshot,
-            includeSnapshots = true,
-            snapshot = remote,
-            snapshotVsInstalled = CommitRelation.Ahead,
+        assertEquals(
+            remote,
+            select(
+                installed = installedSnapshot,
+                includeSnapshots = true,
+                snapshot = remote,
+            ).target,
         )
-        assertEquals(remote, ahead.target)
-
-        for (relation in listOf(CommitRelation.Behind, CommitRelation.Identical)) {
-            val result = select(
-                installed = installedSnapshot,
-                includeSnapshots = true,
-                snapshot = remote,
-                snapshotVsInstalled = relation,
-            )
-            assertNull(result.target)
-            assertTrue(result.issues.isEmpty())
-        }
-    }
-
-    @Test
-    fun `same code snapshot with diverged or unknown relation reports an issue`() {
-        val remote = release(UpdateChannel.Snapshot, 120, sha = SHA_B)
-        for (relation in listOf(CommitRelation.Diverged, CommitRelation.Unknown, null)) {
-            val result = select(
-                installed = installedSnapshot,
-                includeSnapshots = true,
-                snapshot = remote,
-                snapshotVsInstalled = relation,
-            )
-            assertNull(result.target)
-            assertEquals(
-                UpdateIssueReason.UnknownCommitRelation,
-                result.issues.single().reason,
-            )
-        }
     }
 
     @Test
@@ -139,22 +106,20 @@ class UpdateSelectionPolicyTest {
             snapshot = remote,
         )
         assertNull(result.target)
-        assertTrue(result.issues.isEmpty())
+        assertEquals(remote, result.displayedRelease)
     }
 
     @Test
-    fun `missing local sha never guesses same code snapshot`() {
+    fun `missing local sha counts as a different build`() {
         val installed = installedSnapshot.copy(commitSha = "")
         val remote = release(UpdateChannel.Snapshot, 120, sha = SHA_B)
-        val result = select(
-            installed = installed,
-            includeSnapshots = true,
-            snapshot = remote,
-        )
-        assertNull(result.target)
         assertEquals(
-            UpdateIssueReason.UnknownCommitRelation,
-            result.issues.single().reason,
+            remote,
+            select(
+                installed = installed,
+                includeSnapshots = true,
+                snapshot = remote,
+            ).target,
         )
         val higher = release(UpdateChannel.Snapshot, 130, sha = SHA_B)
         assertEquals(
@@ -164,7 +129,7 @@ class UpdateSelectionPolicyTest {
     }
 
     @Test
-    fun `tie between eligible channels prefers higher code then explicit snapshot lead`() {
+    fun `tie between eligible channels prefers higher code then snapshot`() {
         val stable = release(UpdateChannel.Stable, 130, sha = SHA_A)
         val snapshot = release(UpdateChannel.Snapshot, 130, sha = SHA_B)
 
@@ -174,16 +139,6 @@ class UpdateSelectionPolicyTest {
                 includeSnapshots = true,
                 stable = stable,
                 snapshot = snapshot,
-                snapshotVsStable = CommitRelation.Ahead,
-            ).target,
-        )
-        assertEquals(
-            stable,
-            select(
-                includeSnapshots = true,
-                stable = stable,
-                snapshot = snapshot,
-                snapshotVsStable = CommitRelation.Behind,
             ).target,
         )
         val sameCommit = release(UpdateChannel.Snapshot, 130, sha = SHA_A)
@@ -195,25 +150,6 @@ class UpdateSelectionPolicyTest {
                 snapshot = sameCommit,
             ).target,
         )
-    }
-
-    @Test
-    fun `uncertain snapshot tie keeps stable and flags the gap`() {
-        val stable = release(UpdateChannel.Stable, 130, sha = SHA_A)
-        val snapshot = release(UpdateChannel.Snapshot, 130, sha = SHA_B)
-        for (relation in listOf(CommitRelation.Diverged, CommitRelation.Unknown, null)) {
-            val result = select(
-                includeSnapshots = true,
-                stable = stable,
-                snapshot = snapshot,
-                snapshotVsStable = relation,
-            )
-            assertEquals(stable, result.target)
-            assertEquals(
-                UpdateIssueReason.UnknownCommitRelation,
-                result.issues.single().reason,
-            )
-        }
     }
 
     @Test
@@ -243,14 +179,13 @@ class UpdateSelectionPolicyTest {
     fun `displayed release falls back to fetched stable then snapshot`() {
         val stable = release(UpdateChannel.Stable, 120)
         assertEquals(stable, select(stable = stable).displayedRelease)
-        val snapshot = release(UpdateChannel.Snapshot, 120, sha = SHA_B)
+        val snapshot = release(UpdateChannel.Snapshot, 120, sha = SHA_A)
         assertEquals(
             snapshot,
             select(
                 installed = installedSnapshot,
                 includeSnapshots = true,
                 snapshot = snapshot,
-                snapshotVsInstalled = CommitRelation.Behind,
             ).displayedRelease,
         )
     }

@@ -1,6 +1,5 @@
 package com.star.schedule.feature.update.data
 
-import com.star.schedule.feature.update.domain.CommitRelation
 import com.star.schedule.feature.update.domain.UpdateChannel
 import com.star.schedule.feature.update.domain.UpdateChangelog
 import com.star.schedule.feature.update.domain.UpdateFetchOutcome
@@ -78,42 +77,6 @@ class GitHubReleaseSource(
                 UpdateFetchOutcome.Failure(
                     issue = UpdateIssue(channel, UpdateIssueReason.Network),
                 )
-            }
-        }
-
-    override suspend fun compareCommits(baseSha: String, headSha: String): CommitRelation =
-        withContext(ioDispatcher) {
-            if (!FULL_SHA.matches(baseSha) || !FULL_SHA.matches(headSha)) {
-                return@withContext CommitRelation.Unknown
-            }
-            if (clock() < currentRateLimit()) {
-                return@withContext CommitRelation.Unknown
-            }
-            try {
-                execute(
-                    apiRequest("$API_ROOT/compare/$baseSha...$headSha?per_page=1"),
-                ).use { response ->
-                    if (response.code == 403 || response.code == 429) {
-                        rateLimitRetryAt(response)
-                            ?.let { recordRateLimit(it) }
-                        return@withContext CommitRelation.Unknown
-                    }
-                    if (response.code != 200) return@withContext CommitRelation.Unknown
-                    val status = json.parseToJsonElement(
-                        readBodyCapped(response, API_BODY_LIMIT),
-                    ).jsonObject["status"]?.let { it as? JsonPrimitive }?.contentOrNull
-                    when (status) {
-                        "ahead" -> CommitRelation.Ahead
-                        "behind" -> CommitRelation.Behind
-                        "identical" -> CommitRelation.Identical
-                        "diverged" -> CommitRelation.Diverged
-                        else -> CommitRelation.Unknown
-                    }
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                CommitRelation.Unknown
             }
         }
 

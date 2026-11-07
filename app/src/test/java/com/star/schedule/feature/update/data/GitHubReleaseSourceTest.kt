@@ -2,7 +2,6 @@ package com.star.schedule.feature.update.data
 
 import com.star.schedule.core.network.fakeTransport
 import com.star.schedule.core.network.responseOf
-import com.star.schedule.feature.update.domain.CommitRelation
 import com.star.schedule.feature.update.domain.UpdateChannel
 import com.star.schedule.feature.update.domain.UpdateFetchOutcome
 import com.star.schedule.feature.update.domain.UpdateIssueReason
@@ -357,25 +356,6 @@ class GitHubReleaseSourceTest {
     }
 
     @Test
-    fun `compare maps github status to relation`() = runTest {
-        val source = source()
-        for ((status, expected) in listOf(
-            "ahead" to CommitRelation.Ahead,
-            "behind" to CommitRelation.Behind,
-            "identical" to CommitRelation.Identical,
-            "diverged" to CommitRelation.Diverged,
-        )) {
-            handler = { request ->
-                assertTrue(request.url.encodedPath.contains("/compare/"))
-                responseOf(request, 200, """{"status":"$status"}""")
-            }
-            assertEquals(expected, source.compareCommits(SHA_LOCAL, SHA_REMOTE))
-        }
-        handler = { responseOf(it, 500) }
-        assertEquals(CommitRelation.Unknown, source.compareCommits(SHA_LOCAL, SHA_REMOTE))
-    }
-
-    @Test
     fun `cancellation propagates instead of a generic failure`() = runTest {
         val latch = CountDownLatch(1)
         handler = { request ->
@@ -440,10 +420,6 @@ class GitHubReleaseSourceTest {
             ).fetchRelease(UpdateChannel.Stable)
             assertTrue("code $code leaked", closes >= 1)
         }
-        closes = 0
-        handler = { trackedResponse(it, 500, """{"status":"ahead"}""", { closes++ }) }
-        source().compareCommits(SHA_LOCAL, SHA_REMOTE)
-        assertTrue(closes >= 1)
     }
 
     @Test
@@ -526,29 +502,13 @@ class GitHubReleaseSourceTest {
     }
 
     @Test
-    fun `rate limit suppresses fetches and compare calls on the same instance`() = runTest {
+    fun `rate limit suppresses subsequent fetches on the same instance`() = runTest {
         val source = source()
         handler = { responseOf(it, 429, "", mapOf("Retry-After" to "120")) }
         source.fetchRelease(UpdateChannel.Stable)
         val calls = requests.size
         val second = source.fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Failure
         assertEquals(UpdateIssueReason.RateLimited, second.issue.reason)
-        assertEquals(calls, requests.size)
-        assertEquals(
-            CommitRelation.Unknown,
-            source.compareCommits(SHA_LOCAL, SHA_REMOTE),
-        )
-        assertEquals(calls, requests.size)
-    }
-
-    @Test
-    fun `compare 429 suppresses subsequent release fetches`() = runTest {
-        val source = source()
-        handler = { responseOf(it, 429, "", mapOf("Retry-After" to "60")) }
-        assertEquals(CommitRelation.Unknown, source.compareCommits(SHA_LOCAL, SHA_REMOTE))
-        val calls = requests.size
-        val outcome = source.fetchRelease(UpdateChannel.Stable) as UpdateFetchOutcome.Failure
-        assertEquals(UpdateIssueReason.RateLimited, outcome.issue.reason)
         assertEquals(calls, requests.size)
     }
 
@@ -586,7 +546,6 @@ class GitHubReleaseSourceTest {
 
     private companion object {
         const val SHA_REMOTE = "cccccccccccccccccccccccccccccccccccccccc"
-        const val SHA_LOCAL = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val SHA_SNAPSHOT = "abcdef0000000000000000000000000000000000"
         const val SHA256_APK = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     }

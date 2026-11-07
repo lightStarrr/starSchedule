@@ -1,6 +1,5 @@
 package com.star.schedule.feature.update.data
 
-import com.star.schedule.feature.update.domain.CommitRelation
 import com.star.schedule.feature.update.domain.UpdateChannel
 import com.star.schedule.feature.update.domain.UpdateChangelog
 import com.star.schedule.feature.update.domain.UpdateCheckTrigger
@@ -42,8 +41,6 @@ class DefaultUpdateRepositoryTest {
     private class FakeSource : UpdateReleaseSource {
         val outcomes = mutableMapOf<UpdateChannel, UpdateFetchOutcome>()
         val fetchCalls = mutableListOf<UpdateChannel>()
-        val compareCalls = mutableListOf<Pair<String, String>>()
-        var compareResult = CommitRelation.Unknown
         var gate: CompletableDeferred<Unit>? = null
 
         override suspend fun fetchRelease(channel: UpdateChannel): UpdateFetchOutcome {
@@ -51,11 +48,6 @@ class DefaultUpdateRepositoryTest {
             gate?.await()
             return outcomes[channel]
                 ?: UpdateFetchOutcome.Failure(UpdateIssue(channel, UpdateIssueReason.Network))
-        }
-
-        override suspend fun compareCommits(baseSha: String, headSha: String): CommitRelation {
-            compareCalls += baseSha to headSha
-            return compareResult
         }
     }
 
@@ -175,27 +167,27 @@ class DefaultUpdateRepositoryTest {
     }
 
     @Test
-    fun `same code snapshot asks for the commit relation before updating`() = runTest {
+    fun `same code snapshot updates whenever the build differs`() = runTest {
         val source = FakeSource()
         val preferences = FakePreferences()
         preferences.includeSnapshots.value = true
         val installed = INSTALLED.copy(
+            versionName = "1.2.0-snapshot.aaaaaaa",
             channel = UpdateChannel.Snapshot,
             commitSha = SHA_A,
         )
         source.outcomes[UpdateChannel.Snapshot] =
             UpdateFetchOutcome.Success(release(UpdateChannel.Snapshot, 120, sha = SHA_B))
-        source.compareResult = CommitRelation.Ahead
         val repository = repository(source, preferences, testScope(), StandardTestDispatcher(testScheduler), installed)
 
         val result = repository.check(UpdateCheckTrigger.Manual)
-        assertEquals(listOf(SHA_A to SHA_B), source.compareCalls)
         assertEquals(120L, result.target?.versionCode)
         assertEquals(UpdateChannel.Snapshot, result.target?.channel)
 
-        source.compareResult = CommitRelation.Behind
-        val behind = repository.check(UpdateCheckTrigger.Manual)
-        assertNull(behind.target)
+        source.outcomes[UpdateChannel.Snapshot] =
+            UpdateFetchOutcome.Success(release(UpdateChannel.Snapshot, 120, sha = SHA_A))
+        val identical = repository.check(UpdateCheckTrigger.Manual)
+        assertNull(identical.target)
     }
 
     @Test
