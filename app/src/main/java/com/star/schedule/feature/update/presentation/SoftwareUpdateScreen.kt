@@ -1,5 +1,11 @@
 package com.star.schedule.feature.update.presentation
 
+import android.provider.Settings
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,16 +38,19 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -268,6 +277,7 @@ internal fun SoftwareUpdateScreen(
                             downloadTarget,
                             downloadState is UpdateDownloadState.Failed,
                         ),
+                        spinning = state.isChecking,
                         modifier = Modifier.widthIn(max = 720.dp),
                     )
                 }
@@ -298,7 +308,7 @@ private fun UpdateContentFade(opaqueAtTop: Boolean) {
 }
 
 /**
- * 顶部卡片：图形拼成的背景保持不变，图标和版本号直接叠在上面。
+ * 顶部卡片：背景图形每次打开从 MaterialShapes 里随机抽四个，图标和版本号直接叠在上面。
  *
  * 图形都允许越过卡片边界，靠外层的 clip 裁掉，边缘才是切开的弧线而不是整块贴纸。
  * 左上角是当前版本，右上角是应用图标，都贴着卡片内边距。
@@ -308,9 +318,12 @@ private fun UpdateContentFade(opaqueAtTop: Boolean) {
 private fun UpdateHeroCard(
     versionName: String,
     statusText: String,
+    spinning: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
+    val spin = rememberHeroSpin(spinning)
+    val shapes = remember { HERO_SHAPE_POOL.shuffled() }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -320,39 +333,43 @@ private fun UpdateHeroCard(
             .background(colors.primaryContainer),
     ) {
         HeroShape(
-            shape = MaterialShapes.SoftBurst.toShape(),
+            shape = shapes[0].toShape(),
             size = 236.dp,
             align = Alignment.CenterEnd,
             offsetX = 96.dp,
             offsetY = (-26).dp,
             rotation = 12f,
+            spin = { spin.floatValue },
             color = colors.primary.copy(alpha = 0.16f),
         )
         HeroShape(
-            shape = MaterialShapes.Cookie4Sided.toShape(),
+            shape = shapes[1].toShape(),
             size = 128.dp,
             align = Alignment.TopStart,
             offsetX = (-44).dp,
             offsetY = (-36).dp,
             rotation = -14f,
+            spin = { spin.floatValue * -0.75f },
             color = colors.primary.copy(alpha = 0.22f),
         )
         HeroShape(
-            shape = MaterialShapes.Sunny.toShape(),
+            shape = shapes[2].toShape(),
             size = 62.dp,
             align = Alignment.BottomStart,
             offsetX = 22.dp,
             offsetY = 24.dp,
             rotation = -18f,
+            spin = { spin.floatValue * 1.35f },
             color = colors.tertiary.copy(alpha = 0.42f),
         )
         HeroShape(
-            shape = MaterialShapes.Circle.toShape(),
+            shape = shapes[3].toShape(),
             size = 26.dp,
             align = Alignment.CenterStart,
             offsetX = 92.dp,
             offsetY = 18.dp,
             rotation = 0f,
+            spin = { spin.floatValue * -0.5f },
             color = colors.primary.copy(alpha = 0.30f),
         )
 
@@ -395,6 +412,52 @@ private fun UpdateHeroCard(
     }
 }
 
+/**
+ * 检查时让背景图形缓慢转动：速度因子先缓入到满速再匀速，
+ * 结束后用更长的缓出刹停。角度在绘制阶段读取，转动只触发
+ * 重绘不触发重组；系统关闭动画时速度恒为 0。
+ */
+@Composable
+private fun rememberHeroSpin(active: Boolean): MutableFloatState {
+    val context = LocalContext.current
+    val animationsEnabled = remember {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
+    val angle = remember { mutableFloatStateOf(0f) }
+    val speed = remember { Animatable(0f) }
+    LaunchedEffect(active) {
+        speed.animateTo(
+            targetValue = if (active && animationsEnabled) 1f else 0f,
+            animationSpec = tween(
+                durationMillis = if (active) {
+                    HERO_SPIN_RAMP_UP_MILLIS
+                } else {
+                    HERO_SPIN_RAMP_DOWN_MILLIS
+                },
+                easing = if (active) FastOutSlowInEasing else LinearOutSlowInEasing,
+            ),
+        )
+    }
+    LaunchedEffect(Unit) {
+        var lastFrame = 0L
+        while (true) {
+            withInfiniteAnimationFrameMillis { frame ->
+                val velocity = speed.value
+                if (lastFrame != 0L && velocity > 0f) {
+                    angle.floatValue +=
+                        HERO_SPIN_DEG_PER_SEC * velocity * (frame - lastFrame) / 1000f
+                }
+                lastFrame = frame
+            }
+        }
+    }
+    return angle
+}
+
 @Composable
 private fun BoxScope.HeroShape(
     shape: Shape,
@@ -404,13 +467,14 @@ private fun BoxScope.HeroShape(
     offsetX: Dp,
     offsetY: Dp,
     rotation: Float,
+    spin: () -> Float,
 ) {
     Box(
         modifier = Modifier
             .align(align)
             .offset(x = offsetX, y = offsetY)
             .size(size)
-            .rotate(rotation)
+            .graphicsLayer { rotationZ = rotation + spin() }
             .clip(shape)
             .background(color),
     )
@@ -420,3 +484,45 @@ private val HERO_CARD_HEIGHT = 200.dp
 private val HERO_CONTENT_PADDING = 20.dp
 private val HERO_LOGO_SIZE = 40.dp
 private val CONTENT_FADE_HEIGHT = 32.dp
+private const val HERO_SPIN_DEG_PER_SEC = 40f
+private const val HERO_SPIN_RAMP_UP_MILLIS = 1_000
+private const val HERO_SPIN_RAMP_DOWN_MILLIS = 1_600
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val HERO_SHAPE_POOL = listOf(
+    MaterialShapes.Circle,
+    MaterialShapes.Square,
+    MaterialShapes.Slanted,
+    MaterialShapes.Arch,
+    MaterialShapes.Fan,
+    MaterialShapes.Arrow,
+    MaterialShapes.SemiCircle,
+    MaterialShapes.Oval,
+    MaterialShapes.Pill,
+    MaterialShapes.Triangle,
+    MaterialShapes.Diamond,
+    MaterialShapes.ClamShell,
+    MaterialShapes.Pentagon,
+    MaterialShapes.Gem,
+    MaterialShapes.Sunny,
+    MaterialShapes.VerySunny,
+    MaterialShapes.Cookie4Sided,
+    MaterialShapes.Cookie6Sided,
+    MaterialShapes.Cookie7Sided,
+    MaterialShapes.Cookie9Sided,
+    MaterialShapes.Cookie12Sided,
+    MaterialShapes.Ghostish,
+    MaterialShapes.Clover4Leaf,
+    MaterialShapes.Clover8Leaf,
+    MaterialShapes.Burst,
+    MaterialShapes.SoftBurst,
+    MaterialShapes.Boom,
+    MaterialShapes.SoftBoom,
+    MaterialShapes.Flower,
+    MaterialShapes.Puffy,
+    MaterialShapes.PuffyDiamond,
+    MaterialShapes.PixelCircle,
+    MaterialShapes.PixelTriangle,
+    MaterialShapes.Bun,
+    MaterialShapes.Heart,
+)
