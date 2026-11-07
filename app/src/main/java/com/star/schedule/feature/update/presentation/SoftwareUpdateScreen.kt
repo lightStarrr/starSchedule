@@ -323,7 +323,9 @@ private fun UpdateHeroCard(
 ) {
     val colors = MaterialTheme.colorScheme
     val spin = rememberHeroSpin(spinning)
-    val shapes = remember { HERO_SHAPE_POOL.shuffled() }
+    // 贴边的三个大图形只抽旋转对称的形状，小图形不受限。
+    val cornerShapes = remember { HERO_CORNER_SHAPE_POOL.shuffled() }
+    val innerShape = remember { HERO_SHAPE_POOL.random() }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -333,7 +335,7 @@ private fun UpdateHeroCard(
             .background(colors.primaryContainer),
     ) {
         HeroShape(
-            shape = shapes[0].toShape(),
+            shape = cornerShapes[0].toShape(),
             size = 236.dp,
             align = Alignment.CenterEnd,
             offsetX = 96.dp,
@@ -343,7 +345,7 @@ private fun UpdateHeroCard(
             color = colors.primary.copy(alpha = 0.16f),
         )
         HeroShape(
-            shape = shapes[1].toShape(),
+            shape = cornerShapes[1].toShape(),
             size = 128.dp,
             align = Alignment.TopStart,
             offsetX = (-44).dp,
@@ -353,7 +355,7 @@ private fun UpdateHeroCard(
             color = colors.primary.copy(alpha = 0.22f),
         )
         HeroShape(
-            shape = shapes[2].toShape(),
+            shape = cornerShapes[2].toShape(),
             size = 62.dp,
             align = Alignment.BottomStart,
             offsetX = 22.dp,
@@ -363,7 +365,7 @@ private fun UpdateHeroCard(
             color = colors.tertiary.copy(alpha = 0.42f),
         )
         HeroShape(
-            shape = shapes[3].toShape(),
+            shape = innerShape.toShape(),
             size = 26.dp,
             align = Alignment.CenterStart,
             offsetX = 92.dp,
@@ -487,6 +489,33 @@ private val CONTENT_FADE_HEIGHT = 32.dp
 private const val HERO_SPIN_DEG_PER_SEC = 40f
 private const val HERO_SPIN_RAMP_UP_MILLIS = 1_000
 private const val HERO_SPIN_RAMP_DOWN_MILLIS = 1_600
+
+// 角落大图形只用至少三重旋转对称的形状：低对称度或非对称形状转出边角后观感突兀。
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val HERO_CORNER_SHAPE_POOL = listOf(
+    MaterialShapes.Circle,
+    MaterialShapes.Square,
+    MaterialShapes.Triangle,
+    MaterialShapes.Pentagon,
+    MaterialShapes.Gem,
+    MaterialShapes.Sunny,
+    MaterialShapes.VerySunny,
+    MaterialShapes.Cookie4Sided,
+    MaterialShapes.Cookie6Sided,
+    MaterialShapes.Cookie7Sided,
+    MaterialShapes.Cookie9Sided,
+    MaterialShapes.Cookie12Sided,
+    MaterialShapes.Clover4Leaf,
+    MaterialShapes.Clover8Leaf,
+    MaterialShapes.Burst,
+    MaterialShapes.SoftBurst,
+    MaterialShapes.Boom,
+    MaterialShapes.SoftBoom,
+    MaterialShapes.Flower,
+    MaterialShapes.Puffy,
+    MaterialShapes.PuffyDiamond,
+    MaterialShapes.PixelCircle,
+)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private val HERO_SHAPE_POOL = listOf(
