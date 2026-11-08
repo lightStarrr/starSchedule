@@ -48,6 +48,7 @@ import com.star.schedule.core.designsystem.component.ElasticSwipeRow
 import com.star.schedule.core.designsystem.component.MESSAGE_SNACKBAR_TIMEOUT_MILLIS
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
+import com.star.schedule.core.designsystem.component.SettingChevron
 import com.star.schedule.core.designsystem.component.UNDO_SNACKBAR_TIMEOUT_MILLIS
 import com.star.schedule.core.designsystem.component.morphedSegmentedShapes
 import com.star.schedule.core.designsystem.component.rememberElasticSwipeState
@@ -191,7 +192,13 @@ private fun LessonTimeTemplateEditScreen(
         },
         topBar = {
             PageTopBar(
-                title = stringResource(R.string.title_edit_lesson_time_template),
+                title = stringResource(
+                    if (state.isNewTemplate) {
+                        R.string.title_new_lesson_time_template
+                    } else {
+                        R.string.title_edit_lesson_time_template
+                    },
+                ),
                 onBack = onBack,
                 scrollBehavior = scrollBehavior,
                 actions = {
@@ -254,10 +261,13 @@ private fun LessonTimeTemplateEditScreen(
                         item(key = "name") {
                             SettingsListItem(
                                 title = stringResource(R.string.label_template_name),
-                                supporting = state.name,
+                                supporting = state.name.ifBlank {
+                                    stringResource(R.string.lesson_time_template_name_unset)
+                                },
                                 onClick = onStartRename,
                                 shapeIndex = 0,
                                 shapeCount = 1,
+                                trailing = { SettingChevron() },
                                 modifier = Modifier.padding(horizontal = LIST_HORIZONTAL_PADDING),
                             )
                         }
@@ -316,6 +326,7 @@ private fun LessonTimeTemplateEditScreen(
                                     shapeIndex = index,
                                     shapeCount = state.rows.size,
                                     shapes = shapes,
+                                    trailing = { SettingChevron() },
                                 )
                             }
                         }

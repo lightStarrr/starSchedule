@@ -43,6 +43,9 @@ class LessonTimeTemplateActivity : ComponentActivity() {
                     onOpenTemplate = { row ->
                         startActivity(LessonTimeTemplateEditActivity.intent(this, row.id))
                     },
+                    onCreateTemplate = {
+                        startActivity(LessonTimeTemplateEditActivity.newTemplateIntent(this))
+                    },
                 )
             }
         }

@@ -31,6 +31,8 @@ data class LessonTimeTemplateEditMessage(
 
 data class LessonTimeTemplateEditUiState(
     val isLoading: Boolean = true,
+    /** 新建模式：不是编辑已有模板，保存直接写新模板，没有「覆盖」选项。 */
+    val isNewTemplate: Boolean = false,
     /** 模板已经被别处删掉了：不再展示编辑器，只提示一句。 */
     val isMissing: Boolean = false,
     val name: String = "",
@@ -86,6 +88,13 @@ class LessonTimeTemplateEditViewModel(
     }
 
     private suspend fun load() {
+        // templateId <= 0 表示新建：不从库里加载，空名空节次的草稿。
+        if (templateId <= 0) {
+            mutableState.update {
+                it.copy(isLoading = false, isNewTemplate = true)
+            }
+            return
+        }
         val template = repository.getLessonTimeTemplateByIdOnce(templateId)
         if (template == null) {
             mutableState.update { it.copy(isLoading = false, isMissing = true) }
@@ -294,8 +303,14 @@ class LessonTimeTemplateEditViewModel(
         mutableState.update { it.copy(discardConfirm = false, finish = true) }
     }
 
-    /** 顶栏的勾：先问一句这一步是覆盖还是另存为新模板。 */
+    /** 顶栏的勾：编辑模式先问覆盖还是另存；新建模式没有覆盖对象，直接存。 */
     fun requestSave() {
+        val state = mutableState.value
+        if (state.isNewTemplate) {
+            // 名字是写库的必填项，没填先把改名框弹出来。
+            if (state.name.isBlank()) startRename() else saveAsNew()
+            return
+        }
         mutableState.update { it.copy(saveChoice = true) }
     }
 

@@ -119,6 +119,8 @@
     <string name="lesson_time_templates_empty">还没有节次时间模板</string>
     <string name="lesson_time_templates_empty_hint">在节次时间页点右上角的保存按钮，就能把当前节次时间存成模板</string>
     <string name="title_edit_lesson_time_template">编辑模板</string>
+    <string name="title_new_lesson_time_template">新建模板</string>
+    <string name="lesson_time_template_name_unset">未命名</string>
     <string name="title_add_template_period">添加一节</string>
     <string name="lesson_time_template_missing">这个模板已被删除</string>
     <string name="lesson_time_template_periods_empty">还没有节次</string>

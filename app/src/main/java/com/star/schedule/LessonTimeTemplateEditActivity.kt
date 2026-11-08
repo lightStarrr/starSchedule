@@ -24,11 +24,8 @@ class LessonTimeTemplateEditActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val templateId = intent.getLongExtra(EXTRA_TEMPLATE_ID, -1L)
-        if (templateId < 0) {
-            finish()
-            return
-        }
+        // EXTRA 缺省为 NEW_TEMPLATE_ID（-1）：不带 id 打开就是新建模式。
+        val templateId = intent.getLongExtra(EXTRA_TEMPLATE_ID, NEW_TEMPLATE_ID)
 
         val repository = RoomScheduleRepository(DatabaseProvider.dao())
         val viewModel = ViewModelProvider(
@@ -48,9 +45,13 @@ class LessonTimeTemplateEditActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_TEMPLATE_ID = "extra_template_id"
+        private const val NEW_TEMPLATE_ID = -1L
 
         fun intent(context: Context, templateId: Long): Intent =
             Intent(context, LessonTimeTemplateEditActivity::class.java)
                 .putExtra(EXTRA_TEMPLATE_ID, templateId)
+
+        fun newTemplateIntent(context: Context): Intent =
+            Intent(context, LessonTimeTemplateEditActivity::class.java)
     }
 }

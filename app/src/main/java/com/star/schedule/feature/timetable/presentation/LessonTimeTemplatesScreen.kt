@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
@@ -37,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
+import com.star.schedule.core.designsystem.component.CircleIconButton
 import com.star.schedule.core.designsystem.component.CountdownSnackbar
 import com.star.schedule.core.designsystem.component.ElasticSwipeRow
 import com.star.schedule.core.designsystem.component.MESSAGE_SNACKBAR_TIMEOUT_MILLIS
@@ -62,12 +65,14 @@ fun LessonTimeTemplatesRoute(
     viewModel: LessonTimeTemplatesViewModel,
     onBack: () -> Unit,
     onOpenTemplate: (LessonTimeTemplateRow) -> Unit,
+    onCreateTemplate: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LessonTimeTemplatesScreen(
         state = state,
         onBack = onBack,
         onOpenTemplate = onOpenTemplate,
+        onCreateTemplate = onCreateTemplate,
         onDelete = viewModel::delete,
         onRequestApply = viewModel::requestApply,
         onCancelApply = viewModel::cancelApply,
@@ -89,6 +94,7 @@ private fun LessonTimeTemplatesScreen(
     state: LessonTimeTemplatesUiState,
     onBack: () -> Unit,
     onOpenTemplate: (LessonTimeTemplateRow) -> Unit,
+    onCreateTemplate: () -> Unit,
     onDelete: (LessonTimeTemplateRow) -> Unit,
     onRequestApply: (LessonTimeTemplateRow) -> Unit,
     onCancelApply: () -> Unit,
@@ -164,6 +170,15 @@ private fun LessonTimeTemplatesScreen(
                 title = stringResource(R.string.title_course_time_templates),
                 onBack = onBack,
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    CircleIconButton(
+                        icon = Icons.Rounded.Add,
+                        contentDescription = stringResource(
+                            R.string.title_new_lesson_time_template,
+                        ),
+                        onClick = onCreateTemplate,
+                    )
+                },
             )
         },
     ) { innerPadding ->
