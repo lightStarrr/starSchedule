@@ -559,4 +559,11 @@
     <string name="datasource_interval_custom_title">自定义刷新间隔</string>
     <string name="datasource_interval_custom_hint">天数</string>
 
+    <string name="manual_create_name_label">课表名称</string>
+    <string name="manual_create_name_hint">例如：2026 春季</string>
+    <string name="manual_create_date_label">开学日期</string>
+    <string name="manual_create_date_suggested">按节假日数据推算的推荐日期</string>
+    <string name="manual_create_semester_spring">%1$d 春季</string>
+    <string name="manual_create_semester_fall">%1$d 秋季</string>
+    <string name="manual_create_create">创建课表</string>
 </resources>

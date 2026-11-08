@@ -559,4 +559,11 @@
     <string name="datasource_interval_custom_title">Custom refresh interval</string>
     <string name="datasource_interval_custom_hint">Days</string>
 
+    <string name="manual_create_name_label">Timetable name</string>
+    <string name="manual_create_name_hint">e.g. 2026 Spring</string>
+    <string name="manual_create_date_label">Semester start date</string>
+    <string name="manual_create_date_suggested">Suggested from holiday data</string>
+    <string name="manual_create_semester_spring">%1$d Spring</string>
+    <string name="manual_create_semester_fall">%1$d Fall</string>
+    <string name="manual_create_create">Create timetable</string>
 </resources>

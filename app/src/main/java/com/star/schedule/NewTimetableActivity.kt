@@ -24,6 +24,12 @@ class NewTimetableActivity : ComponentActivity() {
             if (result.resultCode == Activity.RESULT_OK) finish()
         }
 
+    /** 手动创建成功后同样已经落库并设为当前课表，跟着退出回到课表页。 */
+    private val manualCreateLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) finish()
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         installEdgeToEdge()
@@ -32,8 +38,12 @@ class NewTimetableActivity : ComponentActivity() {
             StarScheduleTheme(dynamicColor = true) {
                 NewTimetableRoute(
                     onBack = ::finish,
-                    // TODO(功能): 手动创建、AI 识别、网页导入、文件导入尚未实现，先只提供入口列表。
-                    onManualCreate = {},
+                    // TODO(功能): AI 识别、网页导入、文件导入尚未实现，先只提供入口列表。
+                    onManualCreate = {
+                        manualCreateLauncher.launch(
+                            Intent(this, ManualCreateTimetableActivity::class.java),
+                        )
+                    },
                     onRecognizeScreenshotOrText = {},
                     onImportFromWebsite = {},
                     onWakeUpImport = {
