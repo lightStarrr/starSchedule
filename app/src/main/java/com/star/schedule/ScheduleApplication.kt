@@ -6,6 +6,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
+import com.star.schedule.app.DataSourceDependencies
 import com.star.schedule.app.UpdateDependencies
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
@@ -40,6 +41,10 @@ class ScheduleApplication : Application(), Configuration.Provider {
         UpdateDependencies(this, applicationScope)
     }
 
+    val dataSourceDependencies: DataSourceDependencies by lazy {
+        DataSourceDependencies(this, applicationScope)
+    }
+
     override fun onCreate() {
         super.onCreate()
         // 崩溃页跑在独立的 :crash 进程，那边不用再装一遍——否则崩溃页自己出错就没人接了。
@@ -50,6 +55,8 @@ class ScheduleApplication : Application(), Configuration.Provider {
         Telemetry.install(this, applicationScope, processStartElapsedMillis)
         Telemetry.onProcessStart()
         DatabaseProvider.init(this)
+        // 触发 lazy 初始化：灌内置节假日快照、按偏好断言定时刷新任务。
+        dataSourceDependencies
         observeRecentsPreference()
         observePrivacyPreference()
         observeProcessLifecycle()

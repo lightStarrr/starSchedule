@@ -534,4 +534,29 @@
     <string name="timetable_edit_name_hint">Timetable name</string>
     <string name="timetable_delete_title">Delete timetable?</string>
     <string name="timetable_delete_message">Delete “%1$s”? Its courses and lesson times will be removed as well.</string>
+
+    <string name="settings_section_data">Data</string>
+    <string name="datasource_entry_title">Data sources</string>
+    <string name="datasource_entry_support">Local cache and refresh for third-party data</string>
+    <string name="datasource_page_title">Data sources</string>
+    <string name="datasource_section_sources">Sources</string>
+    <string name="datasource_section_refresh">Auto refresh</string>
+    <string name="datasource_holiday_cn_name">Chinese statutory holidays</string>
+    <string name="datasource_holiday_cn_description">State Council holiday arrangements, including adjusted workdays (holiday-cn)</string>
+    <string name="datasource_never_updated">Not refreshed yet</string>
+    <string name="datasource_last_success">Last refreshed: %1$s</string>
+    <string name="datasource_last_error">Refresh failed: %1$s</string>
+    <string name="datasource_refreshing">Refreshing…</string>
+    <string name="datasource_refresh_action">Refresh</string>
+    <string name="datasource_interval_title">Refresh interval</string>
+    <string name="datasource_interval_support">How often sources refresh in the background</string>
+    <string name="datasource_interval_off">Off</string>
+    <string name="datasource_interval_daily">Daily</string>
+    <string name="datasource_interval_weekly">Weekly</string>
+    <string name="datasource_interval_monthly">Monthly</string>
+    <string name="datasource_interval_custom">Every %1$d days</string>
+    <string name="datasource_interval_custom_option">Custom…</string>
+    <string name="datasource_interval_custom_title">Custom refresh interval</string>
+    <string name="datasource_interval_custom_hint">Days</string>
+
 </resources>

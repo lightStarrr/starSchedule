@@ -534,4 +534,29 @@
     <string name="timetable_edit_name_hint">课表名称</string>
     <string name="timetable_delete_title">删除课表？</string>
     <string name="timetable_delete_message">确定删除“%1$s”？课表内的课程和节次会一起删除。</string>
+
+    <string name="settings_section_data">数据</string>
+    <string name="datasource_entry_title">数据源</string>
+    <string name="datasource_entry_support">第三方数据的本地缓存与刷新</string>
+    <string name="datasource_page_title">数据源</string>
+    <string name="datasource_section_sources">数据源</string>
+    <string name="datasource_section_refresh">自动刷新</string>
+    <string name="datasource_holiday_cn_name">中国法定节假日</string>
+    <string name="datasource_holiday_cn_description">国务院放假安排，含调休工作日（holiday-cn）</string>
+    <string name="datasource_never_updated">尚未刷新</string>
+    <string name="datasource_last_success">上次刷新：%1$s</string>
+    <string name="datasource_last_error">刷新失败：%1$s</string>
+    <string name="datasource_refreshing">正在刷新…</string>
+    <string name="datasource_refresh_action">刷新</string>
+    <string name="datasource_interval_title">刷新频率</string>
+    <string name="datasource_interval_support">后台自动刷新的间隔</string>
+    <string name="datasource_interval_off">关闭</string>
+    <string name="datasource_interval_daily">每天</string>
+    <string name="datasource_interval_weekly">每周</string>
+    <string name="datasource_interval_monthly">每月</string>
+    <string name="datasource_interval_custom">每 %1$d 天</string>
+    <string name="datasource_interval_custom_option">自定义…</string>
+    <string name="datasource_interval_custom_title">自定义刷新间隔</string>
+    <string name="datasource_interval_custom_hint">天数</string>
+
 </resources>

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Shield
@@ -60,6 +61,7 @@ fun SettingsRoute(
     onOpenAiSettings: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenUpdatePage: () -> Unit,
+    onOpenDataSources: () -> Unit,
     onRequestNotificationPermission: ((() -> Unit) -> Unit),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -70,6 +72,7 @@ fun SettingsRoute(
         onOpenAiSettings = onOpenAiSettings,
         onOpenAbout = onOpenAbout,
         onOpenUpdatePage = onOpenUpdatePage,
+        onOpenDataSources = onOpenDataSources,
         onReminderEnabledChange = viewModel::setReminderEnabled,
         onHideFromRecentsChange = viewModel::setHideFromRecents,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
@@ -95,6 +98,7 @@ private fun SettingsScreen(
     onOpenAiSettings: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenUpdatePage: () -> Unit,
+    onOpenDataSources: () -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onHideFromRecentsChange: (Boolean) -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
@@ -263,6 +267,23 @@ private fun SettingsScreen(
                                 leading = {
                                     Icon(Icons.Rounded.Shield, contentDescription = null)
                                 },
+                            )
+                        }
+                    }
+
+                    item { SettingsSectionTitle(R.string.settings_section_data) }
+                    item {
+                        SettingsGroup {
+                            SettingsActionItem(
+                                title = stringResource(R.string.datasource_entry_title),
+                                supporting = stringResource(R.string.datasource_entry_support),
+                                onClick = onOpenDataSources,
+                                shapeIndex = 0,
+                                shapeCount = 1,
+                                leading = {
+                                    Icon(Icons.Rounded.CloudSync, contentDescription = null)
+                                },
+                                trailing = { SettingChevron() },
                             )
                         }
                     }

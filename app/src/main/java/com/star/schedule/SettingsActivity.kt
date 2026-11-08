@@ -51,6 +51,9 @@ class SettingsActivity : ComponentActivity() {
                     onOpenUpdatePage = {
                         startActivity(Intent(this, SoftwareUpdateActivity::class.java))
                     },
+                    onOpenDataSources = {
+                        startActivity(Intent(this, DataSourcesActivity::class.java))
+                    },
                     onRequestNotificationPermission = permissionGate::request,
                 )
             }

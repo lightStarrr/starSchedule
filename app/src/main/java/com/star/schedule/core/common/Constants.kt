@@ -47,9 +47,21 @@ object Constants {
     const val PREF_AI_REASONING_EFFORT = "ai_reasoning_effort"
     const val PREF_TIMETABLE_WALLPAPER_PREFIX = "timetable_wallpaper_"
 
+    /** 数据源自动刷新间隔天数；0 表示关闭自动刷新。 */
+    const val PREF_DATASOURCE_REFRESH_INTERVAL_DAYS = "datasource_refresh_interval_days"
+
+    /** 数据源刷新状态键前缀，按源 id 各存一份。 */
+    const val PREF_DATASOURCE_STATE_PREFIX = "datasource_state_"
+
     /** 缺省视为开启：老用户升级后继续上报，只有明确关掉才停。 */
     fun isDataCollectionEnabled(value: String?): Boolean = value != "false"
 
     fun timetableWallpaperPreference(timetableId: Long): String =
         "$PREF_TIMETABLE_WALLPAPER_PREFIX$timetableId"
+
+    fun datasourceLastSuccessKey(sourceId: String): String =
+        "${PREF_DATASOURCE_STATE_PREFIX}${sourceId}_last_success"
+
+    fun datasourceLastErrorKey(sourceId: String): String =
+        "${PREF_DATASOURCE_STATE_PREFIX}${sourceId}_last_error"
 }

@@ -16,14 +16,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LessonTimeTemplateItemEntity::class,
         CourseEntity::class,
         ReminderEntity::class,
-        DayNoteEntity::class
+        DayNoteEntity::class,
+        HolidayEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter
 abstract class AppDatabase : RoomDatabase() {
     abstract fun scheduleDao(): ScheduleDao
+    abstract fun holidayDao(): HolidayDao
 
     companion object {
         // 从版本3迁移到版本4，添加rowHeight字段
@@ -110,6 +112,21 @@ abstract class AppDatabase : RoomDatabase() {
         // 从版本9迁移到版本10：修复旧版本写入的 JSON 缺少 type 字段的问题
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
+            }
+        }
+
+        // 从版本10迁移到版本11：新增法定节假日缓存表
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS holiday (
+                        date TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        isOffDay INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

@@ -133,3 +133,11 @@ data class DayNoteEntity(
     val date: String,         // 对应的具体日期 yyyy-MM-dd
     val content: String       // 便签内容
 )
+
+// 法定节假日与调休工作日（数据源缓存，不依赖课程表）
+@Entity(tableName = "holiday")
+data class HolidayEntity(
+    @PrimaryKey val date: String,   // yyyy-MM-dd
+    val name: String,               // 节日名，如「春节」；调休日沿用所属节日名
+    val isOffDay: Boolean           // true=放假，false=调休上班
+)
