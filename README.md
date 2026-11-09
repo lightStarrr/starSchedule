@@ -1,5 +1,5 @@
 <p align="center">
-  <img width='100%' src="/background.svg">
+  <img width='100%' src="./background.svg">
 </p>
 <h3 align='center'>一个美观的MD3风格课表</h3>
 <p align="center">
