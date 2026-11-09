@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="198" height="64" viewBox="0 0 198 64" role="img" aria-label="开源许可">
+<svg xmlns="http://www.w3.org/2000/svg" width="174" height="64" viewBox="0 0 174 64" role="img" aria-label="开源许可">
 <title>开源许可</title>
-<rect width="198" height="64" rx="32.0" fill="#004F57"/>
-<path transform="translate(14.0 14.0) scale(0.3600)" d="M50.00 28.59C50.16 28.59 50.33 28.53 50.44 28.39C54.29 23.99 58.15 19.58 62.00 15.18C70.46 5.49 85.63 5.85 93.63 15.91C100.00 23.92 99.85 35.30 93.27 43.13C78.90 60.23 64.53 77.33 50.16 94.43C50.12 94.48 50.06 94.51 50.00 94.51C49.94 94.51 49.88 94.48 49.84 94.43C35.47 77.33 21.10 60.23 6.73 43.13C0.15 35.30 0.00 23.92 6.37 15.91C14.37 5.85 29.54 5.49 38.00 15.18C41.85 19.58 45.71 23.99 49.56 28.39C49.67 28.53 49.84 28.59 50.00 28.59Z" fill="#4ED8E9"/>
-<text x="64.0" y="41.4" font-family="'Google Sans','Product Sans','HarmonyOS Sans SC','MiSans','PingFang SC','Noto Sans SC','Microsoft YaHei',system-ui,sans-serif" font-size="26" font-weight="700" fill="#91F1FF" text-anchor="start">开源许可</text>
+<path transform="translate(0.0 10.0) scale(0.4400)" d="M50.00 28.59C50.16 28.59 50.33 28.53 50.44 28.39C54.29 23.99 58.15 19.58 62.00 15.18C70.46 5.49 85.63 5.85 93.63 15.91C100.00 23.92 99.85 35.30 93.27 43.13C78.90 60.23 64.53 77.33 50.16 94.43C50.12 94.48 50.06 94.51 50.00 94.51C49.94 94.51 49.88 94.48 49.84 94.43C35.47 77.33 21.10 60.23 6.73 43.13C0.15 35.30 0.00 23.92 6.37 15.91C14.37 5.85 29.54 5.49 38.00 15.18C41.85 19.58 45.71 23.99 49.56 28.39C49.67 28.53 49.84 28.59 50.00 28.59Z" fill="#4ED8E9"/>
+<text x="58.0" y="42.1" font-family="'Google Sans','Product Sans','HarmonyOS Sans SC','MiSans','PingFang SC','Noto Sans SC','Microsoft YaHei',system-ui,sans-serif" font-size="28" font-weight="700" fill="#E0FBFF" text-anchor="start">开源许可</text>
 </svg>

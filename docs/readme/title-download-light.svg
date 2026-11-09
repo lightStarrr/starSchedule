@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="198" height="64" viewBox="0 0 198 64" role="img" aria-label="下载安装">
+<svg xmlns="http://www.w3.org/2000/svg" width="174" height="64" viewBox="0 0 174 64" role="img" aria-label="下载安装">
 <title>下载安装</title>
-<rect width="198" height="64" rx="32.0" fill="#91F1FF"/>
-<path transform="translate(14.0 14.0) scale(0.3600)" d="M49.94 83.69C47.89 83.68 45.85 83.89 43.84 84.34C38.49 85.52 33.14 86.69 27.80 87.87C12.20 91.32 0.00 74.49 8.13 60.74C11.18 55.57 14.24 50.40 17.29 45.23C31.81 20.66 39.07 8.37 49.88 8.35C60.69 8.34 67.99 20.60 82.59 45.13C85.60 50.18 88.60 55.24 91.61 60.29C100.00 74.39 87.38 91.66 71.40 87.96C66.28 86.77 61.15 85.59 56.03 84.40C54.03 83.93 51.98 83.70 49.94 83.69Z" fill="#006972"/>
-<text x="64.0" y="41.4" font-family="'Google Sans','Product Sans','HarmonyOS Sans SC','MiSans','PingFang SC','Noto Sans SC','Microsoft YaHei',system-ui,sans-serif" font-size="26" font-weight="700" fill="#00363C" text-anchor="start">下载安装</text>
+<path transform="translate(0.0 10.0) scale(0.4400)" d="M49.94 83.69C47.89 83.68 45.85 83.89 43.84 84.34C38.49 85.52 33.14 86.69 27.80 87.87C12.20 91.32 0.00 74.49 8.13 60.74C11.18 55.57 14.24 50.40 17.29 45.23C31.81 20.66 39.07 8.37 49.88 8.35C60.69 8.34 67.99 20.60 82.59 45.13C85.60 50.18 88.60 55.24 91.61 60.29C100.00 74.39 87.38 91.66 71.40 87.96C66.28 86.77 61.15 85.59 56.03 84.40C54.03 83.93 51.98 83.70 49.94 83.69Z" fill="#4ED8E9"/>
+<text x="58.0" y="42.1" font-family="'Google Sans','Product Sans','HarmonyOS Sans SC','MiSans','PingFang SC','Noto Sans SC','Microsoft YaHei',system-ui,sans-serif" font-size="28" font-weight="700" fill="#00363C" text-anchor="start">下载安装</text>
 </svg>

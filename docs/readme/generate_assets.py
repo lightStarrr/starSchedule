@@ -173,8 +173,13 @@ def pill(label, icon, bg, fg, icon_fill, height=64, size=26):
     return svg(width, height, body, label)
 
 
-def section_title(p, label, icon):
-    return pill(label, icon, p["chip_bg"], p["chip_text"], p["chip_icon"])
+def section_title(p, label, icon, height=64, size=28):
+    width = 44 + 14 + text_width(label, size) + 4
+    body = "\n".join([
+        shape(icon, 0, (height - 44) / 2, 44, p["accent"]),
+        text(58, height / 2 + size * 0.36, label, size, p["title"], 700),
+    ])
+    return svg(width, height, body, label)
 
 
 def button(p, label, icon, kind):
