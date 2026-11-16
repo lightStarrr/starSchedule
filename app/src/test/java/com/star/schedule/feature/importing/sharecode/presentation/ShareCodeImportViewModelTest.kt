@@ -1,10 +1,7 @@
-package com.star.schedule.feature.importing.wakeup.presentation
+package com.star.schedule.feature.importing.sharecode.presentation
 
-import com.star.schedule.feature.importing.wakeup.domain.ImportWakeUpScheduleUseCase
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportParser
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportPlan
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpScheduleWriter
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpShareSource
+import com.star.schedule.feature.importing.sharecode.domain.ShareCodeImportResult
+import com.star.schedule.feature.importing.sharecode.domain.ShareCodeImporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -21,16 +18,9 @@ import org.junit.Test
 import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class WakeUpImportViewModelTest {
+class ShareCodeImportViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-    private val plan = WakeUpImportPlan(
-        timetableName = "测试课表",
-        showWeekend = true,
-        startDate = "2026-09-21",
-        lessonTimes = emptyList(),
-        courses = emptyList(),
-    )
-    private val fetchedKeys = mutableListOf<String>()
+    private val fetchedCodes = mutableListOf<String>()
     private val selectedTimetables = mutableListOf<Long>()
 
     @Before
@@ -44,41 +34,44 @@ class WakeUpImportViewModelTest {
     }
 
     private fun viewModel(
-        source: WakeUpShareSource = WakeUpShareSource { key ->
-            fetchedKeys += key
-            "response"
+        importer: ShareCodeImporter = ShareCodeImporter { code ->
+            fetchedCodes += code
+            ShareCodeImportResult.Success(7L)
         },
-    ) = WakeUpImportViewModel(
-        importSchedule = ImportWakeUpScheduleUseCase(
-            source = source,
-            parser = WakeUpImportParser { plan },
-            writer = WakeUpScheduleWriter { 7L },
-        ),
+    ) = ShareCodeImportViewModel(
+        importer = importer,
+        extractCode = { input -> input.substringAfter("「", "").substringBefore("」") },
+        errorOf = { error ->
+            when (error) {
+                is IOException -> ShareCodeImportError.Network
+                else -> ShareCodeImportError.Rejected
+            }
+        },
         selectTimetable = { selectedTimetables += it },
     )
 
     @Test
-    fun `extracts share key while typing`() {
+    fun `extracts share code while typing`() {
         val viewModel = viewModel()
 
         viewModel.onInputChange("分享口令为「a1b2c3d4」")
 
-        assertEquals("a1b2c3d4", viewModel.uiState.value.shareKey)
+        assertEquals("a1b2c3d4", viewModel.uiState.value.shareCode)
         assertTrue(viewModel.uiState.value.canImport)
     }
 
     @Test
-    fun `refuses to import without a recognizable key`() {
+    fun `refuses to import without a recognizable code`() {
         val viewModel = viewModel()
 
         viewModel.onInputChange("随便一段话")
         viewModel.import()
 
         assertEquals(
-            WakeUpImportPhase.Failed(WakeUpImportError.InvalidCode),
+            ShareCodeImportPhase.Failed(ShareCodeImportError.InvalidCode),
             viewModel.uiState.value.phase,
         )
-        assertTrue(fetchedKeys.isEmpty())
+        assertTrue(fetchedCodes.isEmpty())
     }
 
     @Test
@@ -89,22 +82,24 @@ class WakeUpImportViewModelTest {
         viewModel.import()
         advanceUntilIdle()
 
-        assertEquals(listOf("a1b2c3d4"), fetchedKeys)
+        assertEquals(listOf("a1b2c3d4"), fetchedCodes)
         assertEquals(listOf(7L), selectedTimetables)
-        assertEquals(WakeUpImportPhase.Finished(7L), viewModel.uiState.value.phase)
+        assertEquals(ShareCodeImportPhase.Finished(7L), viewModel.uiState.value.phase)
         assertFalse(viewModel.uiState.value.canImport)
     }
 
     @Test
     fun `marks network failures separately from rejected codes`() = runTest(dispatcher) {
-        val viewModel = viewModel(source = WakeUpShareSource { throw IOException("offline") })
+        val viewModel = viewModel(
+            importer = ShareCodeImporter { ShareCodeImportResult.Failure(IOException("offline")) },
+        )
 
         viewModel.onInputChange("分享口令为「a1b2c3d4」")
         viewModel.import()
         advanceUntilIdle()
 
         assertEquals(
-            WakeUpImportPhase.Failed(WakeUpImportError.Network),
+            ShareCodeImportPhase.Failed(ShareCodeImportError.Network),
             viewModel.uiState.value.phase,
         )
         assertTrue(selectedTimetables.isEmpty())

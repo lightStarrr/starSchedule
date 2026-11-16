@@ -1,19 +1,19 @@
-package com.star.schedule.feature.importing.wakeup.data
+package com.star.schedule.feature.importing.sharecode.data
 
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.TimetableEntity
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportPlan
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpScheduleWriter
+import com.star.schedule.feature.importing.sharecode.domain.ImportedTimetablePlan
+import com.star.schedule.feature.importing.sharecode.domain.ImportedTimetableWriter
 import com.star.schedule.feature.timetable.domain.TimetableRepository
 import java.time.LocalDate
 
-class RoomWakeUpScheduleWriter(
+class RoomImportedTimetableWriter(
     private val repository: TimetableRepository,
     private val defaultTimetableName: String,
     private val currentDate: () -> LocalDate = LocalDate::now,
-) : WakeUpScheduleWriter {
-    override suspend fun write(plan: WakeUpImportPlan): Long {
+) : ImportedTimetableWriter {
+    override suspend fun write(plan: ImportedTimetablePlan): Long {
         val timetableId = repository.insertTimetableWithReminders(
             TimetableEntity(
                 name = plan.timetableName ?: defaultTimetableName,

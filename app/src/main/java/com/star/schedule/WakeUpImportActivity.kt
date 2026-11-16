@@ -6,10 +6,13 @@ import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
+import com.star.schedule.feature.importing.sharecode.presentation.ShareCodeImportRoute
+import com.star.schedule.feature.importing.sharecode.presentation.ShareCodeImportViewModel
+import com.star.schedule.feature.importing.sharecode.presentation.ShareCodeImportViewModelFactory
 import com.star.schedule.feature.importing.wakeup.data.createWakeUpImportUseCase
-import com.star.schedule.feature.importing.wakeup.presentation.WakeUpImportRoute
-import com.star.schedule.feature.importing.wakeup.presentation.WakeUpImportViewModel
-import com.star.schedule.feature.importing.wakeup.presentation.WakeUpImportViewModelFactory
+import com.star.schedule.feature.importing.wakeup.domain.extractKeyFromShareText
+import com.star.schedule.feature.importing.wakeup.presentation.wakeUpImportErrorOf
+import com.star.schedule.feature.importing.wakeup.presentation.wakeUpShareCodeBrand
 import com.star.schedule.feature.settings.data.RoomSettingsRepository
 import com.star.schedule.feature.timetable.data.RoomTimetableRepository
 import com.star.schedule.notification.UnifiedNotificationManager
@@ -36,13 +39,19 @@ class WakeUpImportActivity : ComponentActivity() {
         val settingsRepository = RoomSettingsRepository(this, dao, notificationManager)
         val viewModel = ViewModelProvider(
             this,
-            WakeUpImportViewModelFactory(importUseCase, settingsRepository::selectTimetable),
-        )[WakeUpImportViewModel::class.java]
+            ShareCodeImportViewModelFactory(
+                importer = importUseCase,
+                extractCode = ::extractKeyFromShareText,
+                errorOf = ::wakeUpImportErrorOf,
+                selectTimetable = settingsRepository::selectTimetable,
+            ),
+        )[ShareCodeImportViewModel::class.java]
 
         setContent {
             StarScheduleTheme(dynamicColor = true) {
-                WakeUpImportRoute(
+                ShareCodeImportRoute(
                     viewModel = viewModel,
+                    brand = wakeUpShareCodeBrand(),
                     onBack = ::finish,
                     onImported = {
                         // 导入成功后入口页也该退掉：此时用户要看的是新课表，不是"选择导入方式"。

@@ -1,5 +1,6 @@
 package com.star.schedule.feature.importing.wakeup.data
 
+import com.star.schedule.feature.importing.sharecode.data.RoomImportedTimetableWriter
 import com.star.schedule.feature.importing.wakeup.domain.ImportWakeUpScheduleUseCase
 import com.star.schedule.feature.timetable.domain.TimetableRepository
 
@@ -9,7 +10,7 @@ fun createWakeUpImportUseCase(
 ): ImportWakeUpScheduleUseCase = ImportWakeUpScheduleUseCase(
     source = OkHttpWakeUpShareSource(),
     parser = WakeUpShareParser(),
-    writer = RoomWakeUpScheduleWriter(
+    writer = RoomImportedTimetableWriter(
         repository = repository,
         defaultTimetableName = defaultTimetableName,
     ),

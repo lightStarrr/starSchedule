@@ -1,5 +1,6 @@
-package com.star.schedule.feature.importing.wakeup.presentation
+package com.star.schedule.feature.importing.sharecode.presentation
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -33,6 +34,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -98,16 +100,29 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
+/**
+ * 各家口令导入页的品牌差异：顶栏图标、整页配色、输入框提示语。
+ *
+ * [colorScheme] 以宿主主题为底换成品牌配色，由各家自己的配色函数提供。
+ */
+data class ShareCodeImportBrand(
+    @param:DrawableRes val logoRes: Int,
+    val colorScheme: @Composable (ColorScheme) -> ColorScheme,
+    @param:StringRes val hintRes: Int,
+)
+
 @Composable
-fun WakeUpImportRoute(
-    viewModel: WakeUpImportViewModel,
+fun ShareCodeImportRoute(
+    viewModel: ShareCodeImportViewModel,
+    brand: ShareCodeImportBrand,
     onBack: () -> Unit,
     onImported: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    WakeUpImportScreen(
+    ShareCodeImportScreen(
         state = state,
+        brand = brand,
         onBack = onBack,
         onInputChange = viewModel::onInputChange,
         onImport = viewModel::import,
@@ -118,15 +133,16 @@ fun WakeUpImportRoute(
 }
 
 /**
- * WakeUp 导入：顶栏、输入框、按钮，三者之外暂时不放任何内容。
+ * 口令导入页：顶栏、输入框、按钮，三者之外暂时不放任何内容。
  *
- * 错误不单独占一行：它顶替输入框下面那句「口令 30 分钟内有效」，用户一改输入就换回原文案。
- * 整页套一层 WakeUp 自己的珊瑚粉配色，只影响这一页。
+ * 错误不单独占一行：它顶替输入框下面那句提示语，用户一改输入就换回原文案。
+ * 整页套一层品牌自己的配色，只影响这一页。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun WakeUpImportScreen(
-    state: WakeUpImportUiState,
+private fun ShareCodeImportScreen(
+    state: ShareCodeImportUiState,
+    brand: ShareCodeImportBrand,
     onBack: () -> Unit,
     onInputChange: (String) -> Unit,
     onImport: () -> Unit,
@@ -134,9 +150,10 @@ private fun WakeUpImportScreen(
 ) {
     // 用 MaterialExpressiveTheme 而不是 MaterialTheme：后者会把 motionScheme 重置成默认，
     // 这里的形状/颜色动画虽然是显式 tween，但没必要让整页的运动规格跟主题脱节。
-    MaterialExpressiveTheme(colorScheme = wakeUpImportColorScheme()) {
-        WakeUpImportContent(
+    MaterialExpressiveTheme(colorScheme = brand.colorScheme(MaterialTheme.colorScheme)) {
+        ShareCodeImportContent(
             state = state,
+            brand = brand,
             onBack = onBack,
             onInputChange = onInputChange,
             onImport = onImport,
@@ -147,16 +164,17 @@ private fun WakeUpImportScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun WakeUpImportContent(
-    state: WakeUpImportUiState,
+private fun ShareCodeImportContent(
+    state: ShareCodeImportUiState,
+    brand: ShareCodeImportBrand,
     onBack: () -> Unit,
     onInputChange: (String) -> Unit,
     onImport: () -> Unit,
     onImported: () -> Unit,
 ) {
-    val submitting = state.phase is WakeUpImportPhase.Importing
+    val submitting = state.phase is ShareCodeImportPhase.Importing
     // 成功不走归位：按钮留在屏幕中间，就地收回饼干、染成 success 色、弹一个勾。
-    val succeeding = state.phase is WakeUpImportPhase.Finished
+    val succeeding = state.phase is ShareCodeImportPhase.Finished
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -266,8 +284,8 @@ private fun WakeUpImportContent(
     // 归位前半段整块文案的 alpha 还是 0，换这一下正好落在那段里，看不见。
     //
     // 去程必须卡住：重试时 phase 会先回到 Idle，若立刻跟着换，提示会在淡出的前半段闪回原文案。
-    var message by remember { mutableStateOf<WakeUpImportError?>(null) }
-    val failure = (state.phase as? WakeUpImportPhase.Failed)?.error
+    var message by remember { mutableStateOf<ShareCodeImportError?>(null) }
+    val failure = (state.phase as? ShareCodeImportPhase.Failed)?.error
     LaunchedEffect(failure, submitting) {
         if (!submitting) message = failure
     }
@@ -321,6 +339,7 @@ private fun WakeUpImportContent(
                     value = state.input,
                     onValueChange = onInputChange,
                     minFieldHeight = fieldHeight,
+                    hint = stringResource(brand.hintRes),
                     errorText = errorText,
                     hintShift = hintShift,
                     hintAlpha = hintAlpha,
@@ -407,10 +426,10 @@ private fun WakeUpImportContent(
                 )
             }
 
-            // 顶栏中间放 WakeUp 自己的图标：这一页的配色也是从它取的，一眼能看出是从哪导入。
+            // 顶栏中间放品牌自己的图标：这一页的配色也是从它取的，一眼能看出是从哪导入。
             // 只有返回键时顶栏是空的，中间空着反而像是没画完。
             Image(
-                painter = painterResource(R.drawable.ic_wakeup_brand),
+                painter = painterResource(brand.logoRes),
                 contentDescription = null,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -437,12 +456,12 @@ private fun ShareKeyField(
     value: String,
     onValueChange: (String) -> Unit,
     minFieldHeight: Dp,
+    hint: String,
     errorText: String?,
     hintShift: Float,
     hintAlpha: Float,
     modifier: Modifier = Modifier,
 ) {
-    val hint = stringResource(R.string.wakeup_import_key_hint)
 
     // 0 = 提示，1 = 错误。一个值管住两个方向：错的时候在 1，改输入后往 0 落。
     val swap = remember { Animatable(if (errorText != null) 1f else 0f) }
@@ -638,7 +657,7 @@ private fun CookieButton(
         while (true) {
             // 下一步是随机挑的，只要求"和当前这个不一样"：固定顺序看上几秒就能背出来，
             // 会显得像一段录播而不是在干活。
-            toShape = pickDifferentShapeIndex(fromShape, WakeUpCycleShapes.size, random)
+            toShape = pickDifferentShapeIndex(fromShape, CycleShapes.size, random)
             // 手头这一步先走完再判断要不要收：在半途切开，形状会从中间硬换一次。
             // 两条动画并行跑，等慢的那条走完再进下一步。
             coroutineScope {
@@ -659,7 +678,7 @@ private fun CookieButton(
         // 分界取 0.5 而不是 1：`MORPH_SPRING` 的可见阈值是 0.1，`Animatable` 可能停在 0.9x 就结束，
         // 拿 1 当分界会把"已经快变完"误判成"还没开始变"，收尾时形状会顿一下。
         val leaving = if (step.value >= 0.5f) toShape else fromShape
-        settleMorph = Morph(wakeUpShapeAt(leaving), MaterialShapes.Cookie9Sided)
+        settleMorph = Morph(shapeAt(leaving), MaterialShapes.Cookie9Sided)
         step.snapTo(0f)
         // 从这一帧起画的是"变回饼干"的形变，成功的话颜色也从这一刻开始染。
         becomingCookie = true
@@ -687,7 +706,7 @@ private fun CookieButton(
         notifySettled()
     }
 
-    val successColors = wakeUpSuccessColors()
+    val successColors = shareCodeSuccessColors()
     // 提交/加载期间就算点不动也要一直是品牌色：按钮这会儿正在往外飞，掉成灰色整段出场就脏了。
     // `enabled` 在 Importing / Finished 会变成 false，所以不能只看它。
     val tinted = enabled || busy || loading
@@ -720,7 +739,7 @@ private fun CookieButton(
     // IconButton 每帧按新轮廓重画（形状实例不变的话它不会重新解算轮廓）。
     // Morph 的构造要做曲线匹配，不算便宜，所以只在 from/to 变化（也就是每换一步）时重建。
     val stepMorph = remember(fromShape, toShape) {
-        Morph(wakeUpShapeAt(fromShape), wakeUpShapeAt(toShape))
+        Morph(shapeAt(fromShape), shapeAt(toShape))
     }
     val morph = if (loading) settleMorph ?: stepMorph else pressMorph
     val morphProgress = if (loading) step.value.coerceIn(0f, 1f) else press.value
@@ -855,12 +874,13 @@ private val MESSAGE_BLUR = 5.dp
 
 /** 每个失败类别对应一句文案；放 UI 层是因为 ViewModel 不持有 Context。 */
 @StringRes
-private fun WakeUpImportError.messageRes(): Int = when (this) {
-    WakeUpImportError.EmptyCode -> R.string.wakeup_import_error_empty
-    WakeUpImportError.InvalidCode -> R.string.wakeup_import_error_invalid
-    WakeUpImportError.Network -> R.string.wakeup_import_error_network
-    WakeUpImportError.Rejected -> R.string.wakeup_import_error_rejected
-    WakeUpImportError.Unsupported -> R.string.wakeup_import_error_unsupported
+private fun ShareCodeImportError.messageRes(): Int = when (this) {
+    ShareCodeImportError.EmptyCode -> R.string.share_code_import_error_empty
+    ShareCodeImportError.InvalidCode -> R.string.share_code_import_error_invalid
+    ShareCodeImportError.Network -> R.string.share_code_import_error_network
+    ShareCodeImportError.Rejected -> R.string.share_code_import_error_rejected
+    ShareCodeImportError.Unsupported -> R.string.share_code_import_error_unsupported
+    ShareCodeImportError.Busy -> R.string.share_code_import_error_busy
 }
 
 /** 可用状态切换时底色与图标色的过渡时长，和按下形变保持同一节奏。 */
@@ -872,14 +892,14 @@ private const val ENABLE_COLOR_MILLIS = 200
  * ViewModel 用同一个常量来决定「什么时候才真的发请求」——编排播完、按钮已经变成加载指示器
  * 之后才发，所以口令错误也不会把这段动画打断。
  */
-private val SUBMIT_MILLIS = WAKEUP_SUBMIT_ANIMATION_MILLIS.toInt()
+private val SUBMIT_MILLIS = SHARE_CODE_SUBMIT_ANIMATION_MILLIS.toInt()
 
 /** 归位（失败回滚）整段编排的时长。比去程短一点：回来这件事不需要慢慢演。 */
 private const val RETURN_MILLIS = 720
 
 private val BUTTON_SIZE = 92.dp
 
-/** 顶栏中间的 WakeUp 图标大小。和返回键的 40dp 圆形容器接近，不会显得比它更重。 */
+/** 顶栏中间的品牌图标大小。和返回键的 40dp 圆形容器接近，不会显得比它更重。 */
 private val BRAND_LOGO_SIZE = 32.dp
 
 /**
@@ -931,16 +951,16 @@ private const val MORPH_GAP_MILLIS = 260L
  * 各形状的曲线数不要求一致——`Morph.match()` 在数量不等时会补占位曲线。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-internal val WakeUpCycleShapes: List<RoundedPolygon> =
+internal val CycleShapes: List<RoundedPolygon> =
     LoadingIndicatorDefaults.IndeterminateIndicatorPolygons
         .filter { it !== MaterialShapes.Cookie9Sided }
 
-/** 形状下标里 [-1, [WakeUpCycleShapes].size) 的取值；[COOKIE_SHAPE] 表示饼干本身。 */
+/** 形状下标里 [-1, [CycleShapes].size) 的取值；[COOKIE_SHAPE] 表示饼干本身。 */
 private const val COOKIE_SHAPE = -1
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun wakeUpShapeAt(index: Int): RoundedPolygon =
-    if (index == COOKIE_SHAPE) MaterialShapes.Cookie9Sided else WakeUpCycleShapes[index]
+private fun shapeAt(index: Int): RoundedPolygon =
+    if (index == COOKIE_SHAPE) MaterialShapes.Cookie9Sided else CycleShapes[index]
 
 /**
  * 从 `[0, shapeCount)` 里随机挑一个不等于 [current] 的下标。

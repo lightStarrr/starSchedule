@@ -79,9 +79,9 @@ import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.SettingChevron
 import com.star.schedule.core.designsystem.navigationBarBottomInset
-import com.star.schedule.feature.importing.wakeup.presentation.WakeUpCycleShapes
-import com.star.schedule.feature.importing.wakeup.presentation.pickDifferentShapeIndex
-import com.star.schedule.feature.importing.wakeup.presentation.wakeUpSuccessColors
+import com.star.schedule.feature.importing.sharecode.presentation.CycleShapes
+import com.star.schedule.feature.importing.sharecode.presentation.pickDifferentShapeIndex
+import com.star.schedule.feature.importing.sharecode.presentation.shareCodeSuccessColors
 import com.star.schedule.feature.settings.presentation.SettingsGroup
 import com.star.schedule.feature.settings.presentation.SettingsListItem
 import com.star.schedule.feature.timetable.presentation.components.StartDatePickerSheet
@@ -351,7 +351,7 @@ private fun NameInputDialog(
 }
 
 // ---------------------------------------------------------------------------
-// 以下整块复制自 WakeUpImportScreen 的 CookieButton 及其形状工具，
+// 以下整块复制自 ShareCodeImportScreen 的 CookieButton 及其形状工具，
 // 保留同样的按下收圆、加载随机变形+旋转、成功染绿弹勾的完整动画。
 // ---------------------------------------------------------------------------
 
@@ -412,7 +412,7 @@ private fun CookieButton(
 
         delay(HANDOFF_HOLD_MILLIS)
         while (true) {
-            toShape = pickDifferentShapeIndex(fromShape, WakeUpCycleShapes.size, random)
+            toShape = pickDifferentShapeIndex(fromShape, CycleShapes.size, random)
             coroutineScope {
                 launch { step.animateTo(targetValue = 1f, animationSpec = MORPH_SPRING) }
                 launch { turn.animateTo(targetValue = ROTATE_PER_STEP, animationSpec = TURN_SPRING) }
@@ -447,7 +447,7 @@ private fun CookieButton(
         notifySettled()
     }
 
-    val successColors = wakeUpSuccessColors()
+    val successColors = shareCodeSuccessColors()
     // 按钮飞向屏幕中心的那段（busy）enabled 已是 false 但还没开始变形，
     // 底色必须钉在品牌色上，掉成灰色整段出场就脏了。
     val tinted = enabled || busy || loading
@@ -607,7 +607,7 @@ private const val COOKIE_SHAPE = -1
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun cookieShapeAt(index: Int) =
-    if (index == COOKIE_SHAPE) MaterialShapes.Cookie9Sided else WakeUpCycleShapes[index]
+    if (index == COOKIE_SHAPE) MaterialShapes.Cookie9Sided else CycleShapes[index]
 
 private val MORPH_SPRING = spring<Float>(
     dampingRatio = 0.6f,

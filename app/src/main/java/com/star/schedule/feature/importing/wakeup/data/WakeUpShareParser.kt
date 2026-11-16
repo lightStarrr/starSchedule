@@ -1,9 +1,9 @@
 package com.star.schedule.feature.importing.wakeup.data
 
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpCourse
+import com.star.schedule.feature.importing.sharecode.domain.ImportedCourse
+import com.star.schedule.feature.importing.sharecode.domain.ImportedLessonTime
+import com.star.schedule.feature.importing.sharecode.domain.ImportedTimetablePlan
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportParser
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpImportPlan
-import com.star.schedule.feature.importing.wakeup.domain.WakeUpLessonTime
 import com.star.schedule.feature.importing.wakeup.domain.parseWakeUpDate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -27,7 +27,7 @@ import kotlinx.serialization.json.jsonPrimitive
 class WakeUpShareParser(
     private val json: Json = Json,
 ) : WakeUpImportParser {
-    override fun parse(responseBody: String): WakeUpImportPlan {
+    override fun parse(responseBody: String): ImportedTimetablePlan {
         val segments = extractShareData(responseBody).split("\n")
         require(segments.size >= REQUIRED_SEGMENT_COUNT) {
             "WakeUp schedule data has ${segments.size} segments"
@@ -39,7 +39,7 @@ class WakeUpShareParser(
         val courses = json.decodeFromString<JsonArray>(segments[COURSE_SEGMENT])
         val courseDetails = json.decodeFromString<JsonArray>(segments[COURSE_DETAIL_SEGMENT])
 
-        return WakeUpImportPlan(
+        return ImportedTimetablePlan(
             timetableName = config["tableName"]?.jsonPrimitive?.contentOrNull,
             showWeekend = config["showSun"]?.jsonPrimitive?.boolean ?: true,
             startDate = config["startDate"]?.jsonPrimitive?.contentOrNull?.let(::parseWakeUpDate),
@@ -81,7 +81,7 @@ class WakeUpShareParser(
     private fun parseLessonTimes(
         lessonTimes: JsonArray,
         nodeLimit: Int?,
-    ): List<WakeUpLessonTime> {
+    ): List<ImportedLessonTime> {
         val processedTimes = mutableSetOf<String>()
         return buildList {
             lessonTimes.forEach { element ->
@@ -99,7 +99,7 @@ class WakeUpShareParser(
                 if (!processedTimes.add(timeKey)) return@forEach
 
                 add(
-                    WakeUpLessonTime(
+                    ImportedLessonTime(
                         period = period,
                         startTime = startTime,
                         endTime = endTime,
@@ -112,7 +112,7 @@ class WakeUpShareParser(
     private fun parseCourses(
         courses: JsonArray,
         courseDetails: JsonArray,
-    ): List<WakeUpCourse> = buildList {
+    ): List<ImportedCourse> = buildList {
         val courseById = courses.associateBy {
             it.jsonObject["id"]?.jsonPrimitive?.int
         }
@@ -138,7 +138,7 @@ class WakeUpShareParser(
                 ?: return@forEach
 
             add(
-                WakeUpCourse(
+                ImportedCourse(
                     name = courseName,
                     // 教室和老师都可能没填，空着也要把这门课导进来。
                     location = detail["room"]?.jsonPrimitive?.contentOrNull.orEmpty(),
