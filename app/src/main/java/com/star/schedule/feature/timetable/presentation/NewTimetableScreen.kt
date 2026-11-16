@@ -1,8 +1,10 @@
 package com.star.schedule.feature.timetable.presentation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,6 +20,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
@@ -37,6 +40,7 @@ fun NewTimetableRoute(
     onRecognizeScreenshotOrText: () -> Unit,
     onImportFromWebsite: () -> Unit,
     onWakeUpImport: () -> Unit,
+    onSleepDownImport: () -> Unit,
     onFileImport: () -> Unit,
 ) {
     NewTimetableScreen(
@@ -45,6 +49,7 @@ fun NewTimetableRoute(
         onRecognizeScreenshotOrText = onRecognizeScreenshotOrText,
         onImportFromWebsite = onImportFromWebsite,
         onWakeUpImport = onWakeUpImport,
+        onSleepDownImport = onSleepDownImport,
         onFileImport = onFileImport,
     )
 }
@@ -64,6 +69,7 @@ private fun NewTimetableScreen(
     onRecognizeScreenshotOrText: () -> Unit,
     onImportFromWebsite: () -> Unit,
     onWakeUpImport: () -> Unit,
+    onSleepDownImport: () -> Unit,
     onFileImport: () -> Unit,
 ) {
     // 与课表设置、提醒设置保持一致：二级页面用会折叠的大标题，不用紧凑单行标题。
@@ -132,15 +138,29 @@ private fun NewTimetableScreen(
                     supporting = stringResource(R.string.new_timetable_wakeup_support),
                     onClick = onWakeUpImport,
                     shapeIndex = 0,
-                    shapeCount = 2,
+                    shapeCount = 3,
                     leading = { WakeUpLogoIcon() },
+                )
+                SettingsListItem(
+                    title = stringResource(R.string.new_timetable_sleepdown_title),
+                    supporting = stringResource(R.string.new_timetable_sleepdown_support),
+                    onClick = onSleepDownImport,
+                    shapeIndex = 1,
+                    shapeCount = 3,
+                    leading = {
+                        Image(
+                            painterResource(R.drawable.ic_sleepdown_logo),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    },
                 )
                 SettingsListItem(
                     title = stringResource(R.string.new_timetable_file_title),
                     supporting = stringResource(R.string.new_timetable_file_support),
                     onClick = onFileImport,
-                    shapeIndex = 1,
-                    shapeCount = 2,
+                    shapeIndex = 2,
+                    shapeCount = 3,
                     leading = { Icon(Icons.Rounded.Description, contentDescription = null) },
                 )
             }

@@ -49,6 +49,7 @@
     <string name="import_qiangzhi_subtitle">Sign in with account and password to import from the academic system (URL required)</string>
     <string name="import_more_coming">More import methods coming soon…</string>
     <string name="wakeup_import_key_hint">The share code is valid for 30 minutes</string>
+    <string name="sleepdown_import_key_hint">Short codes expire after 15 minutes</string>
     <!-- Replaces the hint above on failure; kept short so the swap never wraps to a second line. -->
     <string name="share_code_import_error_empty">Paste a share code first</string>
     <string name="share_code_import_error_invalid">No share code found in the text</string>
@@ -57,6 +58,7 @@
     <string name="share_code_import_error_unsupported">This share code isn\'t supported, please update</string>
     <string name="share_code_import_error_busy">Too many requests or the service is busy. Try again later.</string>
     <string name="wakeup_default_timetable_name">Untitled WakeUp timetable</string>
+    <string name="sleepdown_default_timetable_name">Untitled SleepDown timetable</string>
     <string name="qiangzhi_import_title">Qiangzhi academic system import</string>
     <string name="qiangzhi_info_text">Uses your credentials to sign into the Qiangzhi academic system and fetch the "Semester Theory Timetable".\nPlease enter the system URL, e.g. %1$s\nYour account and password will be stored in the timetable database for one–tap updates.</string>
     <string name="label_base_url">URL</string>
@@ -392,6 +394,8 @@
     <string name="new_timetable_section_import">Import an existing timetable</string>
     <string name="new_timetable_wakeup_title">WakeUp timetable</string>
     <string name="new_timetable_wakeup_support">Paste a share code to import</string>
+    <string name="new_timetable_sleepdown_title">SleepDown timetable</string>
+    <string name="new_timetable_sleepdown_support">Paste a short share code to import</string>
     <string name="new_timetable_file_title">Local file</string>
     <string name="new_timetable_file_support">Import from an html, json, or xlsx file</string>
     <string name="new_timetable_section_ai">AI import</string>

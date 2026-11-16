@@ -24,6 +24,11 @@ class NewTimetableActivity : ComponentActivity() {
             if (result.resultCode == Activity.RESULT_OK) finish()
         }
 
+    private val sleepDownImportLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) finish()
+        }
+
     /** 手动创建成功后同样已经落库并设为当前课表，跟着退出回到课表页。 */
     private val manualCreateLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -48,6 +53,11 @@ class NewTimetableActivity : ComponentActivity() {
                     onImportFromWebsite = {},
                     onWakeUpImport = {
                         wakeUpImportLauncher.launch(Intent(this, WakeUpImportActivity::class.java))
+                    },
+                    onSleepDownImport = {
+                        sleepDownImportLauncher.launch(
+                            Intent(this, SleepDownImportActivity::class.java),
+                        )
                     },
                     onFileImport = {},
                 )
