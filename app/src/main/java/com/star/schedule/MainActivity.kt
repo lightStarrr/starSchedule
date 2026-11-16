@@ -25,6 +25,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 兜底：任务根 Intent 不是桌面启动 Intent 时（比如崩溃页用普通 Intent 重新拉起主页），
+        // 桌面图标/通知发出的 MAIN+LAUNCHER Intent 按 filterEquals 匹配不上这个任务，
+        // 系统会在栈顶再叠一个主页。这里直接关掉这个多出来的实例，露出原来的页面。
+        if (!isTaskRoot &&
+            intent?.action == Intent.ACTION_MAIN &&
+            intent.hasCategory(Intent.CATEGORY_LAUNCHER)
+        ) {
+            finish()
+            return
+        }
+
         DatabaseProvider.init(this)
         lifecycleScope.launch(Dispatchers.IO) {
             UnifiedNotificationManager(applicationContext).initializeOnAppStart()

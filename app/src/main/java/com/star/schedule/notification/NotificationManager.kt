@@ -284,6 +284,28 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
     }
 
 
+    /**
+     * 点击通知时用与桌面图标完全相同的启动 Intent：系统按 filterEquals 匹配到已有任务后
+     * 只把它切到前台（用户停在哪页就是哪页），而不是新建一个主页压到栈顶；
+     * 应用不在时则照常冷启动。注意不能加 setPackage(null) 之类的改动，
+     * 否则 Intent 与桌面发出的不一致，匹配不上现有任务。
+     */
+    private fun bringAppToFrontPendingIntent(): PendingIntent {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LAUNCHER)
+                .setClass(context, MainActivity::class.java)
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+        )
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     private fun showMeizuLiveNotification(
         courseName: String,
         location: String,
@@ -370,6 +392,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
             .setContentText(location)
             .addExtras(liveBundle)
             .setCustomContentView(contentRemoteViews)
+            .setContentIntent(bringAppToFrontPendingIntent())
             .setAutoCancel(false)
 
         customSmallIconBitmap?.let { smallIcon ->
@@ -389,16 +412,6 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         customIconPath: String?
     ) {
         val reminderLabel = context.getString(R.string.notification_course_reminder)
-        val launchIntent = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0, launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val contentText = if (finish) {
             if (location.isNotEmpty()) {
                 context.getString(
@@ -452,7 +465,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                     }
                 )
             )
-            setContentIntent(pendingIntent)
+            setContentIntent(bringAppToFrontPendingIntent())
             setAutoCancel(false)
             setPriority(NotificationCompat.PRIORITY_MAX)
             setCategory(NotificationCompat.CATEGORY_REMINDER)
