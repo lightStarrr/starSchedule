@@ -91,6 +91,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -226,11 +228,51 @@ private fun TimetableSettingsScreen(
                     .coerceAtMost(maxWidth * PreviewCardWidthMaxFraction)
                     .coerceIn(PreviewCardMinWidth, PreviewCardMaxWidth)
                 val cardMaxHeight = cardMaxWidth * screenAspect
+                // 折叠进度在这一层统一持有：预览卡缩放和下面的滚动钳制读的是同一个值。
+                val progress = rememberPreviewCollapseProgress(scrollBehavior.state)
+                val scrollState = rememberScrollState()
+                // 预览卡比顶栏晚缩几帧，期间多出来的上滑量按「缩完之后」的滚动上限提前吃掉，
+                // 否则卡片缩完滚动值被钳回，内容会先被顶上去再掉下来（见 previewScrollOverflow）。
+                val previewScrollClamp = remember(
+                    scrollState,
+                    progress,
+                    scrollBehavior.state,
+                    cardMaxWidth,
+                    cardMaxHeight,
+                    density,
+                ) {
+                    fun cardHeightPx(fraction: Float): Float = with(density) {
+                        lerp(
+                            cardMaxWidth,
+                            PreviewCardCollapsedWidth,
+                            fraction.coerceIn(0f, 1f),
+                        ).toPx() * cardMaxHeight.value / cardMaxWidth.value
+                    }
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(
+                            available: Offset,
+                            source: NestedScrollSource,
+                        ): Offset {
+                            val pendingShrinkPx = cardHeightPx(progress.value) -
+                                cardHeightPx(scrollBehavior.state.collapsedFraction)
+                            return Offset(
+                                0f,
+                                previewScrollOverflow(
+                                    available.y,
+                                    scrollState.value,
+                                    scrollState.maxValue,
+                                    pendingShrinkPx,
+                                ),
+                            )
+                        }
+                    }
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .nestedScroll(previewScrollClamp)
                         .verticalScroll(
-                            state = rememberScrollState(),
+                            state = scrollState,
                             overscrollEffect = null,
                         )
                         .padding(top = PageContentTopSpacing),
@@ -239,10 +281,10 @@ private fun TimetableSettingsScreen(
                         pagerState = pagerState,
                         previews = state.previews,
                         currentId = state.currentId,
-                        // 直接传 state：折叠进度在 layout / draw 阶段读，避免每帧重组卡片内容。
-                        topBarState = scrollBehavior.state,
+                        // 直接传 Animatable：折叠进度在 layout / draw 阶段读，避免每帧重组卡片内容。
+                        progress = progress,
                         maxCardWidth = cardMaxWidth,
-                        maxCardHeight = cardMaxWidth * screenAspect,
+                        maxCardHeight = cardMaxHeight,
                         onApply = onApply,
                         onCreateTimetable = onCreateTimetable,
                         scrimmedTimetableId = if (actionMenuOpen) actionMenu?.timetableId else null,
@@ -366,23 +408,13 @@ private fun TimetableSettingsScreen(
 }
 
 /**
- * 顶部预览：左右滑动看不同课表，最右一张是「新建」占位。
- * 滑动只改变预览，真正切换要点下面的「应用」，避免顺手一滑就把课表换掉。
+ * 预览卡的折叠进度：对顶栏 [TopAppBarState.collapsedFraction] 做指数平滑，
+ * 提到 Screen 层持有，预览卡缩放和列表的滚动钳制共用同一个值。
  */
 @Composable
-private fun TimetablePreviewPager(
-    pagerState: PagerState,
-    previews: List<TimetablePreview>,
-    currentId: Long?,
+private fun rememberPreviewCollapseProgress(
     topBarState: TopAppBarState,
-    maxCardWidth: Dp,
-    maxCardHeight: Dp,
-    onApply: (Long) -> Unit,
-    onCreateTimetable: () -> Unit,
-    scrimmedTimetableId: Long?,
-    onLongPress: (Long, Rect) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
+): Animatable<Float, AnimationVector1D> {
     // 折叠进度不直接照着滚，而是做指数平滑（一阶低通，Unity 里叫 SmoothDamp）：
     // 每帧按 dt 把当前值往目标靠一定比例。目标一直在变也不会有问题——
     // 弹簧那种「每次重设目标就把速度清零」的做法，慢速滚动时会一直追不上，看着像卡住。
@@ -415,6 +447,27 @@ private fun TimetablePreviewPager(
             }
         }
     }
+    return progress
+}
+
+/**
+ * 顶部预览：左右滑动看不同课表，最右一张是「新建」占位。
+ * 滑动只改变预览，真正切换要点下面的「应用」，避免顺手一滑就把课表换掉。
+ */
+@Composable
+private fun TimetablePreviewPager(
+    pagerState: PagerState,
+    previews: List<TimetablePreview>,
+    currentId: Long?,
+    progress: Animatable<Float, AnimationVector1D>,
+    maxCardWidth: Dp,
+    maxCardHeight: Dp,
+    onApply: (Long) -> Unit,
+    onCreateTimetable: () -> Unit,
+    scrimmedTimetableId: Long?,
+    onLongPress: (Long, Rect) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
     // 记住一个稳定回调，页面拿到的是同一个函数实例，折叠时上层重组才能跳过页面内容。
     val onSelectPage: (Int) -> Unit = remember(pagerState, scope) {
         { page -> scope.launch { pagerState.animateScrollToPage(page) } }
@@ -501,7 +554,7 @@ private fun TimetablePreviewPager(
 }
 
 /**
- * 一页预览。参数全部取稳定值（[TimetablePreview] 标了 @Immutable、[TopAppBarState] 是 @Stable），
+ * 一页预览。参数全部取稳定值（[TimetablePreview] 标了 @Immutable、[Animatable] 是 @Stable），
  * 所以顶栏折叠导致上层重组时，这里会被跳过；缩放发生在 layout / draw 阶段。
  */
 @Composable
