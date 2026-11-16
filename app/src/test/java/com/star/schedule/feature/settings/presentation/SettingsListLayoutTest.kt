@@ -10,7 +10,7 @@ class SettingsListLayoutTest {
         val rows = notificationRows(wakeUpAvailable = false)
 
         assertEquals(
-            listOf(SettingsRow.Reminder, SettingsRow.InstantTest, SettingsRow.DelayedTest),
+            listOf(SettingsRow.Reminder),
             rows,
         )
     }
@@ -19,9 +19,9 @@ class SettingsListLayoutTest {
     fun `visible rows receive contiguous segmented positions`() {
         val rows = notificationRows(wakeUpAvailable = true).positions()
 
-        assertEquals(4, rows.size)
+        assertEquals(2, rows.size)
         assertEquals(0, rows.first().index)
-        assertEquals(3, rows.last().index)
+        assertEquals(1, rows.last().index)
         assertTrue(rows.all { it.count == rows.size })
     }
 }

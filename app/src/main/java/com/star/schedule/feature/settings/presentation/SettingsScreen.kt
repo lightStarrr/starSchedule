@@ -19,7 +19,6 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -77,12 +76,6 @@ fun SettingsRoute(
         onHideFromRecentsChange = viewModel::setHideFromRecents,
         onWakeUpSimulationChange = viewModel::setWakeUpSimulation,
         onDataCollectionChange = viewModel::setDataCollectionEnabled,
-        onSendTestNotification = {
-            onRequestNotificationPermission(viewModel::sendTestNotification)
-        },
-        onScheduleTestReminder = {
-            onRequestNotificationPermission(viewModel::scheduleTestReminder)
-        },
         onEnableReminder = {
             onRequestNotificationPermission { viewModel.setReminderEnabled(true) }
         },
@@ -103,8 +96,6 @@ private fun SettingsScreen(
     onHideFromRecentsChange: (Boolean) -> Unit,
     onWakeUpSimulationChange: (Boolean) -> Unit,
     onDataCollectionChange: (Boolean) -> Unit,
-    onSendTestNotification: () -> Unit,
-    onScheduleTestReminder: () -> Unit,
     onEnableReminder: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -198,24 +189,6 @@ private fun SettingsScreen(
                                 },
                                 shapeIndex = reminderPosition.index,
                                 shapeCount = reminderPosition.count,
-                            )
-                            val instantPosition = positions.getValue(SettingsRow.InstantTest)
-                            SettingsActionItem(
-                                title = stringResource(R.string.notification_test_title),
-                                supporting = stringResource(R.string.notification_test_support_instant),
-                                onClick = onSendTestNotification,
-                                shapeIndex = instantPosition.index,
-                                shapeCount = instantPosition.count,
-                                leading = { Icon(Icons.Rounded.Science, contentDescription = null) },
-                            )
-                            val delayedPosition = positions.getValue(SettingsRow.DelayedTest)
-                            SettingsActionItem(
-                                title = stringResource(R.string.notification_test_title),
-                                supporting = stringResource(R.string.notification_test_support_delayed),
-                                onClick = onScheduleTestReminder,
-                                shapeIndex = delayedPosition.index,
-                                shapeCount = delayedPosition.count,
-                                leading = { Icon(Icons.Rounded.Science, contentDescription = null) },
                             )
                         }
                     }

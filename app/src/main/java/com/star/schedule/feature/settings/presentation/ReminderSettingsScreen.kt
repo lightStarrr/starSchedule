@@ -104,6 +104,12 @@ fun ReminderSettingsRoute(
         onClearLiveIcon = viewModel::clearLiveCapsuleIcon,
         onLiveCapsuleBgColorChange = viewModel::setLiveCapsuleBgColor,
         onLiveTemplateChange = viewModel::setLiveNotificationTemplate,
+        onSendTestNotification = {
+            onRequestNotificationPermission(viewModel::sendTestNotification)
+        },
+        onScheduleTestReminder = {
+            onRequestNotificationPermission(viewModel::scheduleTestReminder)
+        },
     )
 }
 
@@ -118,6 +124,8 @@ private fun ReminderSettingsScreen(
     onClearLiveIcon: () -> Unit,
     onLiveCapsuleBgColorChange: (String) -> Unit,
     onLiveTemplateChange: (String) -> Unit,
+    onSendTestNotification: () -> Unit,
+    onScheduleTestReminder: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -326,6 +334,27 @@ private fun ReminderSettingsScreen(
                                         )
                                     }
                                 }
+                            }
+                        }
+
+                        item {
+                            Spacer(Modifier.height(24.dp))
+                            // 测试行跟在详细选项后面，同样随总开关整块显隐。
+                            SettingsGroup {
+                                SettingsActionItem(
+                                    title = stringResource(R.string.notification_test_title),
+                                    supporting = stringResource(R.string.notification_test_support_instant),
+                                    onClick = onSendTestNotification,
+                                    shapeIndex = 0,
+                                    shapeCount = 2,
+                                )
+                                SettingsActionItem(
+                                    title = stringResource(R.string.notification_test_title),
+                                    supporting = stringResource(R.string.notification_test_support_delayed),
+                                    onClick = onScheduleTestReminder,
+                                    shapeIndex = 1,
+                                    shapeCount = 2,
+                                )
                             }
                         }
                     }

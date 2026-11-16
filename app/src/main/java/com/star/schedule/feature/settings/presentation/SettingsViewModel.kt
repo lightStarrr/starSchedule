@@ -110,10 +110,6 @@ class SettingsViewModel(
             repository.setPreference(Constants.PREF_PRIVACY_DATA_ENABLED, enabled.toString())
         }
     }
-
-    fun sendTestNotification() = repository.sendTestNotification()
-
-    fun scheduleTestReminder() = repository.scheduleTestReminder()
 }
 
 class SettingsViewModelFactory(

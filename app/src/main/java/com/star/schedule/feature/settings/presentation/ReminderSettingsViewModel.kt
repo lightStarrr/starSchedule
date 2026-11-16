@@ -122,6 +122,10 @@ class ReminderSettingsViewModel(
             repository.setPreference(Constants.PREF_FLYME_LIVE_TEMPLATE, template)
         }
     }
+
+    fun sendTestNotification() = repository.sendTestNotification()
+
+    fun scheduleTestReminder() = repository.scheduleTestReminder()
 }
 
 class ReminderSettingsViewModelFactory(
