@@ -142,7 +142,7 @@
     <string name="lesson_time_template_deleted">已删除模板「%1$s」</string>
     <string name="lesson_time_template_restore_failed">恢复失败，请重新保存模板</string>
     <string name="content_desc_save_lesson_time_template">保存为节次时间模板</string>
-    <string name="toast_no_lessons_to_save_template">当前课表暂无节次时间，无法保存模板</string>
+    <string name="toast_no_lessons_to_save_template">该课表暂无节次时间，无法保存模板</string>
     <string name="action_save_current_as_template">保存当前为模板</string>
     <string name="action_import_template">导入</string>
     <string name="toast_no_template_to_export">暂无模板可导出</string>
@@ -158,7 +158,7 @@
     <string name="action_skip">跳过</string>
     <string name="title_save_template">保存节次时间模板</string>
     <string name="label_template_name">模板名称</string>
-    <string name="save_template_helper">将当前课表的节次时间保存为模板，可用于其他课表。</string>
+    <string name="save_template_helper">将该课表的节次时间保存为模板，可用于其他课表。</string>
     <string name="error_template_name_empty">模板名称不能为空</string>
     <string name="error_template_name_too_long">模板名称不能超过100个字符</string>
     <string name="error_template_save_failed">保存失败，请重试</string>
@@ -376,7 +376,7 @@
     <string name="timetable_settings_row_height_increase">增大行高</string>
     <string name="timetable_settings_new">新建课表</string>
     <string name="timetable_settings_courses">课程设置</string>
-    <string name="timetable_settings_courses_support">管理当前课表里的课程</string>
+    <string name="timetable_settings_courses_support">管理该课表里的课程</string>
     <string name="timetable_settings_lesson_times">节次时间</string>
     <string name="timetable_settings_lesson_times_support">设置时间列里每节课的开始与结束时间</string>
     <string name="courses_settings_go_lesson_times">去设置节次时间</string>

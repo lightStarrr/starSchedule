@@ -36,14 +36,14 @@ class TimetableSettingsActivity : ComponentActivity() {
                 TimetableSettingsRoute(
                     viewModel = viewModel,
                     onBack = ::finish,
-                    onOpenRowHeight = {
-                        startActivity(Intent(this, RowHeightActivity::class.java))
+                    onOpenRowHeight = { timetableId ->
+                        startActivity(RowHeightActivity.intent(this, timetableId))
                     },
-                    onOpenCourses = {
-                        startActivity(Intent(this, CourseSettingsActivity::class.java))
+                    onOpenCourses = { timetableId ->
+                        startActivity(CourseSettingsActivity.intent(this, timetableId))
                     },
-                    onOpenLessonTimes = {
-                        startActivity(Intent(this, LessonTimeSettingsActivity::class.java))
+                    onOpenLessonTimes = { timetableId ->
+                        startActivity(LessonTimeSettingsActivity.intent(this, timetableId))
                     },
                     onCreateTimetable = {
                         startActivity(Intent(this, NewTimetableActivity::class.java))

@@ -126,9 +126,9 @@ import com.star.schedule.feature.settings.presentation.SettingsListItem
 fun TimetableSettingsRoute(
     viewModel: TimetableSettingsViewModel,
     onBack: () -> Unit,
-    onOpenRowHeight: () -> Unit,
-    onOpenCourses: () -> Unit,
-    onOpenLessonTimes: () -> Unit,
+    onOpenRowHeight: (Long) -> Unit,
+    onOpenCourses: (Long) -> Unit,
+    onOpenLessonTimes: (Long) -> Unit,
     onCreateTimetable: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -151,9 +151,9 @@ private fun TimetableSettingsScreen(
     state: TimetableSettingsUiState,
     onBack: () -> Unit,
     onApply: (Long) -> Unit,
-    onRowHeightClick: () -> Unit,
-    onCoursesClick: () -> Unit,
-    onLessonTimesClick: () -> Unit,
+    onRowHeightClick: (Long) -> Unit,
+    onCoursesClick: (Long) -> Unit,
+    onLessonTimesClick: (Long) -> Unit,
     onCreateTimetable: () -> Unit,
     onRename: (Long, String) -> Unit,
     onDelete: (Long) -> Unit,
@@ -299,7 +299,7 @@ private fun TimetableSettingsScreen(
                         SettingsListItem(
                             title = stringResource(R.string.timetable_settings_row_height),
                             supporting = stringResource(R.string.timetable_settings_row_height_support),
-                            onClick = onRowHeightClick,
+                            onClick = { onRowHeightClick(previewed.id) },
                             shapeIndex = 0,
                             shapeCount = 3,
                             trailing = {
@@ -319,7 +319,7 @@ private fun TimetableSettingsScreen(
                         SettingsListItem(
                             title = stringResource(R.string.timetable_settings_courses),
                             supporting = stringResource(R.string.timetable_settings_courses_support),
-                            onClick = onCoursesClick,
+                            onClick = { onCoursesClick(previewed.id) },
                             shapeIndex = 1,
                             shapeCount = 3,
                             trailing = { SettingChevron() },
@@ -329,7 +329,7 @@ private fun TimetableSettingsScreen(
                             supporting = stringResource(
                                 R.string.timetable_settings_lesson_times_support,
                             ),
-                            onClick = onLessonTimesClick,
+                            onClick = { onLessonTimesClick(previewed.id) },
                             shapeIndex = 2,
                             shapeCount = 3,
                             trailing = { SettingChevron() },

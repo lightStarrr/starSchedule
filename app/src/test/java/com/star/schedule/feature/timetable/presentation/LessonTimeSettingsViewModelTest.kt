@@ -276,7 +276,7 @@ class LessonTimeSettingsViewModelTest {
      * delete 会静默 return。这里常驻收集一份，runTest 结束时由 backgroundScope 自动取消。
      */
     private fun TestScope.createViewModel(): LessonTimeSettingsViewModel {
-        val viewModel = LessonTimeSettingsViewModel(repository)
+        val viewModel = LessonTimeSettingsViewModel(repository, timetableId = 1L)
         backgroundScope.launch { viewModel.uiState.collect { } }
         return viewModel
     }
@@ -289,7 +289,6 @@ class LessonTimeSettingsViewModelTest {
  * 没有它造不出「两次删除都是第 3 节」这个复现条件。
  */
 private class FakeScheduleRepository : ScheduleRepository {
-    private val timetableId = MutableStateFlow<Long?>(1L)
     private val lessonTimes = MutableStateFlow(
         listOf(
             LessonTimeEntity(id = 1L, timetableId = 1L, period = 1, startTime = "08:00", endTime = "08:45"),
@@ -314,7 +313,8 @@ private class FakeScheduleRepository : ScheduleRepository {
     /** 非 null 时删除会卡在这里，用来制造写入重叠。 */
     var deleteGate: CompletableDeferred<Unit>? = null
 
-    override fun observeCurrentTimetableId(): Flow<Long?> = timetableId
+    // 页面吃的是构造时传入的课表 id；这里故意给别的值，读写应该仍落在构造参数上。
+    override fun observeCurrentTimetableId(): Flow<Long?> = flowOf(9L)
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = flowOf(null)
 

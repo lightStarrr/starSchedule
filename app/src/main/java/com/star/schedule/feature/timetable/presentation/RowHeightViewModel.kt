@@ -43,10 +43,12 @@ data class RowHeightUiState(
  *
  * 预览用「课最多的一周」，行高变化在课程密集的列上最直观。
  * 调整只改本地草稿，点「应用」才写回数据库，返回即丢弃。
+ * 作用对象是打开页面时传入的 [timetableId]，不跟随「已应用课表」变化。
  */
 class RowHeightViewModel(
     scheduleRepository: ScheduleRepository,
     private val settingsRepository: SettingsRepository,
+    timetableId: Long,
 ) : ViewModel() {
     private val draftRowHeight = MutableStateFlow<Int?>(null)
 
@@ -54,7 +56,7 @@ class RowHeightViewModel(
     private val previewTimetable = RowHeightPreviewSample.create()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val currentTimetableId: Flow<Long?> = scheduleRepository.observeCurrentTimetableId()
+    private val currentTimetableId: Flow<Long?> = flowOf(timetableId)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val timetable: Flow<TimetableEntity?> = currentTimetableId.flatMapLatest { id ->
@@ -133,11 +135,12 @@ class RowHeightViewModel(
 class RowHeightViewModelFactory(
     private val scheduleRepository: ScheduleRepository,
     private val settingsRepository: SettingsRepository,
+    private val timetableId: Long,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(RowHeightViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return RowHeightViewModel(scheduleRepository, settingsRepository) as T
+            return RowHeightViewModel(scheduleRepository, settingsRepository, timetableId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

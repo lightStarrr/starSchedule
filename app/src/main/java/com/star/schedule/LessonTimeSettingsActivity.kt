@@ -1,5 +1,6 @@
 package com.star.schedule
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -22,6 +23,13 @@ class LessonTimeSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 页面作用的对象是「打开时指定的课表」，不是已应用的那张；没带 id 就没有目标。
+        val timetableId = intent.getLongExtra(EXTRA_TIMETABLE_ID, -1L).takeIf { it > 0 }
+        if (timetableId == null) {
+            finish()
+            return
+        }
+
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
@@ -32,7 +40,7 @@ class LessonTimeSettingsActivity : ComponentActivity() {
         )
         val viewModel = ViewModelProvider(
             this,
-            LessonTimeSettingsViewModelFactory(repository),
+            LessonTimeSettingsViewModelFactory(repository, timetableId),
         )[LessonTimeSettingsViewModel::class.java]
 
         setContent {
@@ -41,10 +49,18 @@ class LessonTimeSettingsActivity : ComponentActivity() {
                     viewModel = viewModel,
                     onBack = ::finish,
                     onOpenTemplates = {
-                        startActivity(Intent(this, LessonTimeTemplateActivity::class.java))
+                        startActivity(LessonTimeTemplateActivity.intent(this, timetableId))
                     },
                 )
             }
         }
+    }
+
+    companion object {
+        private const val EXTRA_TIMETABLE_ID = "extra_timetable_id"
+
+        fun intent(context: Context, timetableId: Long): Intent =
+            Intent(context, LessonTimeSettingsActivity::class.java)
+                .putExtra(EXTRA_TIMETABLE_ID, timetableId)
     }
 }

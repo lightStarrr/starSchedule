@@ -105,12 +105,13 @@ data class LessonTimeSettingsUiState(
 /**
  * 节次时间（首页左侧时间列）设置页。
  *
- * 只改当前课表的节次时间：首页时间列显示的、课程提醒算的，都是这份数据。
+ * 只改打开页面时指定课表的节次时间，不跟随「已应用课表」变化。
  * 所有写操作都经过 Repository 的 AutoSort 事务，节次号会跟着开始时间重新排。
  * 删除是立刻落库的，撤销靠把删掉的那条重新插回去。
  */
 class LessonTimeSettingsViewModel(
     private val repository: ScheduleRepository,
+    timetableId: Long,
 ) : ViewModel() {
     private val editor = MutableStateFlow<LessonTimeEditor?>(null)
 
@@ -136,15 +137,15 @@ class LessonTimeSettingsViewModel(
     /** 只在 [writeLock] 内递增，保证单调且与落库顺序一致。 */
     private var nextUndoToken = 0L
 
-    private val timetableId: Flow<Long?> = repository.observeCurrentTimetableId()
+    private val targetTimetableId: Flow<Long?> = flowOf(timetableId)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val lessonTimes: Flow<List<LessonTimeEntity>> = timetableId.flatMapLatest { id ->
+    private val lessonTimes: Flow<List<LessonTimeEntity>> = targetTimetableId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.observeLessonTimes(id)
     }
 
     val uiState: StateFlow<LessonTimeSettingsUiState> = combine(
-        combine(timetableId, lessonTimes, editor, pendingUndo) { id, lessonTimes, draft, pending ->
+        combine(targetTimetableId, lessonTimes, editor, pendingUndo) { id, lessonTimes, draft, pending ->
             LessonTimeSettingsUiState(
                 isLoading = false,
                 timetableId = id,
@@ -427,11 +428,12 @@ class LessonTimeSettingsViewModel(
 
 class LessonTimeSettingsViewModelFactory(
     private val repository: ScheduleRepository,
+    private val timetableId: Long,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LessonTimeSettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return LessonTimeSettingsViewModel(repository) as T
+            return LessonTimeSettingsViewModel(repository, timetableId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

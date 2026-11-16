@@ -170,20 +170,22 @@ class LessonTimeTemplatesViewModelTest {
     }
 
     @Test
-    fun `confirming apply writes into the current timetable and offers undo`() = runTest(dispatcher) {
-        val viewModel = createViewModel()
-        advanceUntilIdle()
+    fun `confirming apply writes into the timetable the page was opened for`() =
+        runTest(dispatcher) {
+            val viewModel = createViewModel()
+            advanceUntilIdle()
 
-        viewModel.requestApply(viewModel.uiState.value.rows.single())
-        advanceUntilIdle()
-        viewModel.confirmApply()
-        advanceUntilIdle()
+            viewModel.requestApply(viewModel.uiState.value.rows.single())
+            advanceUntilIdle()
+            viewModel.confirmApply()
+            advanceUntilIdle()
 
-        assertEquals(listOf(5L to 7L), repository.applied)
-        assertNull(viewModel.uiState.value.applyPreview)
-        val undo = requireNotNull(viewModel.uiState.value.undo) as LessonTimeTemplatesUndo.Applied
-        assertEquals("早八作息", undo.templateName)
-    }
+            // fake 的「当前课表」是 9，写入目标是构造时传入的 5。
+            assertEquals(listOf(5L to 7L), repository.applied)
+            assertNull(viewModel.uiState.value.applyPreview)
+            val undo = requireNotNull(viewModel.uiState.value.undo) as LessonTimeTemplatesUndo.Applied
+            assertEquals("早八作息", undo.templateName)
+        }
 
     @Test
     fun `an empty template is not applied`() = runTest(dispatcher) {
@@ -321,7 +323,7 @@ class LessonTimeTemplatesViewModelTest {
      * 这里常驻收集一份，runTest 结束时由 backgroundScope 自动取消。
      */
     private fun TestScope.createViewModel(): LessonTimeTemplatesViewModel {
-        val viewModel = LessonTimeTemplatesViewModel(repository)
+        val viewModel = LessonTimeTemplatesViewModel(repository, timetableId = 5L)
         backgroundScope.launch { viewModel.uiState.collect { } }
         return viewModel
     }
@@ -331,7 +333,6 @@ class LessonTimeTemplatesViewModelTest {
 private class FakeTemplateRepository : ScheduleRepository {
     private val templates = MutableStateFlow<List<LessonTimeTemplateEntity>>(emptyList())
     private val items = MutableStateFlow<List<LessonTimeTemplateItemEntity>>(emptyList())
-    private val timetableId = MutableStateFlow<Long?>(5L)
     private val timetable = MutableStateFlow<TimetableEntity?>(
         TimetableEntity(id = 5L, name = "2026 秋季学期", showWeekend = false, startDate = "2026-09-01"),
     )
@@ -349,8 +350,8 @@ private class FakeTemplateRepository : ScheduleRepository {
 
     var applyError: Exception? = null
 
+    /** 模拟目标课表在页面打开期间被删：「应用」应当随之不可用。 */
     fun clearTimetable() {
-        timetableId.value = null
         timetable.value = null
     }
 
@@ -417,7 +418,8 @@ private class FakeTemplateRepository : ScheduleRepository {
         this.items.value = this.items.value.filterNot { it.templateId == template.id } + items
     }
 
-    override fun observeCurrentTimetableId(): Flow<Long?> = timetableId
+    // 「应用」的目标是构造时传入的课表 id；这里故意给别的值，写入应该仍落在构造参数上。
+    override fun observeCurrentTimetableId(): Flow<Long?> = flowOf(9L)
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = timetable
 

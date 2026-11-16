@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -75,18 +74,20 @@ data class LessonTimeTemplatesUiState(
     /** 应用确认弹窗的内容；null 表示没弹。随课程流实时重算。 */
     val applyPreview: LessonTimeApplyPreview? = null,
     val isApplying: Boolean = false,
-    /** 没有当前课表时「应用」置灰。 */
+    /** 目标课表不存在时「应用」置灰。 */
     val canApply: Boolean = false,
 )
 
 /**
  * 节次时间模板：全局的时间方案，和某一门课表无关。
  *
- * 删除与「应用到当前课表」都立刻落库，撤销靠快照；
+ * 删除与「应用」都立刻落库，撤销靠快照；应用目标是打开页面时传入的 [timetableId]，
+ * 不跟随「已应用课表」变化。
  * 写操作串行化，避免两次快速操作时撤销数据互相覆盖。
  */
 class LessonTimeTemplatesViewModel(
     private val repository: ScheduleRepository,
+    private val timetableId: Long,
 ) : ViewModel() {
     /** 完整实体只留在 ViewModel 里：撤销要原样恢复，界面只需要名字。 */
     private val pendingUndo = MutableStateFlow<PendingUndo?>(null)
@@ -104,7 +105,7 @@ class LessonTimeTemplatesViewModel(
 
     private var nextMessageToken = 0L
 
-    private val currentTimetableId: Flow<Long?> = repository.observeCurrentTimetableId()
+    private val currentTimetableId: Flow<Long?> = flowOf(timetableId)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val currentTimetable = currentTimetableId.flatMapLatest { id ->
@@ -119,10 +120,9 @@ class LessonTimeTemplatesViewModel(
     private val browseData: Flow<BrowseData> = combine(
         repository.observeLessonTimeTemplates(),
         repository.observeLessonTimeTemplateItems(),
-        currentTimetableId,
         currentTimetable,
         currentCourses,
-    ) { templates, items, timetableId, timetable, courses ->
+    ) { templates, items, timetable, courses ->
         val itemsByTemplate = items.groupBy { it.templateId }
         BrowseData(
             rows = templates.map { template ->
@@ -135,7 +135,7 @@ class LessonTimeTemplatesViewModel(
             },
             templates = templates,
             itemsByTemplate = itemsByTemplate,
-            timetableId = timetableId,
+            hasTimetable = timetable != null,
             timetableName = timetable?.name.orEmpty(),
             courses = courses,
         )
@@ -153,7 +153,7 @@ class LessonTimeTemplatesViewModel(
             rows = data.rows,
             undo = pending?.toUi(),
             message = message,
-            canApply = data.timetableId != null,
+            canApply = data.hasTimetable,
             isApplying = applying,
             applyPreview = target?.let { templateId ->
                 val template = data.templates.firstOrNull { it.id == templateId }
@@ -217,13 +217,6 @@ class LessonTimeTemplatesViewModel(
             writeLock.withLock {
                 isApplying.value = true
                 try {
-                    // 重新读一次当前课表：弹窗期间用户可能切走过。
-                    val timetableId = repository.observeCurrentTimetableId().firstOrNull()
-                    if (timetableId == null) {
-                        applyTarget.value = null
-                        emitMessage(LessonTimeTemplatesMessageType.NoTimetable)
-                        return@withLock
-                    }
                     val snapshot = repository.applyLessonTimeTemplateToTimetable(timetableId, templateId)
                     if (snapshot == null) {
                         applyTarget.value = null
@@ -312,7 +305,7 @@ class LessonTimeTemplatesViewModel(
         val rows: List<LessonTimeTemplateRow>,
         val templates: List<LessonTimeTemplateEntity>,
         val itemsByTemplate: Map<Long, List<LessonTimeTemplateItemEntity>>,
-        val timetableId: Long?,
+        val hasTimetable: Boolean,
         val timetableName: String,
         val courses: List<CourseEntity>,
     )
@@ -336,11 +329,12 @@ class LessonTimeTemplatesViewModel(
 
 class LessonTimeTemplatesViewModelFactory(
     private val repository: ScheduleRepository,
+    private val timetableId: Long,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LessonTimeTemplatesViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return LessonTimeTemplatesViewModel(repository) as T
+            return LessonTimeTemplatesViewModel(repository, timetableId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

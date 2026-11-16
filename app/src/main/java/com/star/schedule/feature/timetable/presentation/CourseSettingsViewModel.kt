@@ -24,10 +24,11 @@ data class CourseSettingsUiState(
 
 class CourseSettingsViewModel(
     repository: ScheduleRepository,
+    timetableId: Long,
 ) : ViewModel() {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val lessonTimes: Flow<List<LessonTimeEntity>> =
-        repository.observeCurrentTimetableId().flatMapLatest { id ->
+        flowOf<Long?>(timetableId).flatMapLatest { id ->
             if (id == null) flowOf(emptyList()) else repository.observeLessonTimes(id)
         }
 
@@ -47,11 +48,12 @@ class CourseSettingsViewModel(
 
 class CourseSettingsViewModelFactory(
     private val repository: ScheduleRepository,
+    private val timetableId: Long,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CourseSettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return CourseSettingsViewModel(repository) as T
+            return CourseSettingsViewModel(repository, timetableId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
