@@ -60,7 +60,6 @@ import com.star.schedule.feature.timetable.presentation.components.LessonTimeEdi
 import com.star.schedule.feature.timetable.presentation.components.lessonTimeSupportingText
 import com.star.schedule.feature.timetable.presentation.components.OverwriteLessonTimeTemplateDialog
 import com.star.schedule.feature.timetable.presentation.components.SaveLessonTimeTemplateDialog
-import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -280,7 +279,7 @@ private fun LessonTimeSettingsScreen(
                                     .animateItem(fadeOutSpec = null),
                             ) { info ->
                                 // 朝向被拖走那一侧的圆角让开一点，另外两个角保持原样。
-                                val morph = abs(info.follow)
+                                val morph = info.morph
                                 val shapes = if (morph > 0.001f && info.morphSide != 0) {
                                     morphedSegmentedShapes(
                                         shapeIndex = index,

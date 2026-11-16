@@ -61,7 +61,6 @@ import com.star.schedule.feature.timetable.presentation.components.LessonTimeEdi
 import com.star.schedule.feature.timetable.presentation.components.RenameTemplateDialog
 import com.star.schedule.feature.timetable.presentation.components.SaveTemplateChoiceDialog
 import com.star.schedule.feature.timetable.presentation.components.lessonTimeSupportingText
-import kotlin.math.abs
 
 private val LIST_HORIZONTAL_PADDING = 16.dp
 
@@ -301,7 +300,7 @@ private fun LessonTimeTemplateEditScreen(
                                     // 再让 LazyList 做「消失淡出」会在原地留一条残影闪一下。
                                     .animateItem(fadeOutSpec = null),
                             ) { info ->
-                                val morph = abs(info.follow)
+                                val morph = info.morph
                                 val shapes = if (morph > 0.001f && info.morphSide != 0) {
                                     morphedSegmentedShapes(
                                         shapeIndex = index,

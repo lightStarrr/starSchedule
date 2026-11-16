@@ -55,7 +55,6 @@ import com.star.schedule.feature.schedule.presentation.TimetableEmptyState
 import com.star.schedule.feature.settings.presentation.SettingsListItem
 import com.star.schedule.feature.timetable.domain.formatTemplateUpdatedAt
 import com.star.schedule.feature.timetable.presentation.components.ApplyTemplateDialog
-import kotlin.math.abs
 
 /** 与 SettingsGroup 的左右留白保持一致。 */
 private val LIST_HORIZONTAL_PADDING = 16.dp
@@ -239,7 +238,7 @@ private fun LessonTimeTemplatesScreen(
                                     .animateItem(fadeOutSpec = null),
                             ) { info ->
                                 // 朝向被拖走那一侧的圆角让开一点，另外两个角保持原样。
-                                val morph = abs(info.follow)
+                                val morph = info.morph
                                 val shapes = if (morph > 0.001f && info.morphSide != 0) {
                                     morphedSegmentedShapes(
                                         shapeIndex = index,
