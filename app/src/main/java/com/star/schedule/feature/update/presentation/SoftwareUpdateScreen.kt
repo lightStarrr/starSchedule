@@ -37,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
@@ -49,9 +50,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -307,6 +310,47 @@ private fun UpdateContentFade(opaqueAtTop: Boolean) {
     )
 }
 
+/** 顶部卡片的配色：底色、装饰形状、状态文字，以及版本号与 logo 共用的强调色。 */
+@Immutable
+private data class HeroCardColors(
+    val container: Color,
+    val decoration: Color,
+    val content: Color,
+    val accent: Color,
+)
+
+/**
+ * 对齐 README 头图的 tone 关系：所有装饰形状同用一个 tone，
+ * 深色 = T20 底 + T30 形状 + T90 状态文字（头图 `#00363C`/`#004F57`）；
+ * 浅色 = T90 底 + T80 形状 + T10 状态文字（头图 `#91F1FF`/`#4ED8E9`）。
+ * 版本号与 logo 对应头图里唯一一个单独着色的图形：深色 T80（`#4ED8E9`）、浅色 T30（`#004F57`）。
+ *
+ * 直接从系统动态取色的主色调色板（system_accent1_*，后缀 100/200/700/800/900
+ * 依次是 T90/T80/T30/T20/T10）按 tone 取色，而不是借用 colorScheme 里的角色：
+ * 角色背后的 tone 随配色规范版本变化，浅色方案里也没有 T80 的常规角色。
+ * 本页始终使用动态取色主题（minSdk 33），调色板与主题同源。
+ */
+@Composable
+private fun heroCardColors(): HeroCardColors {
+    // 用 surface 亮度判明暗，比读 isSystemInDarkTheme 稳：主题可能被外部强行指定。
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    return if (dark) {
+        HeroCardColors(
+            container = colorResource(android.R.color.system_accent1_800),
+            decoration = colorResource(android.R.color.system_accent1_700),
+            content = colorResource(android.R.color.system_accent1_100),
+            accent = colorResource(android.R.color.system_accent1_200),
+        )
+    } else {
+        HeroCardColors(
+            container = colorResource(android.R.color.system_accent1_100),
+            decoration = colorResource(android.R.color.system_accent1_200),
+            content = colorResource(android.R.color.system_accent1_900),
+            accent = colorResource(android.R.color.system_accent1_700),
+        )
+    }
+}
+
 /**
  * 顶部卡片：背景图形每次打开从 MaterialShapes 里随机抽四个，图标和版本号直接叠在上面。
  *
@@ -321,7 +365,7 @@ private fun UpdateHeroCard(
     spinning: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val colors = MaterialTheme.colorScheme
+    val colors = heroCardColors()
     val spin = rememberHeroSpin(spinning)
     // 贴边的三个大图形只抽旋转对称的形状，小图形不受限。
     val cornerShapes = remember { HERO_CORNER_SHAPE_POOL.shuffled() }
@@ -332,7 +376,7 @@ private fun UpdateHeroCard(
             .padding(horizontal = 16.dp)
             .height(HERO_CARD_HEIGHT)
             .clip(MaterialTheme.shapes.extraLarge)
-            .background(colors.primaryContainer),
+            .background(colors.container),
     ) {
         HeroShape(
             shape = cornerShapes[0].toShape(),
@@ -342,7 +386,7 @@ private fun UpdateHeroCard(
             offsetY = (-26).dp,
             rotation = 12f,
             spin = { spin.floatValue },
-            color = colors.primary.copy(alpha = 0.16f),
+            color = colors.decoration,
         )
         HeroShape(
             shape = cornerShapes[1].toShape(),
@@ -352,7 +396,7 @@ private fun UpdateHeroCard(
             offsetY = (-36).dp,
             rotation = -14f,
             spin = { spin.floatValue * -0.75f },
-            color = colors.primary.copy(alpha = 0.22f),
+            color = colors.decoration,
         )
         HeroShape(
             shape = cornerShapes[2].toShape(),
@@ -362,7 +406,7 @@ private fun UpdateHeroCard(
             offsetY = 24.dp,
             rotation = -18f,
             spin = { spin.floatValue * 1.35f },
-            color = colors.tertiary.copy(alpha = 0.42f),
+            color = colors.decoration,
         )
         HeroShape(
             shape = innerShape.toShape(),
@@ -372,7 +416,7 @@ private fun UpdateHeroCard(
             offsetY = 18.dp,
             rotation = 0f,
             spin = { spin.floatValue * -0.5f },
-            color = colors.primary.copy(alpha = 0.30f),
+            color = colors.decoration,
         )
 
         Row(
@@ -387,7 +431,7 @@ private fun UpdateHeroCard(
                 text = versionName,
                 style = MaterialTheme.typography.headlineLargeEmphasized
                     .copy(fontWeight = FontWeight.Bold),
-                color = colors.onPrimaryContainer,
+                color = colors.accent,
                 horizontalBias = -1f,
                 fallbackMaxLines = 2,
                 modifier = Modifier.weight(1f),
@@ -395,7 +439,7 @@ private fun UpdateHeroCard(
             Icon(
                 painter = painterResource(R.drawable.ic_logo),
                 contentDescription = null,
-                tint = colors.onPrimaryContainer,
+                tint = colors.accent,
                 modifier = Modifier
                     .testTag("update-hero-logo")
                     .size(HERO_LOGO_SIZE),
@@ -405,7 +449,7 @@ private fun UpdateHeroCard(
             text = statusText,
             style = MaterialTheme.typography.titleMedium
                 .copy(fontWeight = FontWeight.SemiBold),
-            color = colors.onPrimaryContainer,
+            color = colors.content,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 10.dp)
