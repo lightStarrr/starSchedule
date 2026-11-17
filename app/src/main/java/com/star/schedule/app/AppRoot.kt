@@ -6,7 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +42,8 @@ fun StarScheduleApp(
     }.collectAsState(initial = null)
     val timetableId = selection?.id
     val startupHintState by startupHintViewModel.uiState.collectAsStateWithLifecycle()
+    // 锁存：课表首次加载完成后一直放行启动弹窗；切课表重新加载或旋转屏幕时不收回。
+    var homeContentReady by rememberSaveable { mutableStateOf(false) }
     key(selection) {
         val wallpaperState by remember(timetableId) {
             timetableId?.let(wallpaperRepository::observe) ?: flowOf(WallpaperState.None)
@@ -59,13 +64,16 @@ fun StarScheduleApp(
                     wallpaperState = wallpaperState,
                     onTimetableSettingsClick = onTimetableSettingsClick,
                     onSettingsClick = onSettingsClick,
+                    onContentReady = { homeContentReady = true },
                 )
-                StartupHintRoute(viewModel = startupHintViewModel)
-                StartupUpdateRoute(
-                    viewModel = startupUpdateViewModel,
-                    startupHintState = startupHintState,
-                    onOpenUpdate = onSoftwareUpdateClick,
-                )
+                if (homeContentReady) {
+                    StartupHintRoute(viewModel = startupHintViewModel)
+                    StartupUpdateRoute(
+                        viewModel = startupUpdateViewModel,
+                        startupHintState = startupHintState,
+                        onOpenUpdate = onSoftwareUpdateClick,
+                    )
+                }
             }
         }
     }

@@ -36,8 +36,10 @@ import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.ToggleButtonSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -86,6 +88,7 @@ fun ScheduleHomeRoute(
     wallpaperState: WallpaperState = WallpaperState.None,
     onTimetableSettingsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onContentReady: () -> Unit = {},
 ) {
     val homeDataFlow: Flow<HomeTimetableData?> = remember(repository, timetableId) {
         if (timetableId == null) {
@@ -105,6 +108,10 @@ fun ScheduleHomeRoute(
     val courses = homeData?.courses.orEmpty()
     val lessonTimes = homeData?.lessonTimes.orEmpty()
     val isLoading = isSelectionLoading || (timetableId != null && homeData == null)
+    val currentOnContentReady by rememberUpdatedState(onContentReady)
+    LaunchedEffect(isLoading) {
+        if (!isLoading) currentOnContentReady()
+    }
     val semesterStart = remember(timetable?.startDate) {
         runCatching { timetable?.startDate?.let(LocalDate::parse) }
             .getOrNull()
