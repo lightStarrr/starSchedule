@@ -4,9 +4,13 @@ import android.content.Context
 import android.util.Log
 import com.star.schedule.R
 import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.feature.datasource.data.DefaultOptionalResourceRepository
 import com.star.schedule.feature.datasource.data.RoomDataSourceRepository
 import com.star.schedule.feature.datasource.domain.DataSourceDescriptor
 import com.star.schedule.feature.datasource.domain.DataSourceRepository
+import com.star.schedule.feature.datasource.domain.OptionalResourceDescriptor
+import com.star.schedule.feature.datasource.domain.OptionalResourceRepository
+import com.star.schedule.feature.emoji.data.NotoEmojiFontResource
 import com.star.schedule.feature.holiday.data.HolidayCnDataSource
 import com.star.schedule.feature.holiday.data.HolidayCnParser
 import com.star.schedule.feature.holiday.data.RoomHolidayStore
@@ -34,6 +38,13 @@ class DataSourceDependencies(
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    // 可选资源体积大、慢网单次下载要分钟级：不设整体 callTimeout，
+    // 只靠连接/读超时兜底，取消交给协程中断。
+    private val downloadClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     val holidayStore: HolidayStore = RoomHolidayStore(DatabaseProvider.db.holidayDao())
 
     private val refreshScheduler = WorkManagerDataSourceRefreshScheduler(appContext)
@@ -52,6 +63,23 @@ class DataSourceDependencies(
         ),
         dao = DatabaseProvider.dao(),
         scheduler = refreshScheduler,
+    )
+
+    // 可选资源与数据源分开：不注册进 repository.sources，后台 refreshAll 不碰它。
+    val optionalResources: OptionalResourceRepository = DefaultOptionalResourceRepository(
+        resources = listOf(
+            OptionalResourceDescriptor(
+                resource = NotoEmojiFontResource(
+                    httpClient = downloadClient,
+                    filesDir = appContext.filesDir,
+                    ioDispatcher = ioDispatcher,
+                ),
+                nameRes = R.string.datasource_noto_emoji_name,
+                descriptionRes = R.string.datasource_noto_emoji_description,
+            ),
+        ),
+        scope = scope,
+        ioDispatcher = ioDispatcher,
     )
 
     init {

@@ -558,7 +558,7 @@
 
     <string name="settings_section_data">数据</string>
     <string name="datasource_entry_title">数据源</string>
-    <string name="datasource_entry_support">第三方数据的本地缓存与刷新</string>
+    <string name="datasource_entry_support">第三方数据的缓存、刷新与可选下载</string>
     <string name="datasource_page_title">数据源</string>
     <string name="datasource_section_sources">数据源</string>
     <string name="datasource_section_refresh">自动刷新</string>
@@ -579,6 +579,16 @@
     <string name="datasource_interval_custom_option">自定义…</string>
     <string name="datasource_interval_custom_title">自定义刷新间隔</string>
     <string name="datasource_interval_custom_hint">天数</string>
+    <string name="datasource_section_resources">可选资源</string>
+    <string name="datasource_noto_emoji_name">表情字体</string>
+    <string name="datasource_noto_emoji_description">Google Noto Emoji 黑白表情（SIL OFL 1.1），供表情壁纸使用</string>
+    <string name="datasource_resource_not_installed">未下载 · 约 %1$s</string>
+    <string name="datasource_resource_downloading">正在下载 %1$s / %2$s，点按取消</string>
+    <string name="datasource_resource_installed">已下载 · %1$s</string>
+    <string name="datasource_resource_failed">下载失败：%1$s</string>
+    <string name="datasource_resource_download_action">下载</string>
+    <string name="datasource_resource_delete_title">删除%1$s？</string>
+    <string name="datasource_resource_delete_message">删除后可随时重新下载。</string>
 
     <string name="manual_create_name_label">课表名称</string>
     <string name="manual_create_name_hint">例如：2026 春季</string>

@@ -1,5 +1,6 @@
 package com.star.schedule.feature.datasource.presentation
 
+import android.text.format.Formatter
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.EventNote
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.UnfoldMore
@@ -34,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -44,6 +49,7 @@ import com.star.schedule.core.designsystem.component.MenuEntry
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.feature.datasource.domain.OptionalResourceState
 import com.star.schedule.feature.datasource.domain.RefreshInterval
 import com.star.schedule.feature.holiday.data.HolidayCnDataSource
 import com.star.schedule.feature.settings.presentation.SettingsGroup
@@ -63,6 +69,9 @@ fun DataSourcesRoute(
         onBack = onBack,
         onRefreshSource = viewModel::refresh,
         onIntervalChange = viewModel::setInterval,
+        onDownloadResource = viewModel::downloadResource,
+        onCancelResourceDownload = viewModel::cancelResourceDownload,
+        onDeleteResource = viewModel::deleteResource,
     )
 }
 
@@ -73,11 +82,15 @@ private fun DataSourcesScreen(
     onBack: () -> Unit,
     onRefreshSource: (String) -> Unit,
     onIntervalChange: (RefreshInterval) -> Unit,
+    onDownloadResource: (String) -> Unit,
+    onCancelResourceDownload: (String) -> Unit,
+    onDeleteResource: (String) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
     var intervalMenuExpanded by remember { mutableStateOf(false) }
     var showCustomIntervalDialog by remember { mutableStateOf(false) }
+    var deleteConfirmId by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -165,6 +178,37 @@ private fun DataSourcesScreen(
                 }
             }
 
+            if (state.resources.isNotEmpty()) {
+                SettingsSectionTitle(R.string.datasource_section_resources)
+                SettingsGroup {
+                    state.resources.forEachIndexed { index, item ->
+                        SettingsListItem(
+                            title = stringResource(item.nameRes),
+                            supporting = resourceSupporting(item),
+                            onClick = {
+                                when (item.state) {
+                                    OptionalResourceState.NotInstalled,
+                                    is OptionalResourceState.Failed,
+                                        -> onDownloadResource(item.id)
+
+                                    is OptionalResourceState.Downloading ->
+                                        onCancelResourceDownload(item.id)
+
+                                    is OptionalResourceState.Installed ->
+                                        deleteConfirmId = item.id
+                                }
+                            },
+                            shapeIndex = index,
+                            shapeCount = state.resources.size,
+                            leading = {
+                                Icon(Icons.Rounded.EmojiEmotions, contentDescription = null)
+                            },
+                            trailing = { ResourceTrailing(item.state) },
+                        )
+                    }
+                }
+            }
+
         }
     }
 
@@ -177,6 +221,93 @@ private fun DataSourcesScreen(
             },
         )
     }
+
+    deleteConfirmId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { deleteConfirmId = null },
+            title = {
+                Text(
+                    stringResource(
+                        R.string.datasource_resource_delete_title,
+                        state.resources.firstOrNull { it.id == id }
+                            ?.let { stringResource(it.nameRes) }
+                            .orEmpty(),
+                    ),
+                )
+            },
+            text = { Text(stringResource(R.string.datasource_resource_delete_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteResource(id)
+                        deleteConfirmId = null
+                    },
+                ) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteConfirmId = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+/** 可选资源行的尾槽：下载图标 / 确定进度转圈 / 删除图标，点击都走整行 onClick。 */
+@Composable
+private fun ResourceTrailing(state: OptionalResourceState) {
+    when (state) {
+        is OptionalResourceState.Downloading -> CircularProgressIndicator(
+            progress = {
+                if (state.totalBytes > 0) {
+                    (state.downloadedBytes.toFloat() / state.totalBytes).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+            },
+            modifier = Modifier.size(20.dp),
+            strokeWidth = 2.dp,
+        )
+
+        is OptionalResourceState.Installed -> Icon(
+            Icons.Rounded.Delete,
+            contentDescription = stringResource(R.string.action_delete),
+        )
+
+        else -> Icon(
+            Icons.Rounded.Download,
+            contentDescription = stringResource(R.string.datasource_resource_download_action),
+        )
+    }
+}
+
+@Composable
+private fun resourceSupporting(item: OptionalResourceItemUiState): String {
+    val context = LocalContext.current
+    val description = stringResource(item.descriptionRes)
+    val status = when (val s = item.state) {
+        OptionalResourceState.NotInstalled -> stringResource(
+            R.string.datasource_resource_not_installed,
+            Formatter.formatShortFileSize(context, item.expectedSizeBytes),
+        )
+
+        is OptionalResourceState.Downloading -> stringResource(
+            R.string.datasource_resource_downloading,
+            Formatter.formatShortFileSize(context, s.downloadedBytes),
+            Formatter.formatShortFileSize(context, s.totalBytes),
+        )
+
+        is OptionalResourceState.Installed -> stringResource(
+            R.string.datasource_resource_installed,
+            Formatter.formatShortFileSize(context, s.sizeBytes),
+        )
+
+        is OptionalResourceState.Failed ->
+            stringResource(R.string.datasource_resource_failed, s.error)
+    }
+    return "$description\n$status"
 }
 
 /** 每个源的图标先写死在这里，源多起来再考虑搬进注册表。 */

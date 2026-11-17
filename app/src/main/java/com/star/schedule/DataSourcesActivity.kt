@@ -16,10 +16,13 @@ class DataSourcesActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         installEdgeToEdge()
 
-        val repository = (application as ScheduleApplication).dataSourceDependencies.repository
+        val dependencies = (application as ScheduleApplication).dataSourceDependencies
         val viewModel = ViewModelProvider(
             this,
-            DataSourcesViewModelFactory(repository),
+            DataSourcesViewModelFactory(
+                dependencies.repository,
+                dependencies.optionalResources,
+            ),
         )[DataSourcesViewModel::class.java]
 
         setContent {
