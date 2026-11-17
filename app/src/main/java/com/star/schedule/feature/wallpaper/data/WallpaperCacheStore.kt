@@ -22,4 +22,24 @@ internal class WallpaperCacheStore(
     fun delete(timetableId: Long, fileName: String) {
         file(timetableId, fileName).takeIf(File::exists)?.delete()
     }
+
+    /** 最近壁纸的共享目录：按内容寻址，跨课表去重。 */
+    fun recentDirectory(): File = root.resolve("recent")
+
+    fun recentFile(contentHash: String): File =
+        recentDirectory().resolve("wallpaper-$contentHash")
+
+    /** 把已入库的壁纸复制一份进共享目录；同名（同内容）文件已存在时不重复写。 */
+    fun storeRecent(contentHash: String, source: File): File {
+        val target = recentFile(contentHash)
+        if (!target.exists()) {
+            recentDirectory().mkdirs()
+            source.copyTo(target)
+        }
+        return target
+    }
+
+    fun deleteRecent(contentHash: String) {
+        recentFile(contentHash).takeIf(File::exists)?.delete()
+    }
 }

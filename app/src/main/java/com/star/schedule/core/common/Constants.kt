@@ -47,6 +47,9 @@ object Constants {
     const val PREF_AI_REASONING_EFFORT = "ai_reasoning_effort"
     const val PREF_TIMETABLE_WALLPAPER_PREFIX = "timetable_wallpaper_"
 
+    /** 最近用过的壁纸列表（跨课表共享，最新在前），值是 JSON 数组。 */
+    const val PREF_WALLPAPER_RECENTS = "wallpaper_recents"
+
     /** 数据源自动刷新间隔天数；0 表示关闭自动刷新。 */
     const val PREF_DATASOURCE_REFRESH_INTERVAL_DAYS = "datasource_refresh_interval_days"
 
