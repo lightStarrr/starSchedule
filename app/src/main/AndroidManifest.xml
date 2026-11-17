@@ -125,6 +125,14 @@
             android:name=".CourseSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".WallpaperActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".WallpaperPreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
         <!-- 崩溃页：独立进程，主进程崩掉后它还能正常显示 -->
         <activity
             android:name=".CrashActivity"

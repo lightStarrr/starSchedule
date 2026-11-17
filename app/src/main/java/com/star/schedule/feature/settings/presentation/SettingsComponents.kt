@@ -73,7 +73,7 @@ internal fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun settingsItemColors(): ListItemColors {
+internal fun settingsItemColors(): ListItemColors {
     // 列表项用 surfaceBright，页面底色是 surfaceContainer，项与项的空隙自然露出底色；
     // 禁用态与选中态保持同一底色，只靠内容颜色变淡，避免行在状态切换时换一个色阶。
     val container = MaterialTheme.colorScheme.surfaceBright

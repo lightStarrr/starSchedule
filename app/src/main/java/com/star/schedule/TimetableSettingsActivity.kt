@@ -11,6 +11,7 @@ import com.star.schedule.feature.settings.data.RoomSettingsRepository
 import com.star.schedule.feature.timetable.presentation.TimetableSettingsRoute
 import com.star.schedule.feature.timetable.presentation.TimetableSettingsViewModel
 import com.star.schedule.feature.timetable.presentation.TimetableSettingsViewModelFactory
+import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
 import com.star.schedule.notification.UnifiedNotificationManager
 import com.star.schedule.platform.systembar.installEdgeToEdge
 
@@ -28,7 +29,10 @@ class TimetableSettingsActivity : ComponentActivity() {
         )
         val viewModel = ViewModelProvider(
             this,
-            TimetableSettingsViewModelFactory(settingsRepository),
+            TimetableSettingsViewModelFactory(
+                settingsRepository,
+                RoomWallpaperRepository(this, DatabaseProvider.dao()),
+            ),
         )[TimetableSettingsViewModel::class.java]
 
         setContent {
@@ -44,6 +48,9 @@ class TimetableSettingsActivity : ComponentActivity() {
                     },
                     onOpenLessonTimes = { timetableId ->
                         startActivity(LessonTimeSettingsActivity.intent(this, timetableId))
+                    },
+                    onOpenWallpaper = { timetableId ->
+                        startActivity(WallpaperActivity.intent(this, timetableId))
                     },
                     onCreateTimetable = {
                         startActivity(Intent(this, NewTimetableActivity::class.java))

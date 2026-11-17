@@ -16,6 +16,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
@@ -81,6 +82,8 @@ fun CompactPageTopBar(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    // 预览页要让顶栏透出底下的壁纸时传 Color.Transparent。
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     scrollBehavior: TopAppBarScrollBehavior? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
@@ -98,8 +101,8 @@ fun CompactPageTopBar(
             WindowInsets(left = 12.dp, right = 12.dp),
         ),
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            containerColor = containerColor,
+            scrolledContainerColor = containerColor,
             titleContentColor = MaterialTheme.colorScheme.onBackground,
         ),
         scrollBehavior = scrollBehavior,

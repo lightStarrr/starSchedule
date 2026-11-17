@@ -10,9 +10,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -22,7 +25,25 @@ fun WallpaperBackground(
     state: WallpaperState,
     modifier: Modifier = Modifier,
 ) {
-    val path = (state as? WallpaperState.Ready)?.localPath
+    val ready = state as? WallpaperState.Ready
+    WallpaperBackground(
+        path = ready?.localPath,
+        blurRadius = 0f,
+        modifier = modifier,
+    )
+}
+
+/**
+ * 按路径直接画壁纸（预览页还没写成 [WallpaperState] 时用）；
+ * [blurRadius] > 0 时对整图加 RenderEffect 模糊，只供预览页实时预览——
+ * 正式应用时模糊会烘焙进文件，这里永远传 0。
+ */
+@Composable
+fun WallpaperBackground(
+    path: String?,
+    blurRadius: Float,
+    modifier: Modifier = Modifier,
+) {
     // 首次布局前尺寸可能为 0，等待真实窗口尺寸后再解码，避免估算尺寸造成重复裁切。
     val targetSize = LocalWindowInfo.current.containerSize
     val bitmap by produceState<Bitmap?>(
@@ -46,7 +67,15 @@ fun WallpaperBackground(
             bitmap = image.asImageBitmap(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier
+                .fillMaxSize()
+                .then(
+                    if (blurRadius > 0f) {
+                        Modifier.blur(blurRadius.dp, BlurredEdgeTreatment.Rectangle)
+                    } else {
+                        Modifier
+                    },
+                ),
         )
     }
 }

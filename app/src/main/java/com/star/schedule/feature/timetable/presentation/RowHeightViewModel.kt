@@ -7,9 +7,9 @@ import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.database.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
-import com.star.schedule.feature.schedule.domain.buildCourseBlocksByWeek
 import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.feature.timetable.domain.RowHeightPreviewSample
+import com.star.schedule.feature.timetable.domain.timetablePreviewGrid
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,29 +79,24 @@ class RowHeightViewModel(
         lessonTimes,
         draftRowHeight,
     ) { timetable, courses, lessonTimes, draft ->
-        val saved = timetable?.rowHeight ?: DEFAULT_ROW_HEIGHT
-        // 还没排课时用示例课表撑起整页，否则只剩一排表头，行高怎么拖都看不出变化。
         // 示例在这里生成一次、存在属性上：拖动滑杆会让 combine 重新跑，不能在函数里重新随机。
-        val hasLessonTimes = lessonTimes.isNotEmpty()
-        val gridLessonTimes = if (hasLessonTimes) lessonTimes else previewTimetable.lessonTimes
-        val gridCourses = if (hasLessonTimes) courses else previewTimetable.courses
-        val busiestWeek = buildCourseBlocksByWeek(gridCourses)
-            .maxByOrNull { (_, blocks) -> blocks.size }
-            ?.key
-            ?: 1
-        val semesterStart = timetable?.startDate
-            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-            ?: LocalDate.now().with(DayOfWeek.MONDAY)
+        val grid = timetablePreviewGrid(
+            timetable = timetable,
+            courses = courses,
+            lessonTimes = lessonTimes,
+            sample = previewTimetable,
+            fallbackRowHeight = DEFAULT_ROW_HEIGHT,
+        )
         RowHeightUiState(
             isLoading = timetable == null,
             timetableId = timetable?.id,
-            rowHeight = draft ?: saved,
-            savedRowHeight = saved,
-            week = busiestWeek,
-            weekStartDate = semesterStart.plusWeeks((busiestWeek - 1).toLong()),
-            lessonTimes = gridLessonTimes.sortedBy { it.period },
-            courses = gridCourses,
-            showWeekend = gridCourses.any { it.dayOfWeek > 5 },
+            rowHeight = draft ?: grid.rowHeight,
+            savedRowHeight = grid.rowHeight,
+            week = grid.week,
+            weekStartDate = grid.weekStartDate,
+            lessonTimes = grid.lessonTimes,
+            courses = grid.courses,
+            showWeekend = grid.showWeekend,
         )
     }.stateIn(
         viewModelScope,

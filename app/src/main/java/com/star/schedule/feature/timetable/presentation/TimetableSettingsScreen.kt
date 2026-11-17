@@ -1,5 +1,7 @@
 package com.star.schedule.feature.timetable.presentation
 
+import android.widget.Toast
+
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.scaleIn
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntOffset
@@ -121,6 +124,11 @@ import com.star.schedule.platform.display.rememberScreenCornerRadius
 import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.presentation.SettingsGroup
 import com.star.schedule.feature.settings.presentation.SettingsListItem
+import com.star.schedule.feature.timetable.presentation.components.WallpaperSettingsCard
+import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
+import com.star.schedule.feature.wallpaper.domain.WallpaperState
+import com.star.schedule.feature.wallpaper.presentation.WallpaperOption
+import com.star.schedule.feature.wallpaper.presentation.recentWallpaperOptions
 
 @Composable
 fun TimetableSettingsRoute(
@@ -129,13 +137,26 @@ fun TimetableSettingsRoute(
     onOpenRowHeight: (Long) -> Unit,
     onOpenCourses: (Long) -> Unit,
     onOpenLessonTimes: (Long) -> Unit,
+    onOpenWallpaper: (Long) -> Unit,
     onCreateTimetable: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.selectRecentFailed.collect {
+            Toast.makeText(
+                context,
+                R.string.wallpaper_apply_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
     TimetableSettingsScreen(
         state = state,
         onBack = onBack,
         onApply = viewModel::apply,
+        onWallpaperClick = onOpenWallpaper,
+        onSelectRecent = viewModel::selectRecent,
         onRowHeightClick = onOpenRowHeight,
         onCoursesClick = onOpenCourses,
         onLessonTimesClick = onOpenLessonTimes,
@@ -145,12 +166,24 @@ fun TimetableSettingsRoute(
     )
 }
 
+private fun RecentWallpaper.toWallpaperOption(): WallpaperOption = when (this) {
+    RecentWallpaper.Default -> WallpaperOption.Default
+    is RecentWallpaper.Image -> WallpaperOption.Image(path, contentHash)
+}
+
+private fun WallpaperOption.toRecentWallpaper(): RecentWallpaper = when (this) {
+    WallpaperOption.Default -> RecentWallpaper.Default
+    is WallpaperOption.Image -> RecentWallpaper.Image(path, contentHash)
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TimetableSettingsScreen(
     state: TimetableSettingsUiState,
     onBack: () -> Unit,
     onApply: (Long) -> Unit,
+    onWallpaperClick: (Long) -> Unit,
+    onSelectRecent: (Long, RecentWallpaper) -> Unit,
     onRowHeightClick: (Long) -> Unit,
     onCoursesClick: (Long) -> Unit,
     onLessonTimesClick: (Long) -> Unit,
@@ -296,12 +329,33 @@ private fun TimetableSettingsScreen(
                 if (previewed != null) {
                     Spacer(Modifier.height(24.dp))
                     SettingsGroup {
+                        val currentWallpaper = (
+                            state.wallpapers[previewed.id] as? WallpaperState.Ready
+                            )?.let { WallpaperOption.Image(it.localPath, it.contentHash) }
+                            ?: WallpaperOption.Default
+                        WallpaperSettingsCard(
+                            timetableId = previewed.id,
+                            available = listOf(currentWallpaper) + recentWallpaperOptions(
+                                currentWallpaper,
+                                state.recents.map { it.toWallpaperOption() },
+                            ),
+                            // 乐观选中优先：点下去的项原地展开，不等仓库写完。
+                            selected = state.pendingWallpapers[previewed.id]
+                                ?.toWallpaperOption()
+                                ?: currentWallpaper,
+                            onOpenWallpaper = { onWallpaperClick(previewed.id) },
+                            onSelect = { option ->
+                                onSelectRecent(previewed.id, option.toRecentWallpaper())
+                            },
+                            shapeIndex = 0,
+                            shapeCount = 4,
+                        )
                         SettingsListItem(
                             title = stringResource(R.string.timetable_settings_row_height),
                             supporting = stringResource(R.string.timetable_settings_row_height_support),
                             onClick = { onRowHeightClick(previewed.id) },
-                            shapeIndex = 0,
-                            shapeCount = 3,
+                            shapeIndex = 1,
+                            shapeCount = 4,
                             trailing = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
@@ -320,8 +374,8 @@ private fun TimetableSettingsScreen(
                             title = stringResource(R.string.timetable_settings_courses),
                             supporting = stringResource(R.string.timetable_settings_courses_support),
                             onClick = { onCoursesClick(previewed.id) },
-                            shapeIndex = 1,
-                            shapeCount = 3,
+                            shapeIndex = 2,
+                            shapeCount = 4,
                             trailing = { SettingChevron() },
                         )
                         SettingsListItem(
@@ -330,8 +384,8 @@ private fun TimetableSettingsScreen(
                                 R.string.timetable_settings_lesson_times_support,
                             ),
                             onClick = { onLessonTimesClick(previewed.id) },
-                            shapeIndex = 2,
-                            shapeCount = 3,
+                            shapeIndex = 3,
+                            shapeCount = 4,
                             trailing = { SettingChevron() },
                         )
                     }
