@@ -487,16 +487,19 @@ internal fun PatternTabContent(
     val thumbSize = 56.dp
     val thumbPx = with(density) { thumbSize.toPx().toInt() }
 
+    // 缩放行的 IconButton 自带 12dp 视觉内缩：外层边距按 16dp 目标反推，
+    // 让缩略图行与 ± 图标字形到卡片边缘的距离四边一致。
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(start = 4.dp, top = 16.dp, end = 4.dp, bottom = 0.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
             EmojiPattern.entries.forEach { pattern ->
@@ -624,15 +627,15 @@ private fun ColorTabContent(
     ready: EmojiWallpaperUiState.Ready,
     onSelectPalette: (Int) -> Unit,
 ) {
+    // 高度 = 两行色板 96 + 行距 8 + 上下各 16 内边距，四边视觉边距一致。
     LazyHorizontalGrid(
         rows = GridCells.Fixed(2),
         modifier = Modifier
             .fillMaxWidth()
-            .height(112.dp)
-            .padding(vertical = 8.dp),
+            .height(136.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
+        contentPadding = PaddingValues(16.dp),
     ) {
         itemsIndexed(ready.palettes) { index, colors ->
             val selected = index == ready.paletteIndex
