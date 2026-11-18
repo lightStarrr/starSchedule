@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -88,6 +89,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -124,10 +126,16 @@ fun EmojiWallpaperRoute(
     onExported: (File) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    // 界面跟所选配色走：编辑页主题种子 = 当前配色的生成种子。
-    val seedColor = (state as? EmojiWallpaperUiState.Ready)
-        ?.spec?.colors?.seedArgb?.let(::Color)
+    val ready = state as? EmojiWallpaperUiState.Ready
+    // 界面跟所选配色走：编辑页主题种子 = 当前配色的生成种子，
+    // 明暗由壁纸底色决定（配色只有浅底/深底两档），不跟随系统，
+    // 这样标题、底部卡片等前景元素在任何配色下都自带对比度。
+    val seedColor = ready?.spec?.colors?.seedArgb?.let(::Color)
+    val darkTheme = ready?.spec?.colors?.backgroundArgb
+        ?.let { Color(it).luminance() < 0.5f }
+        ?: isSystemInDarkTheme()
     StarScheduleTheme(
+        darkTheme = darkTheme,
         dynamicColor = seedColor == null,
         seedColor = seedColor,
     ) {
