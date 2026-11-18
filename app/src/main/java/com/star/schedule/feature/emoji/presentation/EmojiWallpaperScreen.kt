@@ -85,6 +85,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -228,6 +229,37 @@ private fun EmojiWallpaperScreen(
                     .background(MaterialTheme.colorScheme.surfaceContainer),
             )
         }
+
+        // 顶栏与底部的对比度保护层：壁纸颜色随配色变化，
+        // 标题和底部编辑控件直接压在画布上可能看不清。
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        ),
+                    ),
+                ),
+        )
 
         Scaffold(
             containerColor = Color.Transparent,
