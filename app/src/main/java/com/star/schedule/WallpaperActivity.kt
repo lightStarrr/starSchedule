@@ -8,8 +8,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
-import com.star.schedule.feature.wallpaper.presentation.WallpaperScreen
+import com.star.schedule.feature.emoji.presentation.WallpaperViewModel
+import com.star.schedule.feature.emoji.presentation.WallpaperViewModelFactory
+import com.star.schedule.feature.wallpaper.presentation.WallpaperRoute
 import com.star.schedule.platform.systembar.installEdgeToEdge
 
 /**
@@ -20,6 +23,13 @@ class WallpaperActivity : ComponentActivity() {
 
     // 预览页「应用」成功后这里也结束，直接回到课表设置页看新壁纸卡片。
     private val previewLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) finish()
+    }
+
+    // 表情壁纸编辑页同样走预览页应用：RESULT_OK 一致收尾。
+    private val emojiLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) finish()
@@ -47,9 +57,19 @@ class WallpaperActivity : ComponentActivity() {
 
         installEdgeToEdge()
 
+        val viewModel = ViewModelProvider(
+            this,
+            WallpaperViewModelFactory(
+                (application as ScheduleApplication)
+                    .dataSourceDependencies
+                    .optionalResources,
+            ),
+        )[WallpaperViewModel::class.java]
+
         setContent {
             StarScheduleTheme(dynamicColor = true) {
-                WallpaperScreen(
+                WallpaperRoute(
+                    viewModel = viewModel,
                     onBack = ::finish,
                     onPickPhoto = {
                         pickPhoto.launch(
@@ -58,6 +78,11 @@ class WallpaperActivity : ComponentActivity() {
                                     ActivityResultContracts.PickVisualMedia.ImageOnly,
                                 )
                                 .build(),
+                        )
+                    },
+                    onMakeEmojiWallpaper = {
+                        emojiLauncher.launch(
+                            EmojiWallpaperActivity.intent(this, timetableId),
                         )
                     },
                 )

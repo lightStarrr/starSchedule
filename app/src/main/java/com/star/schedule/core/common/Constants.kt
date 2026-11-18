@@ -56,6 +56,9 @@ object Constants {
     /** 数据源刷新状态键前缀，按源 id 各存一份。 */
     const val PREF_DATASOURCE_STATE_PREFIX = "datasource_state_"
 
+    /** 表情选择器的「最近使用」：JSON 字符串数组，最新在前。 */
+    const val PREF_EMOJI_PICKER_RECENTS = "emoji_picker_recents"
+
     /** 缺省视为开启：老用户升级后继续上报，只有明确关掉才停。 */
     fun isDataCollectionEnabled(value: String?): Boolean = value != "false"
 

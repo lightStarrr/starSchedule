@@ -1,34 +1,90 @@
 package com.star.schedule.feature.wallpaper.presentation
 
+import android.text.format.Formatter
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
+import com.star.schedule.feature.datasource.domain.OptionalResourceState
+import com.star.schedule.feature.emoji.presentation.WallpaperViewModel
 
-/** 壁纸页：目前只有选图入口，选择结果交给预览页决定要不要用。 */
+@Composable
+fun WallpaperRoute(
+    viewModel: WallpaperViewModel,
+    onBack: () -> Unit,
+    onPickPhoto: () -> Unit,
+    onMakeEmojiWallpaper: () -> Unit,
+) {
+    val fontState by viewModel.emojiFontState.collectAsStateWithLifecycle()
+    WallpaperScreen(
+        emojiFontState = fontState,
+        emojiFontExpectedBytes = viewModel.emojiFontExpectedBytes,
+        onBack = onBack,
+        onPickPhoto = onPickPhoto,
+        onMakeEmojiWallpaper = onMakeEmojiWallpaper,
+        onDownloadFont = viewModel::downloadEmojiFont,
+        onCancelFontDownload = viewModel::cancelEmojiFontDownload,
+    )
+}
+
+/**
+ * 壁纸页：选照片，或进表情壁纸编辑器。
+ * 表情字体没下载时点「制作表情壁纸」弹下载对话框，下完自动进编辑器。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WallpaperScreen(
+    emojiFontState: OptionalResourceState,
+    emojiFontExpectedBytes: Long,
     onBack: () -> Unit,
     onPickPhoto: () -> Unit,
+    onMakeEmojiWallpaper: () -> Unit,
+    onDownloadFont: () -> Unit,
+    onCancelFontDownload: () -> Unit,
 ) {
+    var showFontDialog by rememberSaveable { mutableStateOf(false) }
+
+    // 对话框里下载完成的瞬间：自动关掉并直接进编辑器，不用用户再点一次。
+    LaunchedEffect(emojiFontState) {
+        if (showFontDialog && emojiFontState is OptionalResourceState.Installed) {
+            showFontDialog = false
+            onMakeEmojiWallpaper()
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -45,14 +101,126 @@ fun WallpaperScreen(
                 .padding(innerPadding),
             contentAlignment = Alignment.Center,
         ) {
-            Button(onClick = onPickPhoto) {
-                Icon(
-                    imageVector = Icons.Rounded.PhotoLibrary,
-                    contentDescription = null,
-                )
-                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                Text(stringResource(R.string.wallpaper_pick_photo))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Button(onClick = onPickPhoto) {
+                    Icon(
+                        imageVector = Icons.Rounded.PhotoLibrary,
+                        contentDescription = null,
+                    )
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.wallpaper_pick_photo))
+                }
+                FilledTonalButton(
+                    onClick = {
+                        if (emojiFontState is OptionalResourceState.Installed) {
+                            onMakeEmojiWallpaper()
+                        } else {
+                            showFontDialog = true
+                        }
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.EmojiEmotions,
+                        contentDescription = null,
+                    )
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.wallpaper_make_emoji))
+                }
             }
         }
     }
+
+    if (showFontDialog) {
+        EmojiFontDialog(
+            state = emojiFontState,
+            expectedBytes = emojiFontExpectedBytes,
+            onDownload = onDownloadFont,
+            onCancelDownload = onCancelFontDownload,
+            onDismiss = { showFontDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun EmojiFontDialog(
+    state: OptionalResourceState,
+    expectedBytes: Long,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.wallpaper_emoji_font_required_title)) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when (state) {
+                    is OptionalResourceState.Downloading -> {
+                        CircularProgressIndicator(
+                            progress = {
+                                if (state.totalBytes > 0) {
+                                    (state.downloadedBytes.toFloat() / state.totalBytes)
+                                        .coerceIn(0f, 1f)
+                                } else {
+                                    0f
+                                }
+                            },
+                        )
+                        Text(
+                            stringResource(
+                                R.string.wallpaper_emoji_downloading,
+                                Formatter.formatShortFileSize(context, state.downloadedBytes),
+                                Formatter.formatShortFileSize(context, state.totalBytes),
+                            ),
+                        )
+                    }
+                    is OptionalResourceState.Failed -> Text(
+                        stringResource(
+                            R.string.wallpaper_emoji_download_failed,
+                            state.error,
+                        ),
+                    )
+                    else -> Text(
+                        stringResource(
+                            R.string.wallpaper_emoji_font_required_body,
+                            Formatter.formatShortFileSize(context, expectedBytes),
+                        ),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            when (state) {
+                is OptionalResourceState.Downloading -> TextButton(
+                    onClick = onCancelDownload,
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+                is OptionalResourceState.Failed -> TextButton(onClick = onDownload) {
+                    Text(stringResource(R.string.action_retry))
+                }
+                else -> TextButton(onClick = onDownload) {
+                    Text(stringResource(R.string.action_download))
+                }
+            }
+        },
+        // 下载中只有一个「取消」（中止下载）；其余状态是「取消」关掉对话框。
+        dismissButton = if (state is OptionalResourceState.Downloading) {
+            null
+        } else {
+            {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        },
+    )
 }
