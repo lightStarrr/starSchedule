@@ -54,8 +54,9 @@ import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.SentimentSatisfied
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -239,27 +240,16 @@ private fun EmojiWallpaperScreen(
                     containerColor = Color.Transparent,
                     actions = {
                         if (ready != null) {
-                            if (ready.exporting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier
-                                        .padding(12.dp)
-                                        .size(24.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                IconButton(
-                                    onClick = {
-                                        onExport(windowSize.width, windowSize.height)
-                                    },
-                                    enabled = ready.emojis.isNotEmpty(),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = stringResource(
-                                            R.string.emoji_wallpaper_done,
-                                        ),
-                                    )
-                                }
+                            Button(
+                                onClick = {
+                                    onExport(windowSize.width, windowSize.height)
+                                },
+                                enabled = ready.emojis.isNotEmpty() && !ready.exporting,
+                                shapes = ButtonDefaults.shapes(
+                                    shape = RoundedCornerShape(50),
+                                ),
+                            ) {
+                                Text(stringResource(R.string.emoji_wallpaper_done))
                             }
                         }
                     },
