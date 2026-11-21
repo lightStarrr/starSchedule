@@ -39,7 +39,8 @@ internal fun WallpaperStudio(
     onMakeEmojiWallpaper: () -> Unit,
     onPreview: (WallpaperDesign?) -> Unit,
 ) {
-    val systemSeed = dynamicLightColorScheme(LocalContext.current).primary.toArgb()
+    val context = LocalContext.current
+    val systemSeed = remember(context) { dynamicLightColorScheme(context).primary.toArgb() }
     val colors = remember(systemSeed) { emojiWallpaperPalettes(systemSeed).first() }
     val emoji = remember(colors) {
         WallpaperDesign(

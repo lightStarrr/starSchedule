@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,13 +36,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
-import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.platform.crash.CrashReport
 
 /**
@@ -55,7 +58,7 @@ fun CrashScreen(
     onRestart: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val navigationBarInset = navigationBarBottomInset()
+    val layoutDirection = LocalLayoutDirection.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -111,21 +114,18 @@ fun CrashScreen(
             }
         },
     ) { innerPadding ->
-        Box(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .consumeWindowInsets(innerPadding),
+            contentPadding = PaddingValues(
+                start = innerPadding.calculateStartPadding(layoutDirection) + 16.dp,
+                end = innerPadding.calculateEndPadding(layoutDirection) + 16.dp,
+                top = innerPadding.calculateTopPadding() + 8.dp,
+                bottom = innerPadding.calculateBottomPadding() + 24.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 8.dp,
-                    bottom = 24.dp + navigationBarInset,
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
                 item {
                     Column {
                         Text(
@@ -183,7 +183,6 @@ fun CrashScreen(
             }
         }
     }
-}
 
 @Composable
 private fun InfoCard(content: @Composable () -> Unit) {

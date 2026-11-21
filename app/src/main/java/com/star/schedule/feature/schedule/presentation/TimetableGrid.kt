@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.star.schedule.R
 import com.star.schedule.core.database.CourseEntity
 import com.star.schedule.core.designsystem.CourseBlockCornerRadius
+import com.star.schedule.core.designsystem.rememberAnimationsEnabled
 import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.feature.schedule.domain.CourseBlock
 import com.star.schedule.feature.schedule.domain.buildCourseBlocksByWeek
@@ -208,11 +209,6 @@ private fun CourseDayColumn(
     }
 
     Box(modifier = modifier.height(totalHeight)) {
-        Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
-            lessonTimes.forEach {
-                Box(modifier = Modifier.fillMaxWidth().height(rowHeight))
-            }
-        }
         courseBlocks.forEachIndexed { index, block ->
             val startIndex = periodIndexes[block.startPeriod]
             val endIndex = periodIndexes[block.endPeriod]
@@ -319,10 +315,16 @@ private fun GridCourseCell(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val alpha = remember { Animatable(0f) }
-    val offsetY = remember { Animatable(20f) }
+    val animationsEnabled = rememberAnimationsEnabled()
+    val alpha = remember { Animatable(if (animationsEnabled) 0f else 1f) }
+    val offsetY = remember { Animatable(if (animationsEnabled) 20f else 0f) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(animationsEnabled) {
+        if (!animationsEnabled) {
+            alpha.snapTo(1f)
+            offsetY.snapTo(0f)
+            return@LaunchedEffect
+        }
         delay(animationDelayMillis)
         coroutineScope {
             launch {
@@ -339,7 +341,12 @@ private fun GridCourseCell(
     val titleLineHeight = with(density) { titleStyle.lineHeight.toDp() }
     val locationLineHeight = with(density) { locationStyle.lineHeight.toDp() }
     val contentHeight = (cellHeight - 16.dp).coerceAtLeast(0.dp)
-    val lineLimits = remember(contentHeight, course?.location.isNullOrBlank()) {
+    val lineLimits = remember(
+        contentHeight,
+        titleLineHeight,
+        locationLineHeight,
+        course?.location.isNullOrBlank(),
+    ) {
         calculateCourseTextLineLimits(
             contentHeight = contentHeight,
             titleLineHeight = titleLineHeight,

@@ -79,6 +79,7 @@
         <activity
             android:name=".DataSourcesActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".ReminderActivity"
@@ -87,6 +88,7 @@
         <activity
             android:name=".TimetableSettingsActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".NewTimetableActivity"
@@ -95,14 +97,17 @@
         <activity
             android:name=".ManualCreateTimetableActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".WakeUpImportActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".SleepDownImportActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".RowHeightActivity"
@@ -111,6 +116,7 @@
         <activity
             android:name=".LessonTimeSettingsActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".LessonTimeTemplateActivity"
@@ -119,6 +125,7 @@
         <activity
             android:name=".LessonTimeTemplateEditActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".CourseSettingsActivity"

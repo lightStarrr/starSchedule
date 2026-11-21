@@ -2,7 +2,7 @@ package com.star.schedule.feature.settings.presentation
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.provider.Settings
+import android.graphics.BitmapFactory
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -14,19 +14,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Code
@@ -38,21 +40,26 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.toShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -65,6 +72,9 @@ import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.component.nestedCornerRadius
 import com.star.schedule.core.designsystem.component.rememberHorizontalSegmentedShape
 import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.core.designsystem.rememberAnimationsEnabled
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AboutRoute(onBack: () -> Unit) {
@@ -92,6 +102,7 @@ private fun AboutScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navigationBarInset = navigationBarBottomInset()
+    val layoutDirection = LocalLayoutDirection.current
     // 版本与构建信息分两行：排查时常常只关心其中一个，混在一行里每次都得自己找。
     val versionText = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
     val buildText = "${BuildConfig.GIT_SHA} · ${BuildConfig.BUILD_TIME}"
@@ -110,19 +121,18 @@ private fun AboutScreen(
             )
         },
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 720.dp)
-                    .align(Alignment.TopCenter),
+                    .align(Alignment.TopCenter)
+                    .consumeWindowInsets(innerPadding),
                 contentPadding = PaddingValues(
-                    top = PageContentTopSpacing,
-                    bottom = 24.dp + navigationBarInset,
+                    start = innerPadding.calculateStartPadding(layoutDirection),
+                    end = innerPadding.calculateEndPadding(layoutDirection),
+                    top = innerPadding.calculateTopPadding() + PageContentTopSpacing,
+                    bottom = innerPadding.calculateBottomPadding() + 24.dp + navigationBarInset,
                 ),
             ) {
                 item { AboutBrandHeader() }
@@ -152,8 +162,8 @@ private fun AboutScreen(
                     // 左右两块各占一半，外侧大圆角、相邻处小圆角，跟列表卡片同一套形状
                     val leftShape = rememberHorizontalSegmentedShape(index = 0, count = 2)
                     val rightShape = rememberHorizontalSegmentedShape(index = 1, count = 2)
-                    val wechatPainter = painterResource(R.drawable.sponsor_wechat)
-                    val alipayPainter = painterResource(R.drawable.sponsor_alipay)
+                    val wechatImage = rememberAsyncDrawableBitmap(R.drawable.sponsor_wechat)
+                    val alipayImage = rememberAsyncDrawableBitmap(R.drawable.sponsor_alipay)
                     val wechatDescription = stringResource(R.string.about_sponsor_wechat)
                     val alipayDescription = stringResource(R.string.about_sponsor_alipay)
                     // 图片圆角跟着卡片走：外圆角减内边距，两段弧同心，不会显得突兀
@@ -168,12 +178,13 @@ private fun AboutScreen(
                         val imageWidth = (maxWidth - gap) / 2 - SPONSOR_CARD_PADDING * 2
                         // 两张图比例不同（1:1 与 2:3），统一按高的那张定卡片高度，图在里面各自居中
                         val imageHeight = maxOf(
-                            imageWidth / wechatPainter.aspectRatio(),
-                            imageWidth / alipayPainter.aspectRatio(),
+                            imageWidth / wechatImage.aspectRatioOrDefault(1f),
+                            imageWidth / alipayImage.aspectRatioOrDefault(2f / 3f),
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                             SponsorQr(
-                                painter = wechatPainter,
+                                bitmap = wechatImage,
+                                fallbackAspectRatio = 1f,
                                 contentDescription = wechatDescription,
                                 shape = leftShape,
                                 imageHeight = imageHeight,
@@ -181,7 +192,8 @@ private fun AboutScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             SponsorQr(
-                                painter = alipayPainter,
+                                bitmap = alipayImage,
+                                fallbackAspectRatio = 2f / 3f,
                                 contentDescription = alipayDescription,
                                 shape = rightShape,
                                 imageHeight = imageHeight,
@@ -205,7 +217,7 @@ private fun AboutScreen(
                         )
                         SettingsActionItem(
                             title = stringResource(R.string.qq_group_title),
-                            supporting = "947574953",
+                            supporting = stringResource(R.string.qq_group_number),
                             onClick = { onOpenLink(qqGroupUrl) },
                             shapeIndex = 1,
                             shapeCount = 2,
@@ -219,13 +231,28 @@ private fun AboutScreen(
 }
 
 /**
+ * 在后台线程异步解码收款码位图，避免列表进入或滚动时阻塞主线程。
+ */
+@Composable
+private fun rememberAsyncDrawableBitmap(@DrawableRes resId: Int): ImageBitmap? {
+    val context = LocalContext.current
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, context, resId) {
+        value = withContext(Dispatchers.IO) {
+            BitmapFactory.decodeResource(context.resources, resId)?.asImageBitmap()
+        }
+    }
+    return bitmap
+}
+
+/**
  * 收款码卡片：高度由调用方统一给定，图在里面等比缩放居中。
  *
  * 用 [ContentScale.Fit] 而不是拉伸，否则二维码会变形扫不出来。
  */
 @Composable
 private fun SponsorQr(
-    painter: Painter,
+    bitmap: ImageBitmap?,
+    fallbackAspectRatio: Float,
     contentDescription: String,
     shape: Shape,
     imageHeight: Dp,
@@ -247,23 +274,25 @@ private fun SponsorQr(
                 .height(imageHeight),
             contentAlignment = Alignment.Center,
         ) {
-            Image(
-                painter = painter,
-                contentDescription = contentDescription,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(painter.aspectRatio())
-                    .clip(RoundedCornerShape(imageCorner)),
-                contentScale = ContentScale.Fit,
-            )
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = contentDescription,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(bitmap.aspectRatioOrDefault(fallbackAspectRatio))
+                        .clip(RoundedCornerShape(imageCorner)),
+                    contentScale = ContentScale.Fit,
+                )
+            }
         }
     }
 }
 
-/** 宽高比，取不到时按 1:1 处理，避免除零。 */
-private fun Painter.aspectRatio(): Float {
-    val size = intrinsicSize
-    return if (size.width > 0f && size.height > 0f) size.width / size.height else 1f
+/** 宽高比，取不到时按默认值处理，避免除零。 */
+private fun ImageBitmap?.aspectRatioOrDefault(defaultRatio: Float): Float {
+    val bmp = this ?: return defaultRatio
+    return if (bmp.width > 0 && bmp.height > 0) bmp.width.toFloat() / bmp.height else defaultRatio
 }
 
 private val SPONSOR_CARD_PADDING = 12.dp
@@ -282,7 +311,7 @@ private fun AboutBrandHeader() {
     val container = MaterialTheme.colorScheme.primaryContainer
     val content = MaterialTheme.colorScheme.onPrimaryContainer
     val cookie = MaterialShapes.Cookie7Sided.toShape()
-    val rotation = rememberCookieRotation()
+    val rotationState = rememberCookieRotationState()
 
     Box(
         modifier = Modifier
@@ -293,7 +322,7 @@ private fun AboutBrandHeader() {
         Box(
             modifier = Modifier
                 .size(BRAND_COOKIE_SIZE)
-                .graphicsLayer { rotationZ = rotation }
+                .graphicsLayer { rotationZ = rotationState.value }
                 .clip(cookie)
                 .background(container),
         )
@@ -306,21 +335,15 @@ private fun AboutBrandHeader() {
     }
 }
 
-/** 一圈 24 秒：慢到不抢注意力，又能看出在动。 */
+/** 一圈 24 秒：慢到不抢注意力，又能看出在动。返回 State 以便在 Draw 阶段延迟读取，避免高频重组。 */
 @Composable
-private fun rememberCookieRotation(): Float {
-    val context = LocalContext.current
-    val animationsEnabled = remember {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) > 0f
+private fun rememberCookieRotationState(): State<Float> {
+    if (!rememberAnimationsEnabled()) {
+        return remember { mutableFloatStateOf(0f) }
     }
-    if (!animationsEnabled) return 0f
 
     val transition = rememberInfiniteTransition(label = "aboutBrandCookie")
-    val angle by transition.animateFloat(
+    return transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
@@ -328,7 +351,6 @@ private fun rememberCookieRotation(): Float {
         ),
         label = "cookieRotation",
     )
-    return angle
 }
 
 private val BRAND_HEADER_HEIGHT = 176.dp

@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -44,10 +45,12 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
@@ -126,7 +129,8 @@ internal fun WallpaperSettingsCard(
                         available,
                         selected,
                         slotCount,
-                    ).also { orderRef[0] = it }
+                    )
+                    SideEffect { orderRef[0] = order }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // 按位置渲染：换选中只是各格宽度与内容变化，项不跳位置。
                         repeat(slotCount) { index ->
@@ -178,7 +182,7 @@ private fun WallpaperStripSlot(
     collapsedWidth: Dp,
     onSelect: () -> Unit,
 ) {
-    val width by animateDpAsState(
+    val widthState = animateDpAsState(
         targetValue = if (isSelected) squareSize else collapsedWidth,
         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
         label = "wallpaperSlotWidth",
@@ -189,8 +193,16 @@ private fun WallpaperStripSlot(
     val checkSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     Box(
         Modifier
-            .width(width)
-            .height(squareSize)
+            .layout { measurable, constraints ->
+                val targetWidthPx = widthState.value.roundToPx().coerceAtLeast(0)
+                val targetHeightPx = squareSize.roundToPx().coerceAtLeast(0)
+                val placeable = measurable.measure(
+                    Constraints.fixed(targetWidthPx, targetHeightPx),
+                )
+                layout(placeable.width, placeable.height) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
             // clip 必须在 clickable 之前，波纹才贴圆角。
             .then(
                 if (option != null) {

@@ -36,7 +36,7 @@ internal fun GeneratedWallpaperBackground(
     val fontFile = remember(context) {
         File(context.filesDir, "optional-resources/noto-emoji/NotoEmoji-3.002.ttf")
     }
-    val typeface by produceState(Typeface.DEFAULT_BOLD, fontFile, fontFile.lastModified()) {
+    val typeface by produceState(Typeface.DEFAULT_BOLD, fontFile) {
         value = withContext(Dispatchers.IO) {
             fontFile.takeIf(File::isFile)
                 ?.let { runCatching { EmojiTypefaceLoader.load(it) }.getOrNull() }

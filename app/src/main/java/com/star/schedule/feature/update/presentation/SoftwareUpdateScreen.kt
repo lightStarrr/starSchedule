@@ -1,6 +1,5 @@
 package com.star.schedule.feature.update.presentation
 
-import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -70,6 +69,7 @@ import com.star.schedule.core.designsystem.component.MESSAGE_SNACKBAR_TIMEOUT_MI
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.core.designsystem.rememberAnimationsEnabled
 import com.star.schedule.feature.update.domain.UpdateDownloadState
 import com.star.schedule.feature.update.domain.UpdateRelease
 
@@ -465,32 +465,31 @@ private fun UpdateHeroCard(
  */
 @Composable
 private fun rememberHeroSpin(active: Boolean): MutableFloatState {
-    val context = LocalContext.current
-    val animationsEnabled = remember {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) > 0f
-    }
+    val animationsEnabled = rememberAnimationsEnabled()
     val angle = remember { mutableFloatStateOf(0f) }
     val speed = remember { Animatable(0f) }
-    LaunchedEffect(active) {
+    val running = active && animationsEnabled
+    LaunchedEffect(running) {
+        if (!animationsEnabled) {
+            speed.snapTo(0f)
+            return@LaunchedEffect
+        }
         speed.animateTo(
-            targetValue = if (active && animationsEnabled) 1f else 0f,
+            targetValue = if (running) 1f else 0f,
             animationSpec = tween(
-                durationMillis = if (active) {
+                durationMillis = if (running) {
                     HERO_SPIN_RAMP_UP_MILLIS
                 } else {
                     HERO_SPIN_RAMP_DOWN_MILLIS
                 },
-                easing = if (active) FastOutSlowInEasing else LinearOutSlowInEasing,
+                easing = if (running) FastOutSlowInEasing else LinearOutSlowInEasing,
             ),
         )
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(running, animationsEnabled) {
+        if (!animationsEnabled) return@LaunchedEffect
         var lastFrame = 0L
-        while (true) {
+        while (running || speed.value > 0f) {
             withInfiniteAnimationFrameMillis { frame ->
                 val velocity = speed.value
                 if (lastFrame != 0L && velocity > 0f) {

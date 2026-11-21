@@ -30,9 +30,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -115,6 +114,10 @@ private const val REMOVAL_TIMEOUT_MILLIS = 1000L
  *
  * @param index 在列表里的下标，用来算「离被拖的行有多远」。
  */
+private class SwipeJobHolder {
+    var job: Job? = null
+}
+
 @Composable
 fun ElasticSwipeRow(
     index: Int,
@@ -124,7 +127,6 @@ fun ElasticSwipeRow(
     config: ElasticSwipeConfig = ElasticSwipeConfig(),
     content: @Composable (ElasticSwipeInfo) -> Unit,
 ) {
-    val density = LocalDensity.current
     // 行的实际宽度：进度、阈值、飞出去的距离全部按它算，不写死 dp。
     var rowWidthPx by remember { mutableFloatStateOf(0f) }
     var offset by remember { mutableFloatStateOf(0f) }
@@ -136,7 +138,7 @@ fun ElasticSwipeRow(
     // onDragStopped 里如果直接 await 动画，这个节点的 pointerInput 会一直挂着，
     // 动画跑完之前新的一次拖动根本进不来。
     val scope = rememberCoroutineScope()
-    var settleJob by remember { mutableStateOf<Job?>(null) }
+    val settleJobHolder = remember { SwipeJobHolder() }
 
     // 删除后这一行仍留在列表里的一小段时间内，邻居靠 removingToken 认出「删除在路上」；
     // 行真正被移除时在这里放行，邻居的圆角才开始收尾动画。
@@ -190,18 +192,6 @@ fun ElasticSwipeRow(
     }
 
     val dragging = state.activeIndex == index
-    /**
-     * 自己的淡出进度只看自己的位移，不读列表级的 [ElasticSwipeState.progress]。
-     *
-     * 删除收尾时 `releaseSharedState()` 会把 progress 归零；如果透明度跟着它走，
-     * 那一帧整行会从全透明跳回不透明，在已经滑到屏幕左侧的位置露出一条卡片残影，
-     * 再被列表移除慢慢淡掉——就是「侧边闪一下」。
-     */
-    val ownProgress = if (rowWidthPx > 0f) {
-        (abs(offset) / rowWidthPx).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
 
     // 邻居跟手：目标值随进度给（越过阈值后变 0），实际位移用逐帧积分的阻尼弹簧追它，
     // 所以跟随、脱离、反向再拉回来都是同一条连续曲线。
@@ -255,7 +245,7 @@ fun ElasticSwipeRow(
     var heldMorph by remember { mutableFloatStateOf(0f) }
     SideEffect {
         if (tracking) {
-            morphSide = if (activeIndex != null && activeIndex < index) -1 else 1
+            morphSide = if (activeIndex < index) -1 else 1
             heldMorph = trackedMorph
         }
     }
@@ -276,13 +266,21 @@ fun ElasticSwipeRow(
     Box(
         modifier = modifier
             .onSizeChanged { rowWidthPx = it.width.toFloat() }
-            .offset { IntOffset((offset + follow * with(density) { config.neighborDrag.toPx() }).roundToInt(), 0) }
-            .alpha(1f - ownProgress)
+            .offset { IntOffset((offset + follow * config.neighborDrag.toPx()).roundToInt(), 0) }
+            .graphicsLayer {
+                // 在绘制阶段延迟读取 offset 计算淡出进度，避免拖动期间触发整行重组。
+                val progress = if (rowWidthPx > 0f) {
+                    (abs(offset) / rowWidthPx).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+                alpha = 1f - progress
+            }
             .draggable(
                 orientation = Orientation.Horizontal,
                 onDragStarted = {
-                    settleJob?.cancel()
-                    settleJob = null
+                    settleJobHolder.job?.cancel()
+                    settleJobHolder.job = null
                     fingerDown = true
                 },
                 state = rememberDraggableState { delta ->
@@ -306,7 +304,7 @@ fun ElasticSwipeRow(
                     }
                     if (releasedProgress >= config.detachProgress) {
                         // 已经滑过阈值，松手就是删除：先顺着惯性滑出去（同时淡到 0）。
-                        settleJob = scope.launch {
+                        settleJobHolder.job = scope.launch {
                             animate(
                                 initialValue = offset,
                                 targetValue = if (offset < 0f) -width else width,
@@ -335,7 +333,7 @@ fun ElasticSwipeRow(
                         }
                     } else {
                         // 回弹的每一帧都要继续上报进度，相邻的行才会跟着一起回来。
-                        settleJob = scope.launch {
+                        settleJobHolder.job = scope.launch {
                             animate(
                                 initialValue = offset,
                                 targetValue = 0f,

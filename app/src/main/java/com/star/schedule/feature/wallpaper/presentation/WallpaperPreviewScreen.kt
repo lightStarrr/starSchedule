@@ -133,7 +133,12 @@ private fun WallpaperPreviewScreen(
         Scaffold(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.padding(bottom = navigationBarBottomInset()),
+                )
+            },
             topBar = {
                 CompactPageTopBar(
                     title = stringResource(R.string.wallpaper_preview_title),

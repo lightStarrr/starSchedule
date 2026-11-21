@@ -17,6 +17,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -36,15 +37,19 @@ internal fun SolidWallpaperColors(
     onSelectColor: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val system = if (isSystemInDarkTheme()) {
-        dynamicDarkColorScheme(LocalContext.current)
-    } else {
-        dynamicLightColorScheme(LocalContext.current)
+    val context = LocalContext.current
+    val isDark = isSystemInDarkTheme()
+    val colors = remember(context, isDark) {
+        val system = if (isDark) {
+            dynamicDarkColorScheme(context)
+        } else {
+            dynamicLightColorScheme(context)
+        }
+        listOf(
+            system.primaryContainer, system.secondaryContainer, system.tertiaryContainer,
+            system.primary, system.secondary, system.tertiary, Color.White, Color.Black,
+        ).distinct()
     }
-    val colors = listOf(
-        system.primaryContainer, system.secondaryContainer, system.tertiaryContainer,
-        system.primary, system.secondary, system.tertiary, Color.White, Color.Black,
-    ).distinct()
     Surface(
         modifier = modifier.padding(horizontal = 16.dp)
             .padding(bottom = 16.dp + navigationBarBottomInset()),

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -66,8 +67,9 @@ fun WallpaperBackground(
     // 没有先后保证。主动 recycle 会让渲染线程访问已释放的像素内存并 abort，
     // 因此这里不回收，改由 GC 释放。
     bitmap?.let { image ->
+        val imageBitmap = remember(image) { image.asImageBitmap() }
         Image(
-            bitmap = image.asImageBitmap(),
+            bitmap = imageBitmap,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = modifier
@@ -107,11 +109,11 @@ private fun decodeWallpaper(
     val region = Rect(spec.left, spec.top, spec.left + spec.width, spec.top + spec.height)
 
     val regionBitmap = runCatching {
-        val decoder = BitmapRegionDecoder.newInstance(path, false)
+        val decoder = BitmapRegionDecoder.newInstance(path)
         try {
-            decoder?.decodeRegion(region, options)
+            decoder.decodeRegion(region, options)
         } finally {
-            decoder?.recycle()
+            decoder.recycle()
         }
     }.getOrNull()
     if (regionBitmap != null) return regionBitmap

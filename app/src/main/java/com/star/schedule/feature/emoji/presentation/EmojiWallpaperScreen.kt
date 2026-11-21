@@ -268,7 +268,12 @@ private fun EmojiWallpaperScreen(
         Scaffold(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.navigationBarsPadding(),
+                )
+            },
             topBar = {
                 CompactPageTopBar(
                     title = stringResource(R.string.emoji_wallpaper_title),
@@ -485,7 +490,11 @@ private fun EmojiTabContent(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            items(ready.emojis) { emoji ->
+            itemsIndexed(
+                items = ready.emojis,
+                key = { index, emoji -> "$index:$emoji" },
+                contentType = { _, _ -> "selectedEmoji" },
+            ) { _, emoji ->
                 EmojiGlyph(
                     emoji = emoji,
                     typeface = ready.typeface,
@@ -519,7 +528,11 @@ internal fun PatternTabContent(
 ) {
     val density = LocalDensity.current
     val sliderState = remember { SliderState(value = ready.scale, steps = 23) }
-    sliderState.value = ready.scale
+    LaunchedEffect(ready.scale) {
+        if (sliderState.value != ready.scale) {
+            sliderState.value = ready.scale
+        }
+    }
     val thumbSize = 56.dp
     val thumbPx = with(density) { thumbSize.toPx().toInt() }
 
@@ -673,7 +686,11 @@ private fun ColorTabContent(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(16.dp),
     ) {
-        itemsIndexed(ready.palettes) { index, colors ->
+        itemsIndexed(
+            items = ready.palettes,
+            key = { index, colors -> "$index:${colors.backgroundArgb}:${colors.emojiArgb}" },
+            contentType = { _, _ -> "palette" },
+        ) { index, colors ->
             val selected = index == ready.paletteIndex
             Box(
                 modifier = Modifier
@@ -743,7 +760,11 @@ private fun EmojiPickerPanel(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    itemsIndexed(ready.emojis) { index, emoji ->
+                    itemsIndexed(
+                        items = ready.emojis,
+                        key = { index, emoji -> "$index:$emoji" },
+                        contentType = { _, _ -> "pickerSelectedEmoji" },
+                    ) { index, emoji ->
                         EmojiGlyph(
                             emoji = emoji,
                             typeface = ready.typeface,
@@ -797,7 +818,7 @@ private fun EmojiPickerPanel(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
-                    item {
+                    item(key = EMOJI_GROUP_RECENT, contentType = "groupTab") {
                         PickerGroupTab(
                             icon = Icons.Rounded.History,
                             description = stringResource(R.string.emoji_group_recent),
@@ -805,7 +826,11 @@ private fun EmojiPickerPanel(
                             onClick = { onSelectPickerGroup(EMOJI_GROUP_RECENT) },
                         )
                     }
-                    items(ready.groups) { group ->
+                    items(
+                        items = ready.groups,
+                        key = { it.id },
+                        contentType = { "groupTab" },
+                    ) { group ->
                         PickerGroupTab(
                             icon = pickerGroupIcon(group.id),
                             description = stringResource(pickerGroupNameRes(group.id)),
@@ -837,7 +862,11 @@ private fun EmojiPickerPanel(
                             .heightIn(max = 280.dp)
                             .padding(horizontal = 8.dp),
                     ) {
-                        items(shown) { emoji ->
+                        items(
+                            items = shown,
+                            key = { it },
+                            contentType = { "emojiCell" },
+                        ) { emoji ->
                             Box(
                                 modifier = Modifier
                                     .aspectRatio(1f)

@@ -40,7 +40,7 @@ fun StarScheduleApp(
 ) {
     val selection by remember(scheduleRepository) {
         scheduleRepository.observeCurrentTimetableId().map(::SelectedTimetable)
-    }.collectAsState(initial = null)
+    }.collectAsStateWithLifecycle(initialValue = null)
     val timetableId = selection?.id
     val startupHintState by startupHintViewModel.uiState.collectAsStateWithLifecycle()
     // 锁存：课表首次加载完成后一直放行启动弹窗；切课表重新加载或旋转屏幕时不收回。
@@ -48,7 +48,7 @@ fun StarScheduleApp(
     key(selection) {
         val wallpaperState by remember(timetableId) {
             timetableId?.let(wallpaperRepository::observe) ?: flowOf(WallpaperState.None)
-        }.collectAsState(initial = WallpaperState.None)
+        }.collectAsStateWithLifecycle(initialValue = WallpaperState.None)
         val seedColor = wallpaperState.seedArgb
             ?.let { argb -> Color(argb) }
 
