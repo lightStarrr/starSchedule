@@ -18,6 +18,11 @@
 
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
 
+    <!-- 仅允许与主应用同签名的代理应用（wakeup-proxy）读取导出的课表数据 -->
+    <permission
+        android:name="com.star.schedule.permission.READ_SCHEDULE_EXPORT"
+        android:protectionLevel="signature" />
+
     <queries>
         <package android:name="com.suda.yzune.wakeupschedule" />
         <provider android:authorities="com.suda.yzune.wakeupschedule.provider" />
@@ -211,6 +216,7 @@
         <provider
             android:name=".provider.ScheduleExportProvider"
             android:authorities="com.star.schedule.export"
+            android:readPermission="com.star.schedule.permission.READ_SCHEDULE_EXPORT"
             android:enabled="true"
             android:exported="true" />
 
