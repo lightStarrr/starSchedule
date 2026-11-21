@@ -48,7 +48,7 @@ data class AiSettingsUiState(
     /**
      * 生效的服务商。
      *
-     * 关闭匿名统计时 [com.star.schedule.ScheduleApplication] 会把云端选择真正写成「无」，
+     * 关闭匿名统计时 [com.star.schedule.app.ScheduleApplication] 会把云端选择真正写成「无」，
      * 这里再兜一道：万一偏好里残留 cloud（比如降级安装），也不会被当成可用。
      */
     val effectiveProviderId: String?

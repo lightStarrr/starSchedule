@@ -16,7 +16,7 @@
 
     <uses-permission android:name="flyme.permission.READ_NOTIFICATION_LIVE_STATE" />
 
-    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!-- 仅允许与主应用同签名的代理应用（wakeup-proxy）读取导出的课表数据 -->
     <permission
@@ -29,7 +29,7 @@
     </queries>
 
     <application
-        android:name=".ScheduleApplication"
+        android:name=".app.ScheduleApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -53,122 +53,129 @@
         </provider>
 
         <activity
+            android:name=".app.MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <!-- 保留 .MainActivity 作为桌面入口别名，确保既有桌面图标与快捷方式升级后持续有效。 -->
+        <activity-alias
             android:name=".MainActivity"
+            android:targetActivity=".app.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.StarSchedule">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
         <activity
-            android:name=".SettingsActivity"
+            android:name=".app.SettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".AiSettingsActivity"
+            android:name=".app.AiSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".NewAiProviderActivity"
+            android:name=".app.NewAiProviderActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".AboutActivity"
+            android:name=".app.AboutActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".SoftwareUpdateActivity"
+            android:name=".app.SoftwareUpdateActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".DataSourcesActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.StarSchedule" />
-        <activity
-            android:name=".ReminderActivity"
-            android:exported="false"
-            android:theme="@style/Theme.StarSchedule" />
-        <activity
-            android:name=".TimetableSettingsActivity"
+            android:name=".app.DataSourcesActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".NewTimetableActivity"
+            android:name=".app.ReminderActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".ManualCreateTimetableActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.StarSchedule" />
-        <activity
-            android:name=".WakeUpImportActivity"
+            android:name=".app.TimetableSettingsActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".SleepDownImportActivity"
+            android:name=".app.NewTimetableActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".app.ManualCreateTimetableActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".RowHeightActivity"
-            android:exported="false"
-            android:theme="@style/Theme.StarSchedule" />
-        <activity
-            android:name=".LessonTimeSettingsActivity"
+            android:name=".app.WakeUpImportActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".LessonTimeTemplateActivity"
-            android:exported="false"
-            android:theme="@style/Theme.StarSchedule" />
-        <activity
-            android:name=".LessonTimeTemplateEditActivity"
+            android:name=".app.SleepDownImportActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".CourseSettingsActivity"
+            android:name=".app.RowHeightActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".WallpaperActivity"
+            android:name=".app.LessonTimeSettingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".app.LessonTimeTemplateActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".WallpaperPreviewActivity"
+            android:name=".app.LessonTimeTemplateEditActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".app.CourseSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <activity
-            android:name=".EmojiWallpaperActivity"
+            android:name=".app.WallpaperActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".app.WallpaperPreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".app.EmojiWallpaperActivity"
             android:exported="false"
             android:theme="@style/Theme.StarSchedule" />
         <!-- 崩溃页：独立进程，主进程崩掉后它还能正常显示 -->
         <activity
-            android:name=".CrashActivity"
+            android:name=".app.CrashActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:process=":crash"
             android:theme="@style/Theme.StarSchedule" />
+
         <!-- 课程提醒广播接收器 -->
         <receiver
-            android:name=".notification.CourseReminderReceiver"
+            android:name=".platform.notification.receiver.CourseReminderReceiver"
             android:exported="false" />
         <receiver
-            android:name=".notification.CourseNotificationUpdateReceiver"
+            android:name=".platform.notification.receiver.CourseNotificationUpdateReceiver"
             android:exported="false" />
         <receiver
-            android:name=".notification.CourseNotificationCancelReceiver"
+            android:name=".platform.notification.receiver.CourseNotificationCancelReceiver"
             android:exported="false" />
 
         <!-- 系统启动广播接收器 -->
         <receiver
-            android:name=".notification.BootCompletedReceiver"
+            android:name=".platform.notification.receiver.BootCompletedReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter android:priority="1000">
@@ -179,7 +186,8 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".widget.TwoDaysWidgetReceiver"
+        <receiver
+            android:name=".platform.widget.TwoDaysWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -191,12 +199,12 @@
 
         <!-- 定期更新广播接收器 -->
         <receiver
-            android:name=".notification.DailyUpdateReceiver"
+            android:name=".platform.notification.receiver.DailyUpdateReceiver"
             android:enabled="true"
             android:exported="false" />
 
         <service
-            android:name=".service.LiveNotification"
+            android:name=".platform.notification.LiveNotification"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.android.systemui.LIVE_NOTIFICATION_SERVICE" />
@@ -209,12 +217,12 @@
 
         <!-- JobScheduler服务 -->
         <service
-            android:name=".service.WidgetUpdateJobService"
+            android:name=".platform.widget.WidgetUpdateJobService"
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="true" />
 
         <provider
-            android:name=".provider.ScheduleExportProvider"
+            android:name=".platform.provider.ScheduleExportProvider"
             android:authorities="com.star.schedule.export"
             android:readPermission="com.star.schedule.permission.READ_SCHEDULE_EXPORT"
             android:enabled="true"
@@ -222,7 +230,7 @@
 
         <!-- 小组件定时更新广播接收器 -->
         <receiver
-            android:name=".receiver.WidgetBootReceiver"
+            android:name=".platform.widget.WidgetBootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter android:priority="1000">

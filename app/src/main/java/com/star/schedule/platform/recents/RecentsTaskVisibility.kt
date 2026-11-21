@@ -10,7 +10,7 @@ import android.content.Context
  * 原来的界面。
  *
  * 设置项本身存在数据库里，生命周期回调无法同步读取，因此由
- * [com.star.schedule.ScheduleApplication] 订阅偏好后写入 [hideFromRecents]，
+ * [com.star.schedule.app.ScheduleApplication] 订阅偏好后写入 [hideFromRecents]，
  * 回调里只读这个内存标志。
  */
 object RecentsTaskVisibility {

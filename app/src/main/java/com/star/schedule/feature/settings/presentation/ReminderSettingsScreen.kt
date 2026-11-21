@@ -81,7 +81,7 @@ import com.star.schedule.core.designsystem.component.MainSwitchBar
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.feature.settings.domain.TimetableSummary
-import com.star.schedule.notification.FlymeLiveTemplate
+import com.star.schedule.platform.notification.FlymeLiveTemplate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

@@ -3,7 +3,7 @@ package com.star.schedule.platform.crash
 import android.content.Context
 import android.content.Intent
 import android.os.Process
-import com.star.schedule.CrashActivity
+import com.star.schedule.app.CrashActivity
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 

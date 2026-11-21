@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.star.schedule.core.database.DatabaseProvider
-import com.star.schedule.notification.UnifiedNotificationManager
 import kotlinx.coroutines.CancellationException
 
 class BootReminderRestoreWorker(

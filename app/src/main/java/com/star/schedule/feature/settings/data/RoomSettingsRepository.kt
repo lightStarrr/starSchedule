@@ -12,9 +12,9 @@ import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.domain.TimetablePreviewBlock
 import com.star.schedule.feature.settings.domain.TimetableSummary
-import com.star.schedule.notification.UnifiedNotificationManager
+import com.star.schedule.platform.notification.UnifiedNotificationManager
 import com.star.schedule.platform.notification.ReminderRefresher
-import com.star.schedule.wakeup.WakeUpSupport
+import com.star.schedule.integration.wakeup.WakeUpSupport
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first

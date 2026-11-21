@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.star.schedule.ScheduleApplication
+import com.star.schedule.app.ScheduleApplication
 import kotlinx.coroutines.CancellationException
 
 class DataSourceRefreshWorker(

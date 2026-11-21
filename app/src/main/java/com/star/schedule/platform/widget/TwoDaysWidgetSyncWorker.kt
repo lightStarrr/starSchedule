@@ -7,7 +7,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.star.schedule.widget.TwoDaysWidget
 import kotlinx.coroutines.CancellationException
 
 class TwoDaysWidgetSyncWorker(
