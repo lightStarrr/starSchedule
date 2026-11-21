@@ -33,8 +33,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.StarSchedule"
-        android:requestLegacyExternalStorage="true"
-        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true">
 
         <!-- 由 ScheduleApplication 提供 WorkManager 配置，首次使用时按该配置初始化。 -->
@@ -145,9 +144,15 @@
             android:process=":crash"
             android:theme="@style/Theme.StarSchedule" />
         <!-- 课程提醒广播接收器 -->
-        <receiver android:name=".notification.CourseReminderReceiver"/>
-        <receiver android:name=".notification.CourseNotificationUpdateReceiver" />
-        <receiver android:name=".notification.CourseNotificationCancelReceiver" />
+        <receiver
+            android:name=".notification.CourseReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".notification.CourseNotificationUpdateReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".notification.CourseNotificationCancelReceiver"
+            android:exported="false" />
 
         <!-- 系统启动广播接收器 -->
         <receiver
@@ -215,10 +220,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- 应用初始化服务 -->
-        <service
-            android:name=".service.WidgetInitializationService"
-            android:exported="false" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates.fileprovider"

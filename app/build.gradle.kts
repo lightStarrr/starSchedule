@@ -113,6 +113,7 @@ android {
         }
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -164,7 +165,6 @@ dependencies {
     implementation(libs.androidx.room.ktx) {
         exclude(group = "com.intellij", module = "annotations")
     }
-    implementation(libs.poi)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.work.runtime)
     testImplementation(libs.junit)
