@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DayNoteEntity::class,
         HolidayEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 @TypeConverters(Converters::class) // 注册 TypeConverter
@@ -127,6 +127,34 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        // 从版本11迁移到版本12：移除废弃的自动更新配置列 autoUpdateJson。
+        // minSdk=33 的系统 SQLite 尚未支持 ALTER TABLE DROP COLUMN，采用重建表方式保留原有数据与外键目标。
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `_new_timetable` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `showWeekend` INTEGER NOT NULL,
+                        `startDate` TEXT NOT NULL,
+                        `showFuture` INTEGER NOT NULL,
+                        `rowHeight` INTEGER NOT NULL,
+                        `reminderTime` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `_new_timetable` (`id`, `name`, `showWeekend`, `startDate`, `showFuture`, `rowHeight`, `reminderTime`)
+                    SELECT `id`, `name`, `showWeekend`, `startDate`, `showFuture`, `rowHeight`, `reminderTime` FROM `timetable`
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE `timetable`")
+                db.execSQL("ALTER TABLE `_new_timetable` RENAME TO `timetable`")
             }
         }
     }
