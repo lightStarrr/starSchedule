@@ -2,17 +2,13 @@ package com.star.schedule.feature.importing.sharecode.presentation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -25,49 +21,31 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LoadingIndicatorDefaults
 import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.toPath
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Matrix
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -80,20 +58,18 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CircleBackButton
-import kotlinx.coroutines.coroutineScope
+import com.star.schedule.core.designsystem.component.CookieActionButton
+import com.star.schedule.core.designsystem.component.CookieCycleShapes
+import com.star.schedule.core.designsystem.component.pickDifferentCookieShapeIndex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.PI
 import kotlin.math.roundToInt
@@ -396,9 +372,10 @@ private fun ShareCodeImportContent(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    CookieButton(
+                    CookieActionButton(
                         // 归位途中按钮还在往下飞，这时候点它会把两套编排撞在一起，先不理。
                         onClick = { if (!returning) onImport() },
+                        actionContentDescription = stringResource(R.string.action_import),
                         // 输入框空着、或文本里认不出口令时按钮置灰，避免点了没反应又看不到错误提示。
                         enabled = state.canImport,
                         // 提交期间按钮已经点不动了（scrim 也挡着），但颜色要保住品牌色。
@@ -567,302 +544,6 @@ private fun FieldMessage(text: String, visible: Float, blur: Dp, color: Color) {
 }
 
 /**
- * 九瓣饼干按钮：按下的圆、提交时的逐帧换形、成功后的染绿和勾，全都在这一颗按钮里画。
- *
- * **为什么只有一颗**：以前按钮和加载指示器是两层——按钮给 `IconButton` 一个 `Shape`，
- * 指示器用 `Canvas` 自己画，交接靠"一层盖一层"。两套画法哪怕都走 [toFittedPath]，
- * 只要有一点差异（动画停在 0.99、角度差半度、透明度没铺满），叠起来就是错位。
- * 现在形状只由 [CookieShape] 提供，旋转烘进轮廓（所以里面的图标不跟着转），颜色和图标各自插值：
- * 任何时刻屏幕上只有一份几何，也就没有"两边对不齐"这回事。
- *
- * MaterialShapes 的 `toShape()` 返回匿名 `Shape`，不是 `CornerBasedShape`，
- * IconButton 自带的形状动画永远不会参与——只能自己用 `Morph` 驱动进度；
- * `colors` 也只吃静态值，颜色同样要自己插值。
- *
- * [loading] 一起，形状进入"饼干 → 随机换形 → 饼干"：每一步随机挑一个和当前不同的形状，
- * 不按固定序列走；[settling] 表示要收尾，手头这一步走完
- * 就边转一步边变回饼干；[success] 让收回的那一步染成 success 色并弹出一个勾；
- * [busy] 表示出场编排正在播——此时虽然点不动，颜色必须保持品牌色，不能淡成禁用态的灰。
- * 收回完成（成功时连勾也算）才回调 [onSettled]。
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun CookieButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    loading: Boolean = false,
-    settling: Boolean = false,
-    success: Boolean = false,
-    busy: Boolean = false,
-    arrowOffsetX: Dp = 0.dp,
-    arrowAlpha: Float = 1f,
-    onSettled: () -> Unit = {},
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val pressMorph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Circle) }
-
-    // 按下收成圆；一旦进加载序列就锁回饼干：序列的第一帧必须是按钮此刻画的那块饼干，
-    // 否则换形状的第一帧会跳。长按不放时也不会把圆带进序列。
-    val press = remember { Animatable(0f) }
-    LaunchedEffect(pressed, loading) {
-        if (loading) {
-            press.snapTo(0f)
-        } else {
-            press.animateTo(
-                targetValue = if (pressed) 1f else 0f,
-                animationSpec = tween(durationMillis = PRESS_MORPH_MILLIS),
-            )
-        }
-    }
-
-    // 加载序列：状态机和自绘版一样，只是把"画"换成了"给容器提供 Shape"。
-    val random = remember { Random.Default }
-    // 形变和这一步的旋转各走一条曲线：形变可以回弹，旋转必须单调。见 [TURN_SPRING]。
-    val step = remember { Animatable(0f) }
-    val turn = remember { Animatable(0f) }
-    // 这一步从哪个形状变到哪个形状。[COOKIE_SHAPE] 表示饼干本身；两步之间 `fromShape` 接着上一步的
-    // `toShape`，所以换步时形状不会跳。
-    var fromShape by remember { mutableIntStateOf(COOKIE_SHAPE) }
-    var toShape by remember { mutableIntStateOf(COOKIE_SHAPE) }
-    // 已经走过的步数，只用来算累计旋转角度。
-    var steps by remember { mutableIntStateOf(0) }
-    // 收尾时改画这一段：从"当前形态"变回饼干。非空即表示正在收。
-    var settleMorph by remember { mutableStateOf<Morph?>(null) }
-    // 只有"变回饼干"那一下才染绿：成功信号来时手头那一步变成的是另一个形状，不是饼干。
-    var becomingCookie by remember { mutableStateOf(false) }
-    // 勾的入场进度。0 = 还没出现，1 = 到位；弹簧带一点过冲，看起来是"弹"出来的。
-    val check = remember { Animatable(0f) }
-
-    // 协程里读组合参数拿到的是启动那一刻的旧值，必须走 rememberUpdatedState。
-    val settleNow by rememberUpdatedState(settling)
-    val successNow by rememberUpdatedState(success)
-    val notifySettled by rememberUpdatedState(onSettled)
-
-    LaunchedEffect(loading) {
-        if (!loading) return@LaunchedEffect
-        // 每一轮都从饼干重新开始：上一轮停在哪个形状、转到哪个角度、勾有没有出来，都不该继承。
-        fromShape = COOKIE_SHAPE
-        toShape = COOKIE_SHAPE
-        steps = 0
-        step.snapTo(0f)
-        turn.snapTo(0f)
-        settleMorph = null
-        becomingCookie = false
-        check.snapTo(0f)
-
-        // 按钮刚飞到位，先让它当一帧饼干再开始变形，节奏上有个喘气。
-        delay(HANDOFF_HOLD_MILLIS)
-        while (true) {
-            // 下一步是随机挑的，只要求"和当前这个不一样"：固定顺序看上几秒就能背出来，
-            // 会显得像一段录播而不是在干活。
-            toShape = pickDifferentShapeIndex(fromShape, CycleShapes.size, random)
-            // 手头这一步先走完再判断要不要收：在半途切开，形状会从中间硬换一次。
-            // 两条动画并行跑，等慢的那条走完再进下一步。
-            coroutineScope {
-                launch { step.animateTo(targetValue = 1f, animationSpec = MORPH_SPRING) }
-                launch { turn.animateTo(targetValue = ROTATE_PER_STEP, animationSpec = TURN_SPRING) }
-            }
-            if (settleNow) break
-            fromShape = toShape
-            step.snapTo(0f)
-            turn.snapTo(0f)
-            steps++
-            delay(MORPH_GAP_MILLIS)
-            if (settleNow) break
-        }
-
-        // 停在一步走完时形状是 toShape；在两步之间被叫停则是 fromShape（这时两者已经相等）。
-        // 两种都从"当前正画着的那个形状"起步，所以切到 settleMorph 的那一帧没有变化。
-        // 分界取 0.5 而不是 1：`MORPH_SPRING` 的可见阈值是 0.1，`Animatable` 可能停在 0.9x 就结束，
-        // 拿 1 当分界会把"已经快变完"误判成"还没开始变"，收尾时形状会顿一下。
-        val leaving = if (step.value >= 0.5f) toShape else fromShape
-        settleMorph = Morph(shapeAt(leaving), MaterialShapes.Cookie9Sided)
-        step.snapTo(0f)
-        // 从这一帧起画的是"变回饼干"的形变，成功的话颜色也从这一刻开始染。
-        becomingCookie = true
-        // 回来的这一程也要转：原地把形状直接换成饼干太生硬，边走边转才和前面的节奏接得上。
-        // 转的是整整一个 [ROTATE_PER_STEP]，终点仍落在 [COOKIE_SYMMETRY_DEGREES] 的整数倍上。
-        coroutineScope {
-            launch { step.animateTo(targetValue = 1f, animationSpec = SETTLE_SPRING) }
-            launch {
-                turn.animateTo(
-                    targetValue = turn.value + ROTATE_PER_STEP,
-                    animationSpec = SETTLE_TURN_SPRING,
-                )
-            }
-        }
-        // 弹簧按 visibilityThreshold 提前收（`Animatable` 不会把值吸附到 target），可能停在 0.995
-        // 这种地方。而下一帧就要把形状交还给"按钮自己的饼干"——`press` 那条 Morph 的 0 帧。
-        // 差这一点点就是"换过去时边缘挪一下"，所以收回本来就是"回到饼干"，直接吸附到终点。
-        step.snapTo(1f)
-        // 同理，角度收到最近的 40° 整数倍：饼干九瓣，转 40° 与没转等价，这样和按钮那颗完全重合。
-        turn.snapTo(
-            (turn.value / COOKIE_SYMMETRY_DEGREES).roundToInt() * COOKIE_SYMMETRY_DEGREES,
-        )
-        // 勾要等饼干彻底变回来才出现，否则会和形状变化抢注意力。
-        if (successNow) check.animateTo(targetValue = 1f, animationSpec = CHECK_SPRING)
-        notifySettled()
-    }
-
-    val successColors = shareCodeSuccessColors()
-    // 提交/加载期间就算点不动也要一直是品牌色：按钮这会儿正在往外飞，掉成灰色整段出场就脏了。
-    // `enabled` 在 Importing / Finished 会变成 false，所以不能只看它。
-    val tinted = enabled || busy || loading
-    val successTint = becomingCookie && success
-    // 染绿和"能不能点"是两件事，时长也不同，所以规格按当下这一程取。
-    val colorMillis = if (successTint) SUCCESS_COLOR_MILLIS else ENABLE_COLOR_MILLIS
-    // 颜色自己插值：IconButton 的 colors 只吃静态值，直接给 disabledContainerColor
-    // 会在 enabled 翻转的那一帧硬切。插值结果同时喂给启用、禁用两组槽位，
-    // 于是真正的 enabled 翻转发生时颜色早已走到位，中间不会闪。
-    val containerColor by animateColorAsState(
-        targetValue = when {
-            successTint -> successColors.container
-            tinted -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-        },
-        animationSpec = tween(durationMillis = colorMillis),
-        label = "cookieContainerColor",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = when {
-            successTint -> successColors.content
-            tinted -> MaterialTheme.colorScheme.onPrimary
-            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        },
-        animationSpec = tween(durationMillis = colorMillis),
-        label = "cookieContentColor",
-    )
-
-    // 形状就这三样：哪一对 Morph、走到哪、转了多少。三者任一变化都换一个新实例，
-    // IconButton 每帧按新轮廓重画（形状实例不变的话它不会重新解算轮廓）。
-    // Morph 的构造要做曲线匹配，不算便宜，所以只在 from/to 变化（也就是每换一步）时重建。
-    val stepMorph = remember(fromShape, toShape) {
-        Morph(shapeAt(fromShape), shapeAt(toShape))
-    }
-    val morph = if (loading) settleMorph ?: stepMorph else pressMorph
-    val morphProgress = if (loading) step.value.coerceIn(0f, 1f) else press.value
-    // 旋转只在形变那一下发生，转完就停住等下一步，和 M3 的 LoadingIndicator 同一个节奏。
-    // 角度必须由 [turn] 这条单调曲线给，不能借用形变弹簧的 step——它低阻尼会回弹，
-    // 角度冲过终点再被下一步 snapTo 拽回来，看起来就是"转过去了又倒一点"。
-    // 累计角取模 360：形状是随机挑的，只有"转过多少步"还能单调递增，转到一整圈时角度才不会倒跳。
-    val rotation = if (loading) (steps * ROTATE_PER_STEP) % 360f + turn.value else 0f
-    val shape = remember(morph, morphProgress, rotation) {
-        CookieShape(morph, morphProgress, rotation)
-    }
-
-    IconButton(
-        onClick = onClick,
-        interactionSource = interactionSource,
-        enabled = enabled && !loading,
-        // requiredSize：形状按钮被父布局压扁时会更难看，宁可溢出也不变形。
-        // clip：让飞出去的箭头被裁在按钮形状里——形状每帧都在变，clip 跟着重组。
-        modifier = modifier
-            .requiredSize(BUTTON_SIZE)
-            .clip(shape),
-        // 两个槽位给同一个实例，IconButton 才会当静态形状直接画，不再自己切换。
-        shapes = IconButtonDefaults.shapes(shape = shape, pressedShape = shape),
-        // 四个槽位都塞插值后的颜色：禁用态若留给默认值会退回「透明底 + 半透明图标」，
-        // 整颗按钮看着会直接消失。
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-            disabledContainerColor = containerColor,
-            disabledContentColor = contentColor,
-        ),
-    ) {
-        Box(
-            modifier = Modifier.requiredSize(BUTTON_SIZE),
-            contentAlignment = Alignment.Center,
-        ) {
-            // 勾和箭头都不在旋转的轮廓里，所以它们不会被形状转着走。
-            Icon(
-                imageVector = Icons.Rounded.Check,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier
-                    .size(CHECK_SIZE)
-                    .graphicsLayer {
-                        val entered = check.value
-                        // 弹簧会冲过 1，透明度不能跟着过冲。
-                        alpha = entered.coerceIn(0f, 1f)
-                        val scale = CHECK_START_SCALE + (1f - CHECK_START_SCALE) * entered
-                        scaleX = scale
-                        scaleY = scale
-                    },
-            )
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                contentDescription = stringResource(R.string.action_import),
-                modifier = Modifier
-                    .size(32.dp)
-                    .graphicsLayer {
-                        // 去程向右滑出去、归位从左滑回来，都由外部算好偏移量传进来；
-                        // 被上面的 clip 关在按钮内，所以是「从按钮内部进出」，不是「从边缘冒出去」。
-                        translationX = arrowOffsetX.toPx()
-                        alpha = arrowAlpha * (1f - check.value.coerceIn(0f, 1f))
-                    },
-            )
-        }
-    }
-}
-
-/**
- * 把 `Morph` 在某个进度上的轮廓画成控件大小的形状。
- *
- * 这些形状都是 `normalized()` 过的：轮廓落在 [0,1] 单位盒里，按控件尺寸缩放后包围盒中心正好
- * 就是控件中心。所以这里**只缩放、不再按包围盒重新居中**。
- *
- * 按包围盒逐帧居中是踩过的坑：形变中途的插值轮廓会略微外凸，"凸"出来的那一侧会把包围盒中心
- * 拽偏，形状就被整体挪几像素；等形变收成饼干、包围盒回到正中，它又弹回原位。表现出来的正是
- * 「转到最后、往下走之前错位一下」。不重新居中就没有这个漂移，首尾两帧也和按钮那颗完全重合。
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun Morph.toFittedPath(progress: Float, size: Size, out: Path = Path()): Path {
-    out.reset()
-    toPath(progress, out)
-    out.transform(Matrix().apply { scale(size.width, size.height) })
-    return out
-}
-
-/**
- * 把 `Morph` 在某个进度上的轮廓当成 `Shape` 用，并把这个形状转一个角度。
- *
- * 几何处理和 [toFittedPath] 一致：只按控件尺寸缩放，不按包围盒重新居中（原因见那里）。
- * 旋转在最后一步做，绕控件中心转——轮廓转、里面的图标不转。
- *
- * 旋转烘进轮廓而不是用 `graphicsLayer { rotationZ }`，是因为后者会把按钮内容一起转掉，
- * 而加载结束时那颗勾必须是正的。
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private class CookieShape(
-    private val morph: Morph,
-    private val progress: Float,
-    private val rotationDegrees: Float,
-) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density,
-    ): Outline {
-        val path = morph.toFittedPath(progress, size)
-        if (rotationDegrees != 0f) {
-            path.transform(
-                Matrix().apply {
-                    translate(size.width / 2f, size.height / 2f)
-                    rotateZ(rotationDegrees)
-                    translate(-size.width / 2f, -size.height / 2f)
-                },
-            )
-        }
-        return Outline.Generic(path)
-    }
-}
-
-private const val PRESS_MORPH_MILLIS = 220
-
-/**
  * 提示位换字的时长。
  *
  * 320ms 够让人看出是「一行字换成了另一行」，而不是硬切；再长就会拖到用户已经重新打字了还没换完。
@@ -883,9 +564,6 @@ private fun ShareCodeImportError.messageRes(): Int = when (this) {
     ShareCodeImportError.Busy -> R.string.share_code_import_error_busy
 }
 
-/** 可用状态切换时底色与图标色的过渡时长，和按下形变保持同一节奏。 */
-private const val ENABLE_COLOR_MILLIS = 200
-
 /**
  * 点击提交后整段出场动画的总时长。
  *
@@ -896,8 +574,6 @@ private val SUBMIT_MILLIS = SHARE_CODE_SUBMIT_ANIMATION_MILLIS.toInt()
 
 /** 归位（失败回滚）整段编排的时长。比去程短一点：回来这件事不需要慢慢演。 */
 private const val RETURN_MILLIS = 720
-
-private val BUTTON_SIZE = 92.dp
 
 /** 顶栏中间的品牌图标大小。和返回键的 40dp 圆形容器接近，不会显得比它更重。 */
 private val BRAND_LOGO_SIZE = 32.dp
@@ -910,148 +586,14 @@ private val BRAND_LOGO_SIZE = 32.dp
  */
 private val BRAND_LOGO_TOP_PADDING = 20.dp
 
-/**
- * 去程时间轴上「按钮已经到位」的位置，从这里起按钮开始换形状。
- *
- * 时间轴名义上到 1.0 才走完，但按钮的位移在 0.86 就结束了；早一点进，按钮还在收尾的那几帧
- * 就已经开始变形。真正的第一帧形变还有 [HANDOFF_HOLD_MILLIS] 的停顿兜着，不会抢。
- */
+/** 去程时间轴上「按钮已经到位」的位置，从这里起按钮开始换形状。 */
 private const val LOADING_START = 0.86f
 
-/**
- * 到位之后先当一帧饼干再开始变形。
- *
- * 按钮落地的减速还没完全停下就换形状，看起来像"没停稳就转起来了"；留 160ms 的呼吸，
- * 也让「按下松手变回饼干」这一步先收干净。
- */
-private const val HANDOFF_HOLD_MILLIS = 160L
-
-/** 饼干九个瓣，转 40° 和没转看上去完全一样。步进角取它的整数倍，交接时就不必再修正角度。 */
-private const val COOKIE_SYMMETRY_DEGREES = 40f
-
-/**
- * 每变形一步转过的角度。
- *
- * 只在这一步的形变过程中转，转完就停住，靠"转、换形、停一下"的节奏表达忙碌，不做持续自转。
- * 取 [COOKIE_SYMMETRY_DEGREES] 的两倍（80°）而不是 M3 的 90°：80 的任意整数倍都落在 40° 上，
- * 所以每一步的终点角度画出来都和"没转过"的饼干一模一样，归位时不必再把角度拉回去
- * （90 的整数倍离 40° 最远差 20°，会在最后一刻看到一次反向扭转）。
- */
-private const val ROTATE_PER_STEP = 2f * COOKIE_SYMMETRY_DEGREES
-
-/** 每步变形之后停一下，和弹簧一起构成约 1.1s 一步的节奏。 */
-private const val MORPH_GAP_MILLIS = 260L
-
-/**
- * 加载指示器的候选形状：每一步从这里面随机挑一个，只要求"和当前这个不一样"。
- *
- * 饼干不参与随机，而且要从 M3 的默认序列里排掉：[LoadingIndicatorDefaults.IndeterminateIndicatorPolygons]
- * 第二个就是 Cookie9Sided，留着会让某一步换成"看上去根本没变"的形状（白转一下）。
- * 饼干只负责开场和收尾——进度 0 和最后一帧都必须落在饼干上，才能和按钮本身无缝接住。
- * 各形状的曲线数不要求一致——`Morph.match()` 在数量不等时会补占位曲线。
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-internal val CycleShapes: List<RoundedPolygon> =
-    LoadingIndicatorDefaults.IndeterminateIndicatorPolygons
-        .filter { it !== MaterialShapes.Cookie9Sided }
+internal val CycleShapes: List<RoundedPolygon> = CookieCycleShapes
 
-/** 形状下标里 [-1, [CycleShapes].size) 的取值；[COOKIE_SHAPE] 表示饼干本身。 */
-private const val COOKIE_SHAPE = -1
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun shapeAt(index: Int): RoundedPolygon =
-    if (index == COOKIE_SHAPE) MaterialShapes.Cookie9Sided else CycleShapes[index]
-
-/**
- * 从 `[0, shapeCount)` 里随机挑一个不等于 [current] 的下标。
- *
- * 只抽一次随机数：先在 `shapeCount - 1` 个位置里取，落在 [current] 及其之后就整体后移一位。
- * "抽到重复再重抽"在形状只有五六个的池子里要多转几圈才凑巧避开，这个写法一次就成，
- * 而且每个候选的概率仍然相同。
- *
- * [current] 不在区间内时不做排除——序列的第一步是从饼干出发的，饼干不在池子里。
- */
-internal fun pickDifferentShapeIndex(current: Int, shapeCount: Int, random: Random): Int {
-    require(shapeCount >= 2) { "候选形状少于两个时无法保证前后不同" }
-    if (current !in 0 until shapeCount) return random.nextInt(shapeCount)
-    val raw = random.nextInt(shapeCount - 1)
-    return if (raw >= current) raw + 1 else raw
-}
-
-/**
- * 变形一步用的弹簧。
- *
- * 可见阈值放大到 0.1：低阻尼弹簧本该有点回弹，阈值太小会拖出一条尾巴。
- * 刚度比 M3 默认（200）低：一步变形走得更缓，不容易看成“一直在切形状”。
- */
-private val MORPH_SPRING = spring<Float>(
-    dampingRatio = 0.6f,
-    stiffness = 110f,
-    visibilityThreshold = 0.1f,
-)
-
-/**
- * 每步那一段旋转的曲线。
- *
- * 必须**过阻尼到不回弹**（`dampingRatio = 1`）。旋转若复用形变那条低阻尼弹簧，角度会先冲过
- * 终点，下一步 `snapTo` 回到整步时再退回来——看起来就是"转过去了又倒一点"。
- * 形状变过去再回一点是柔软的，角度退一点就是纯倒退，所以这两件事不能用同一条曲线。
- * 刚度取 150：形变弹簧在第一个峰值附近就因为 `visibilityThreshold` 结束（约 0.4s），
- * 旋转收得稍晚一点，观感是"形状到位之后把这一下转完"，两条不会互相拖。
- */
-private val TURN_SPRING = spring<Float>(
-    dampingRatio = 1f,
-    stiffness = 150f,
-    visibilityThreshold = 0.5f,
-)
-
-/**
- * 归位时"收回饼干"那一步的弹簧。
- *
- * 比常规一步硬：用户已经等了一整轮失败，这里不宜再慢慢演，只要看起来是连续的就行。
- */
-private val SETTLE_SPRING = spring<Float>(
-    dampingRatio = 0.85f,
-    stiffness = 190f,
-    visibilityThreshold = 0.01f,
-)
-
-/**
- * 归位时那一步旋转的曲线。
- *
- * 同样不能回弹，而且要快：[TURN_SPRING] 转 80° 要 0.55s，归位前最多还会先走完手头一步
- * （0.55s），加起来会顶到 [INDICATOR_SETTLE_TIMEOUT_MILLIS] 的兜底时间。
- */
-private val SETTLE_TURN_SPRING = spring<Float>(
-    dampingRatio = 1f,
-    stiffness = 260f,
-    visibilityThreshold = 0.5f,
-)
-
-/**
- * 成功后从品牌粉染到 success 绿用的时长。
- *
- * 和收尾的形变同时开始。比形变略短一点：粉和绿之间是插值出来的褐色，那一段越短越好，
- * 但要能和形变对上，不能绿在形状还没收回来之前就到位。
- */
-private const val SUCCESS_COLOR_MILLIS = 300
-
-/** 勾的大小。饼干是 92dp，勾占一半左右，四周还能看见一圈绿底。 */
-private val CHECK_SIZE = 46.dp
-
-/** 勾入场时的起始缩放。不用 0：从 0 弹出来会像凭空冒出来，0.6 才看得出是"长出来"的。 */
-private const val CHECK_START_SCALE = 0.6f
-
-/**
- * 勾的入场弹簧。
- *
- * 阻尼 0.5 是刻意留一点过冲：这是整段流程里唯一一个"结果"信号，弹一下比匀速放大更像确认。
- */
-private val CHECK_SPRING = spring<Float>(
-    dampingRatio = 0.5f,
-    stiffness = 420f,
-    visibilityThreshold = 0.01f,
-)
+internal fun pickDifferentShapeIndex(current: Int, shapeCount: Int, random: Random): Int =
+    pickDifferentCookieShapeIndex(current, shapeCount, random)
 
 /** 勾出来之后停一下再离开这一页，让人看清"成了"。 */
 private const val SUCCESS_HOLD_MILLIS = 420L

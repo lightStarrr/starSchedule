@@ -1,53 +1,25 @@
 package com.star.schedule.feature.timetable.presentation
 
 import android.widget.Toast
-
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.scaleIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.offset
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.toShape
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,7 +36,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -72,34 +44,42 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -107,13 +87,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.PageContentTopSpacing
 import com.star.schedule.core.designsystem.component.PageTopBar
@@ -124,6 +104,12 @@ import com.star.schedule.platform.display.rememberScreenCornerRadius
 import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.presentation.SettingsGroup
 import com.star.schedule.feature.settings.presentation.SettingsListItem
+import com.star.schedule.feature.timetable.presentation.components.RenameTimetableDialog
+import com.star.schedule.feature.timetable.presentation.components.TimetableActionMenu
+import com.star.schedule.feature.timetable.presentation.components.TimetableActionMenuFadeInMillis
+import com.star.schedule.feature.timetable.presentation.components.TimetableActionMenuFadeOutMillis
+import com.star.schedule.feature.timetable.presentation.components.TimetableActionScrimAlpha
+import com.star.schedule.feature.timetable.presentation.components.TimetableCardActionOverlay
 import com.star.schedule.feature.timetable.presentation.components.WallpaperSettingsCard
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
@@ -842,7 +828,6 @@ private fun NewTimetableCard(
     }
 }
 
-
 /**
  * 页宽随顶栏折叠变化，但取值发生在测量阶段（[PageSize.calculateMainAxisPageSize] 在 measure 里调用），
  * 所以 pager 不会因为折叠而重组。
@@ -914,206 +899,3 @@ private val PreviewCardMinWidth = 160.dp
 // 顶栏完全收起后只定宽度，高度按 PreviewCardAspect 推出来（128dp 宽 ≈ 277dp 高）。
 private val PreviewCardCollapsedWidth = 128.dp
 private const val THUMBNAIL_ROWS = 12
-
-
-/** 长按卡片后浮在页面上的操作菜单，位置跟着卡片走。 */
-private data class TimetableActionMenu(
-    val timetableId: Long,
-    val bounds: Rect,
-)
-
-private const val TimetableActionScrimAlpha = 0.12f
-private const val TimetableActionMenuFadeInMillis = 180
-private const val TimetableActionMenuFadeOutMillis = 140
-
-private const val TimetableActionButtonInitialScale = 0.6f
-private const val TimetableActionButtonStaggerMillis = 60
-
-private val TimetableActionButtonMinSize = 48.dp
-private val TimetableActionButtonMaxSize = 88.dp
-private val TimetableActionButtonGap = 12.dp
-
-/**
- * 卡片中心浮出两个按钮：编辑名称 / 删除。
- *
- * 整层铺满屏幕接管点击，点按钮以外任何地方都收起；按钮尺寸按卡片短边收敛，
- * 卡片折叠变小的时候不会顶出卡片外。
- */
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun TimetableCardActionOverlay(
-    bounds: Rect,
-    visible: Boolean,
-    onRename: () -> Unit,
-    onDelete: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val density = LocalDensity.current
-    // 宽高比决定排布：卡片宽于高就横排，否则竖排。
-    val horizontal = bounds.width >= bounds.height
-    // 大卡片上按短边的 30% 撑开，小卡片上限收到 64dp，别顶出卡片外。
-    val buttonSize = with(density) {
-        (minOf(bounds.width, bounds.height) * 0.3f).toDp()
-    }.coerceIn(TimetableActionButtonMinSize, TimetableActionButtonMaxSize)
-    val stackWidth =
-        if (horizontal) buttonSize * 2 + TimetableActionButtonGap else buttonSize
-    val stackHeight =
-        if (horizontal) buttonSize else buttonSize * 2 + TimetableActionButtonGap
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
-    ) {
-        Box(
-            modifier = Modifier.offset {
-                IntOffset(
-                    (bounds.center.x - with(density) { stackWidth.toPx() } / 2f).roundToInt(),
-                    (bounds.center.y - with(density) { stackHeight.toPx() } / 2f).roundToInt(),
-                )
-            },
-        ) {
-            // 两个按钮各自做淡入 + 放大，第二个晚一点点，出场时同样分开缩回去。
-            val editButton: @Composable () -> Unit = {
-                AnimatedCardActionButton(visible = visible, delayMillis = 0) {
-                    TimetableActionButton(
-                        label = stringResource(R.string.timetable_action_edit_name),
-                        icon = Icons.Rounded.Edit,
-                        shape = MaterialShapes.Cookie4Sided.toShape(),
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        size = buttonSize,
-                        onClick = onRename,
-                    )
-                }
-            }
-            val deleteButton: @Composable () -> Unit = {
-                AnimatedCardActionButton(
-                    visible = visible,
-                    delayMillis = TimetableActionButtonStaggerMillis,
-                ) {
-                    TimetableActionButton(
-                        label = stringResource(R.string.action_delete),
-                        icon = Icons.Rounded.Delete,
-                        shape = MaterialShapes.Ghostish.toShape(),
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        size = buttonSize,
-                        onClick = onDelete,
-                    )
-                }
-            }
-            if (horizontal) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(TimetableActionButtonGap),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    editButton()
-                    deleteButton()
-                }
-            } else {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(TimetableActionButtonGap),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    editButton()
-                    deleteButton()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimetableActionButton(
-    label: String,
-    icon: ImageVector,
-    shape: Shape,
-    containerColor: Color,
-    contentColor: Color,
-    size: Dp,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(shape)
-            .background(containerColor)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = contentColor,
-            modifier = Modifier.size(size * 0.45f),
-        )
-    }
-}
-
-@Composable
-private fun RenameTimetableDialog(
-    initialName: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var name by remember(initialName) { mutableStateOf(initialName) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.timetable_action_edit_name)) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                label = { Text(stringResource(R.string.timetable_edit_name_hint)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(name) },
-                enabled = name.isNotBlank(),
-            ) {
-                Text(stringResource(R.string.action_save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
-
-
-/**
- * 单个按钮的出场动画。
- *
- * 用 [MutableTransitionState] 从 false 起步：直接给 AnimatedVisibility 传 visible = true 时，
- * 首次组合就已经是可见状态，进场动画会被整个跳过。
- */
-@Composable
-private fun AnimatedCardActionButton(
-    visible: Boolean,
-    delayMillis: Int = 0,
-    content: @Composable () -> Unit,
-) {
-    val transitionState = remember { MutableTransitionState(false) }
-    transitionState.targetState = visible
-    AnimatedVisibility(
-        visibleState = transitionState,
-        enter = fadeIn(tween(TimetableActionMenuFadeInMillis, delayMillis = delayMillis)) +
-            scaleIn(
-                initialScale = TimetableActionButtonInitialScale,
-                animationSpec = tween(TimetableActionMenuFadeInMillis, delayMillis = delayMillis),
-            ),
-        exit = fadeOut(tween(TimetableActionMenuFadeOutMillis)) +
-            scaleOut(
-                targetScale = TimetableActionButtonInitialScale,
-                animationSpec = tween(TimetableActionMenuFadeOutMillis),
-            ),
-    ) {
-        content()
-    }
-}

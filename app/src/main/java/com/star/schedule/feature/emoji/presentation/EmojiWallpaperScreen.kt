@@ -7,12 +7,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +19,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,28 +29,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.EmojiEmotions
-import androidx.compose.material.icons.rounded.EmojiEvents
-import androidx.compose.material.icons.rounded.EmojiFlags
-import androidx.compose.material.icons.rounded.EmojiObjects
-import androidx.compose.material.icons.rounded.EmojiSymbols
-import androidx.compose.material.icons.rounded.FlightTakeoff
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Lightbulb
-import androidx.compose.material.icons.rounded.People
-import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.SentimentSatisfied
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,7 +48,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -92,7 +75,6 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -102,7 +84,6 @@ import androidx.compose.ui.text.EmojiSupportMatch
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -728,210 +709,6 @@ private fun ColorTabContent(
     }
 }
 
-// ---------- 选择器 ----------
-
-@Composable
-private fun EmojiPickerPanel(
-    ready: EmojiWallpaperUiState.Ready,
-    onSelectPickerGroup: (String) -> Unit,
-    onAddEmoji: (String) -> Unit,
-    onRemoveEmoji: (Int) -> Unit,
-    onClearEmojis: () -> Unit,
-    onConfirmPicker: () -> Unit,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        // 已选表情卡片：点表情移除，✓ 至少留一个才可点。
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                LazyRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    itemsIndexed(
-                        items = ready.emojis,
-                        key = { index, emoji -> "$index:$emoji" },
-                        contentType = { _, _ -> "pickerSelectedEmoji" },
-                    ) { index, emoji ->
-                        EmojiGlyph(
-                            emoji = emoji,
-                            typeface = ready.typeface,
-                            size = 26.sp,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable { onRemoveEmoji(index) }
-                                .padding(4.dp),
-                        )
-                    }
-                }
-                Text(
-                    text = stringResource(
-                        R.string.emoji_wallpaper_selected_count,
-                        ready.emojis.size,
-                        EMOJI_WALLPAPER_MAX_EMOJIS,
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(onClick = onClearEmojis) {
-                    Text(stringResource(R.string.emoji_wallpaper_clear_all))
-                }
-                IconButton(
-                    onClick = onConfirmPicker,
-                    enabled = ready.emojis.isNotEmpty(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = stringResource(
-                            R.string.emoji_wallpaper_done,
-                        ),
-                    )
-                }
-            }
-        }
-
-        // 分类页签 + 表情网格。
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-            ) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                ) {
-                    item(key = EMOJI_GROUP_RECENT, contentType = "groupTab") {
-                        PickerGroupTab(
-                            icon = Icons.Rounded.History,
-                            description = stringResource(R.string.emoji_group_recent),
-                            selected = ready.pickerGroupId == EMOJI_GROUP_RECENT,
-                            onClick = { onSelectPickerGroup(EMOJI_GROUP_RECENT) },
-                        )
-                    }
-                    items(
-                        items = ready.groups,
-                        key = { it.id },
-                        contentType = { "groupTab" },
-                    ) { group ->
-                        PickerGroupTab(
-                            icon = pickerGroupIcon(group.id),
-                            description = stringResource(pickerGroupNameRes(group.id)),
-                            selected = ready.pickerGroupId == group.id,
-                            onClick = { onSelectPickerGroup(group.id) },
-                        )
-                    }
-                }
-                val shown = if (ready.pickerGroupId == EMOJI_GROUP_RECENT) {
-                    ready.recents
-                } else {
-                    ready.groups.firstOrNull { it.id == ready.pickerGroupId }?.emojis
-                }.orEmpty()
-                if (shown.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.emoji_picker_empty),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp),
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 48.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp)
-                            .padding(horizontal = 8.dp),
-                    ) {
-                        items(
-                            items = shown,
-                            key = { it },
-                            contentType = { "emojiCell" },
-                        ) { emoji ->
-                            Box(
-                                modifier = Modifier
-                                    .aspectRatio(1f)
-                                    .clip(CircleShape)
-                                    .clickable { onAddEmoji(emoji) },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                EmojiGlyph(
-                                    emoji = emoji,
-                                    typeface = ready.typeface,
-                                    size = 26.sp,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PickerGroupTab(
-    icon: ImageVector,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    IconButton(onClick = onClick) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                LocalContentColor.current
-            },
-        )
-    }
-}
-
-private fun pickerGroupIcon(groupId: String): ImageVector = when (groupId) {
-    "smileys" -> Icons.Rounded.EmojiEmotions
-    "people" -> Icons.Rounded.People
-    "animals" -> Icons.Rounded.Pets
-    "food" -> Icons.Rounded.Restaurant
-    "travel" -> Icons.Rounded.FlightTakeoff
-    "activities" -> Icons.Rounded.EmojiEvents
-    "objects" -> Icons.Rounded.EmojiObjects
-    "symbols" -> Icons.Rounded.EmojiSymbols
-    else -> Icons.Rounded.EmojiFlags
-}
-
-private fun pickerGroupNameRes(groupId: String): Int = when (groupId) {
-    "smileys" -> R.string.emoji_group_smileys
-    "people" -> R.string.emoji_group_people
-    "animals" -> R.string.emoji_group_animals
-    "food" -> R.string.emoji_group_food
-    "travel" -> R.string.emoji_group_travel
-    "activities" -> R.string.emoji_group_activities
-    "objects" -> R.string.emoji_group_objects
-    "symbols" -> R.string.emoji_group_symbols
-    else -> R.string.emoji_group_flags
-}
-
 private val EmojiPattern.nameRes: Int
     get() = when (this) {
         EmojiPattern.MOSAIC -> R.string.emoji_pattern_mosaic
@@ -946,7 +723,7 @@ private val EmojiPattern.nameRes: Int
  * 关掉 EmojiSupportMatch 防止 EmojiCompat 换成彩色表情。
  */
 @Composable
-private fun EmojiGlyph(
+internal fun EmojiGlyph(
     emoji: String,
     typeface: Typeface,
     size: TextUnit,
