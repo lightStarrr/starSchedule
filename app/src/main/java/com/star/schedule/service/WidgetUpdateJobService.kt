@@ -7,14 +7,17 @@ import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * JobScheduler服务类，用于定时更新小组件数据
- * 支持系统重启、应用更新等场景下的自动重新调度
+ * JobScheduler 服务类，用于定时更新小组件数据。
+ * 支持系统重启、应用更新等场景下的自动重新调度。
  */
 class WidgetUpdateJobService : JobService() {
 
@@ -22,17 +25,15 @@ class WidgetUpdateJobService : JobService() {
         private const val TAG = "WidgetUpdateJobService"
         private const val JOB_ID = 1001
 
-        /**
-         * 调度定时任务
-         */
         fun scheduleJob(context: Context) {
+            val appContext = context.applicationContext
             val jobScheduler =
-                context.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler
+                appContext.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler
 
-            val componentName = ComponentName(context, WidgetUpdateJobService::class.java)
+            val componentName = ComponentName(appContext, WidgetUpdateJobService::class.java)
             val jobInfo = JobInfo.Builder(JOB_ID, componentName)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_NONE) // 不需要网络
-                .setPersisted(true) // 系统重启后保持
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_NONE)
+                .setPersisted(true)
                 .setPeriodic(JobInfo.getMinPeriodMillis())
                 .build()
 
@@ -45,43 +46,36 @@ class WidgetUpdateJobService : JobService() {
             }
         }
 
-        /**
-         * 取消定时任务
-         */
         fun cancelJob(context: Context) {
             val jobScheduler =
-                context.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler
+                context.applicationContext.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler
             jobScheduler.cancel(JOB_ID)
             Log.d(TAG, "Job cancelled")
         }
 
-        /**
-         * 检查任务是否已调度
-         */
         fun isJobScheduled(context: Context): Boolean {
             val jobScheduler =
-                context.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler
+                context.applicationContext.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler
             val jobs = jobScheduler.allPendingJobs
             return jobs.any { it.id == JOB_ID }
         }
     }
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
 
     override fun onStartJob(params: JobParameters?): Boolean {
         Log.d(TAG, "Job started")
-
-        // 使用协程异步执行小组件更新
-        job = CoroutineScope(Dispatchers.IO).launch {
+        job?.cancel()
+        job = serviceScope.launch {
             try {
-                WidgetRefreshManager.refreshWidgetImmediately(this@WidgetUpdateJobService)
+                WidgetRefreshManager.refreshWidgetImmediately(applicationContext)
                 Log.d(TAG, "Widget updated successfully")
-
-                // 标记任务完成
                 jobFinished(params, false)
+            } catch (cancel: CancellationException) {
+                throw cancel
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating widget: ${e.message}", e)
-                // 任务失败，需要重新调度
                 jobFinished(params, true)
             }
         }
@@ -92,5 +86,10 @@ class WidgetUpdateJobService : JobService() {
         Log.d(TAG, "Job stopped")
         job?.cancel()
         return true
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
     }
 }

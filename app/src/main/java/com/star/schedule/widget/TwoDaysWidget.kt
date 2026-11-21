@@ -3,6 +3,7 @@ package com.star.schedule.widget
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.util.Log
+import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -16,6 +17,7 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.itemsIndexed
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
@@ -39,11 +41,12 @@ import com.star.schedule.R
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
+import com.star.schedule.platform.widget.TwoDaysWidgetSyncWorker
 import com.star.schedule.service.WidgetUpdateJobService
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
@@ -97,15 +100,13 @@ class TwoDaysWidget : GlanceAppWidget() {
         Log.d("TwoDaysWidget", "provideGlance called for glanceId: $id")
 
         try {
-            if (!DatabaseProvider.isInitialized()) {
-                DatabaseProvider.init(context)
-            }
-
             provideContent {
                 GlanceTheme {
                     Content()
                 }
             }
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (e: Exception) {
             Log.e("TwoDaysWidget", "Error in provideGlance", e)
             provideContent {
@@ -114,6 +115,19 @@ class TwoDaysWidget : GlanceAppWidget() {
                 }
             }
         }
+    }
+
+    override fun onCompositionError(
+        context: Context,
+        glanceId: GlanceId,
+        appWidgetId: Int,
+        throwable: Throwable,
+    ) {
+        Log.e("TwoDaysWidget", "Glance composition error for appWidgetId=$appWidgetId", throwable)
+        val fallback = RemoteViews(context.packageName, R.layout.widget_initial_layout).apply {
+            setTextViewText(R.id.widget_fallback_text, context.getString(R.string.widget_error_title))
+        }
+        AppWidgetManager.getInstance(context).updateAppWidget(appWidgetId, fallback)
     }
 
     @Composable
@@ -247,12 +261,18 @@ class TwoDaysWidget : GlanceAppWidget() {
                 
                 if (activeCourses.isNotEmpty()) {
                     LazyColumn(modifier = GlanceModifier.fillMaxHeight()) {
-                        items(activeCourses.size) { index ->
-                            val course = activeCourses[index]
+                        itemsIndexed(
+                            items = activeCourses,
+                            itemId = { index, course ->
+                                "${if (isToday) 1 else 2}:${course.name}:${course.startTime}:${course.endTime}:$index"
+                                    .hashCode()
+                                    .toLong()
+                            },
+                        ) { index, course ->
                             CourseItem(
                                 course = course,
                                 isToday = isToday,
-                                isFirst = index == 0
+                                isFirst = index == 0,
                             )
                         }
                     }
@@ -367,133 +387,150 @@ class TwoDaysWidget : GlanceAppWidget() {
     }
 
     companion object {
-        suspend fun updateWidgetContent(context: Context) {
+        suspend fun updateWidgetContent(context: Context) = withContext(Dispatchers.IO) {
+            val appContext = context.applicationContext
             try {
                 if (!DatabaseProvider.isInitialized()) {
-                    DatabaseProvider.init(context)
+                    DatabaseProvider.init(appContext)
                 }
+                DatabaseProvider.ensureValidCurrentTimetable()
 
                 val database = DatabaseProvider.db
                 val dao = database.scheduleDao()
-
-                val currentTimetableId = dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
-                    .firstOrNull()?.toLongOrNull() ?: return
-
-                val timetable = dao.getTimetableFlow(currentTimetableId).firstOrNull() ?: return
-
-                val today = LocalDate.now()
-                val startDate = LocalDate.parse(timetable.startDate)
-                val currentWeekNumber = today.getWeekOfSemester(startDate)
-
-                val courses = dao.getCoursesFlow(currentTimetableId).firstOrNull() ?: emptyList()
-                val lessonTimes = dao.getLessonTimesFlow(currentTimetableId).firstOrNull() ?: emptyList()
-
-                val thisWeekCourses = courses.filter { it.weeks.contains(currentWeekNumber) }
-
-                val todayCourses = thisWeekCourses.filter { it.dayOfWeek == today.dayOfWeek.value }
-                val tomorrow = today.plusDays(1)
-                val tomorrowCourses = thisWeekCourses.filter { it.dayOfWeek == tomorrow.dayOfWeek.value }
-
                 val now = LocalDateTime.now()
-                val currentTime = now.toLocalTime()
                 val updateTimeStr = now.format(DateTimeFormatter.ofPattern("HH:mm"))
 
-                val todayCourseItems = todayCourses
-                    .sortedBy { it.periods.minOrNull() ?: 0 }
-                    .map { course ->
-                        val startPeriod = course.periods.minOrNull() ?: 0
-                val endPeriod = course.periods.maxOrNull() ?: 0
-                val startLesson = lessonTimes.find { it.period == startPeriod }
-                val endLesson = lessonTimes.find { it.period == endPeriod }
+                val currentTimetableId = dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
+                    .firstOrNull()?.toLongOrNull()
+                val timetable = currentTimetableId?.let { dao.getTimetableFlow(it).firstOrNull() }
 
-                val startTime = startLesson?.startTime ?: ""
-                val endTime = endLesson?.endTime ?: ""
-                val statusInfo = getCourseStatus(startTime, endTime, currentTime, context)
-                    ?: CourseStatusInfo(null, CourseStatus.ACTIVE)
+                val widgetData = if (currentTimetableId == null || timetable == null) {
+                    // 当前课表不存在或已删除时必须清空 DataStore，避免小组件永久残留过期课表。
+                    WidgetCourseData(
+                        today = DayCourses(emptyList()),
+                        tomorrow = DayCourses(emptyList()),
+                        updateTime = updateTimeStr,
+                    )
+                } else {
+                    val today = now.toLocalDate()
+                    val startDate = runCatching { LocalDate.parse(timetable.startDate) }
+                        .getOrElse { today }
+                    val currentWeekNumber = today.getWeekOfSemester(startDate)
 
-                CourseItem(
-                    name = course.name,
-                    location = course.location,
-                    teacher = course.teacher,
-                            startTime = startTime,
-                            endTime = endTime,
-                            status = statusInfo.text,
-                            color = if (statusInfo.text != null) "secondary" else "primary",
-                            courseStatus = statusInfo.courseStatus
-                        )
+                    val courses = dao.getCoursesFlow(currentTimetableId).firstOrNull() ?: emptyList()
+                    val lessonTimes =
+                        dao.getLessonTimesFlow(currentTimetableId).firstOrNull() ?: emptyList()
+
+                    val thisWeekCourses = courses.filter { it.weeks.contains(currentWeekNumber) }
+                    val todayCourses = thisWeekCourses.filter { it.dayOfWeek == today.dayOfWeek.value }
+                    val tomorrow = today.plusDays(1)
+                    val tomorrowWeekNumber = tomorrow.getWeekOfSemester(startDate)
+                    val tomorrowCourses = courses.filter {
+                        it.weeks.contains(tomorrowWeekNumber) &&
+                            it.dayOfWeek == tomorrow.dayOfWeek.value
                     }
 
-                val tomorrowCourseItems = tomorrowCourses
-                    .sortedBy { it.periods.minOrNull() ?: 0 }
-                    .take(2)
-                    .map { course ->
-                        val startPeriod = course.periods.minOrNull() ?: 0
-                        val endPeriod = course.periods.maxOrNull() ?: 0
-                        val startLesson = lessonTimes.find { it.period == startPeriod }
-                        val endLesson = lessonTimes.find { it.period == endPeriod }
+                    val currentTime = now.toLocalTime()
 
-                        CourseItem(
-                            name = course.name,
-                            location = course.location,
-                            teacher = course.teacher,
-                            startTime = startLesson?.startTime ?: "",
-                            endTime = endLesson?.endTime ?: "",
-                            courseStatus = CourseStatus.ACTIVE
-                        )
-                    }
+                    val todayCourseItems = todayCourses
+                        .sortedBy { it.periods.minOrNull() ?: 0 }
+                        .map { course ->
+                            val startPeriod = course.periods.minOrNull() ?: 0
+                            val endPeriod = course.periods.maxOrNull() ?: 0
+                            val startLesson = lessonTimes.find { it.period == startPeriod }
+                            val endLesson = lessonTimes.find { it.period == endPeriod }
 
-                val widgetData = WidgetCourseData(
-                    today = DayCourses(
-                        courses = todayCourseItems
-                    ),
-                    tomorrow = DayCourses(
-                        courses = tomorrowCourseItems
-                    ),
-                    updateTime = updateTimeStr
-                )
+                            val startTime = startLesson?.startTime ?: ""
+                            val endTime = endLesson?.endTime ?: ""
+                            val statusInfo =
+                                getCourseStatus(startTime, endTime, currentTime, appContext)
+                                    ?: CourseStatusInfo(null, CourseStatus.ACTIVE)
+
+                            CourseItem(
+                                name = course.name,
+                                location = course.location,
+                                teacher = course.teacher,
+                                startTime = startTime,
+                                endTime = endTime,
+                                status = statusInfo.text,
+                                color = if (statusInfo.text != null) "secondary" else "primary",
+                                courseStatus = statusInfo.courseStatus,
+                            )
+                        }
+
+                    val tomorrowCourseItems = tomorrowCourses
+                        .sortedBy { it.periods.minOrNull() ?: 0 }
+                        .take(2)
+                        .map { course ->
+                            val startPeriod = course.periods.minOrNull() ?: 0
+                            val endPeriod = course.periods.maxOrNull() ?: 0
+                            val startLesson = lessonTimes.find { it.period == startPeriod }
+                            val endLesson = lessonTimes.find { it.period == endPeriod }
+
+                            CourseItem(
+                                name = course.name,
+                                location = course.location,
+                                teacher = course.teacher,
+                                startTime = startLesson?.startTime ?: "",
+                                endTime = endLesson?.endTime ?: "",
+                                courseStatus = CourseStatus.ACTIVE,
+                            )
+                        }
+
+                    WidgetCourseData(
+                        today = DayCourses(courses = todayCourseItems),
+                        tomorrow = DayCourses(courses = tomorrowCourseItems),
+                        updateTime = updateTimeStr,
+                    )
+                }
 
                 val coursesJson = jsonParser.encodeToString(WidgetCourseData.serializer(), widgetData)
 
-                val manager = GlanceAppWidgetManager(context)
+                val manager = GlanceAppWidgetManager(appContext)
                 val glanceIds = manager.getGlanceIds(TwoDaysWidget::class.java)
 
-                if (glanceIds.isEmpty()) return
+                if (glanceIds.isEmpty()) return@withContext
 
+                val appWidgetManager = AppWidgetManager.getInstance(appContext)
                 val validGlanceIds = glanceIds.filter { id ->
                     try {
                         val appWidgetId = manager.getAppWidgetId(id)
-                        val appWidgetManager = AppWidgetManager.getInstance(context)
                         appWidgetManager.getAppWidgetInfo(appWidgetId) != null
                     } catch (_: Exception) {
                         false
                     }
                 }
 
-                if (validGlanceIds.isEmpty()) return
+                if (validGlanceIds.isEmpty()) return@withContext
 
                 validGlanceIds.forEach { id ->
                     try {
                         updateAppWidgetState(
-                            context,
+                            appContext,
                             PreferencesGlanceStateDefinition,
-                            id
+                            id,
                         ) { prefs: Preferences ->
                             prefs.toMutablePreferences().apply {
                                 this[KEY_COURSES_JSON] = coursesJson
                                 this[KEY_UPDATE_TIME] = updateTimeStr
                             }
                         }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
                     } catch (e: Exception) {
                         Log.e("TwoDaysWidget", "更新小组件失败", e)
                     }
                 }
 
                 try {
-                    TwoDaysWidget().updateAll(context)
+                    TwoDaysWidget().updateAll(appContext)
+                } catch (cancel: CancellationException) {
+                    throw cancel
                 } catch (e: Exception) {
                     Log.e("TwoDaysWidget", "刷新小组件失败", e)
                 }
-
+            } catch (cancel: CancellationException) {
+                throw cancel
             } catch (e: Exception) {
                 Log.e("TwoDaysWidget", "更新小组件内容失败", e)
             }
@@ -552,20 +589,11 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        // goAsync() 可能已经被 Glance 的父实现消费掉而返回 null，判空再用；
-        // 直接把 finish() 写在 finally 前面也救不了——NPE 就是从这里抛出来的。
-        val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                TwoDaysWidget.updateWidgetContent(context)
-            } finally {
-                pendingResult?.finish()
-            }
-        }
-
+        val appContext = context.applicationContext
+        TwoDaysWidgetSyncWorker.enqueue(appContext)
         try {
-            if (!WidgetUpdateJobService.isJobScheduled(context)) {
-                WidgetUpdateJobService.scheduleJob(context)
+            if (!WidgetUpdateJobService.isJobScheduled(appContext)) {
+                WidgetUpdateJobService.scheduleJob(appContext)
             }
         } catch (e: Exception) {
             Log.e("TwoDaysWidgetReceiver", "调度更新任务失败", e)
@@ -575,7 +603,7 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         try {
-            WidgetUpdateJobService.cancelJob(context)
+            WidgetUpdateJobService.cancelJob(context.applicationContext)
         } catch (e: Exception) {
             Log.e("TwoDaysWidgetReceiver", "取消更新任务失败", e)
         }
@@ -588,6 +616,7 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
     ) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
         Log.d("TwoDaysWidgetReceiver", "onUpdate: ${appWidgetIds.size} widgets")
+        val appContext = context.applicationContext
 
         try {
             val validAppWidgetIds = appWidgetIds.filter { appWidgetId ->
@@ -601,28 +630,16 @@ class TwoDaysWidgetReceiver : GlanceAppWidgetReceiver() {
 
             if (validAppWidgetIds.isEmpty()) return
 
-            // 这里不能再调 goAsync()：Glance 的 super.onUpdate 已经取了广播的 PendingResult
-            // 并在自己的协程结束时 finish，再调一次拿到的是 null，finish() 会直接 NPE。
-            // 刷新本身用独立协程跑完即可，不向系统申请延长广播生命周期。
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    if (!DatabaseProvider.isInitialized()) {
-                        DatabaseProvider.init(context)
-                    }
-                    TwoDaysWidget.updateWidgetContent(context)
-                } catch (e: Exception) {
-                    Log.e("TwoDaysWidgetReceiver", "更新失败", e)
-                }
-            }
+            // 交由持久化 WorkManager 任务刷新 DataStore，避免在 super.onUpdate 结束后野协程被进程冻结。
+            TwoDaysWidgetSyncWorker.enqueue(appContext)
 
             try {
-                if (!WidgetUpdateJobService.isJobScheduled(context)) {
-                    WidgetUpdateJobService.scheduleJob(context)
+                if (!WidgetUpdateJobService.isJobScheduled(appContext)) {
+                    WidgetUpdateJobService.scheduleJob(appContext)
                 }
             } catch (e: Exception) {
                 Log.e("TwoDaysWidgetReceiver", "调度任务失败", e)
             }
-
         } catch (e: Exception) {
             Log.e("TwoDaysWidgetReceiver", "onUpdate失败", e)
         }
