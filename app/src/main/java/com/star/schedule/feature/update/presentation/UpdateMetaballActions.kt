@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -78,7 +79,8 @@ private class LastCircleAction {
     var action: UpdateCircleAction? = null
 }
 
-private fun MetaballBridge.toPath(): Path = Path().apply {
+private fun MetaballBridge.writeTo(path: Path): Path = path.apply {
+    rewind()
     moveTo(start1.x, start1.y)
     cubicTo(control1.x, control1.y, control2.x, control2.y, end1.x, end1.y)
     lineTo(start2.x, start2.y)
@@ -103,9 +105,11 @@ internal fun UpdateMetaballActions(
         .compositeOver(surface)
 
     val lastLeft = remember { LastCircleAction() }
-    if (leftCircle != null) lastLeft.action = leftCircle
     val lastRight = remember { LastCircleAction() }
-    if (rightCircle != null) lastRight.action = rightCircle
+    SideEffect {
+        if (leftCircle != null) lastLeft.action = leftCircle
+        if (rightCircle != null) lastRight.action = rightCircle
+    }
     val drawnLeft = leftCircle ?: lastLeft.action
     val drawnRight = rightCircle ?: lastRight.action
 
@@ -119,7 +123,7 @@ internal fun UpdateMetaballActions(
     LaunchedEffect(fillTarget) {
         fillFraction.animateTo(fillTarget, spatialSpec)
     }
-    val fillColor by animateColorAsState(
+    val fillColorState = animateColorAsState(
         targetValue = when (pill) {
             is UpdatePillContent.Label ->
                 if (pill.enabled) colorScheme.primary else disabledContainer
@@ -137,7 +141,7 @@ internal fun UpdateMetaballActions(
         animationSpec = effects,
         label = "fillContent",
     )
-    val leftCircleColor by animateColorAsState(
+    val leftCircleColorState = animateColorAsState(
         targetValue = if (drawnLeft?.enabled == false) {
             disabledContainer
         } else {
@@ -146,7 +150,7 @@ internal fun UpdateMetaballActions(
         animationSpec = effects,
         label = "leftCircle",
     )
-    val leftContentColor by animateColorAsState(
+    val leftContentColorState = animateColorAsState(
         targetValue = if (drawnLeft?.enabled == false) {
             disabledContent
         } else {
@@ -155,7 +159,7 @@ internal fun UpdateMetaballActions(
         animationSpec = effects,
         label = "leftContent",
     )
-    val rightCircleColor by animateColorAsState(
+    val rightCircleColorState = animateColorAsState(
         targetValue = if (drawnRight?.enabled == false) {
             disabledContainer
         } else {
@@ -164,7 +168,7 @@ internal fun UpdateMetaballActions(
         animationSpec = effects,
         label = "rightCircle",
     )
-    val rightContentColor by animateColorAsState(
+    val rightContentColorState = animateColorAsState(
         targetValue = if (drawnRight?.enabled == false) {
             disabledContent
         } else {
@@ -189,6 +193,8 @@ internal fun UpdateMetaballActions(
     val density = LocalDensity.current
     val stepPx = with(density) { step.toPx() }
     val heightPx = with(density) { height.toPx() }
+    val bridgePath = remember { Path() }
+    val pillPath = remember { Path() }
 
     BoxWithConstraints(
         modifier = modifier
@@ -199,6 +205,11 @@ internal fun UpdateMetaballActions(
         val track = colorScheme.primaryContainer
         val widthPx = constraints.maxWidth.toFloat()
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val fillColor = fillColorState.value
+            val leftCircleColor = leftCircleColorState.value
+            val leftContentColor = leftContentColorState.value
+            val rightCircleColor = rightCircleColorState.value
+            val rightContentColor = rightContentColorState.value
             val radius = size.height / 2f
             val centerY = size.height / 2f
             val leftCx = radius
@@ -222,7 +233,7 @@ internal fun UpdateMetaballActions(
                     maxDistance = stepPx,
                 )?.let { bridge ->
                     drawPath(
-                        path = bridge.toPath(),
+                        path = bridge.writeTo(bridgePath),
                         brush = Brush.horizontalGradient(
                             colors = listOf(leftCircleColor, pillEndLeft),
                             startX = leftCx,
@@ -262,7 +273,7 @@ internal fun UpdateMetaballActions(
                     maxDistance = stepPx,
                 )?.let { bridge ->
                     drawPath(
-                        path = bridge.toPath(),
+                        path = bridge.writeTo(bridgePath),
                         brush = Brush.horizontalGradient(
                             colors = listOf(pillEndRight, rightCircleColor),
                             startX = rightCapX,
@@ -291,17 +302,16 @@ internal fun UpdateMetaballActions(
                 }
             }
 
-            val pillPath = Path().apply {
-                addRoundRect(
-                    RoundRect(
-                        left = pillLeft,
-                        top = 0f,
-                        right = pillRight.coerceAtLeast(pillLeft),
-                        bottom = size.height,
-                        cornerRadius = CornerRadius(radius, radius),
-                    ),
-                )
-            }
+            pillPath.rewind()
+            pillPath.addRoundRect(
+                RoundRect(
+                    left = pillLeft,
+                    top = 0f,
+                    right = pillRight.coerceAtLeast(pillLeft),
+                    bottom = size.height,
+                    cornerRadius = CornerRadius(radius, radius),
+                ),
+            )
             if (f >= 0.999f) {
                 drawPath(pillPath, fillColor)
             } else {

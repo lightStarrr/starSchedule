@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
+import com.star.schedule.core.designsystem.rememberAnimationsEnabled
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -71,9 +72,27 @@ internal fun RollingText(
     horizontalBias: Float = 0f,
     fallbackMaxLines: Int = 1,
 ) {
+    val animationsEnabled = rememberAnimationsEnabled()
+    val rollStyle = style.copy(fontFeatureSettings = "tnum")
+    val textAlign = when {
+        horizontalBias < 0f -> TextAlign.Start
+        horizontalBias > 0f -> TextAlign.End
+        else -> TextAlign.Center
+    }
+    if (!animationsEnabled) {
+        Text(
+            text = text,
+            style = rollStyle,
+            color = color,
+            maxLines = fallbackMaxLines,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = textAlign,
+            modifier = modifier,
+        )
+        return
+    }
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val rollStyle = style.copy(fontFeatureSettings = "tnum")
     val fontSize = if (style.fontSize.isUnspecified) 14.sp else style.fontSize
     val dyPx = with(density) { fontSize.toPx() * 0.5f }
     val maxBlurPx = with(density) { fontSize.toPx() * 0.5f }
@@ -83,11 +102,6 @@ internal fun RollingText(
     val state = remember { RollState() }
     val current = remember { mutableStateListOf<RollGlyph>() }
     val ghosts = remember { mutableStateListOf<GhostGlyph>() }
-    val textAlign = when {
-        horizontalBias < 0f -> TextAlign.Start
-        horizontalBias > 0f -> TextAlign.End
-        else -> TextAlign.Center
-    }
     val measureStyle = rollStyle.copy(textAlign = textAlign)
 
     fun newGlyph(glyph: String) = RollGlyph(state.nextId++, glyph)

@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -63,6 +62,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -728,27 +728,32 @@ private fun TimetablePreviewCard(
         },
     ) {
         // 长按菜单的遮罩就画在卡片里，圆角和裁剪由 Card 的 shape 负责。
-        val scrimAlpha by animateFloatAsState(
+        // 延迟到绘制阶段读取透明值，避免淡入淡出期间每帧重组整个预览卡片。
+        val scrimColor = MaterialTheme.colorScheme.scrim
+        val scrimAlpha = animateFloatAsState(
             targetValue = if (scrimmed) TimetableActionScrimAlpha else 0f,
             animationSpec = tween(
                 if (scrimmed) TimetableActionMenuFadeInMillis else TimetableActionMenuFadeOutMillis,
             ),
             label = "timetableCardScrim",
         )
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    drawContent()
+                    val alpha = scrimAlpha.value
+                    if (alpha > 0f) {
+                        drawRect(color = scrimColor.copy(alpha = alpha))
+                    }
+                },
+        ) {
             TimetableThumbnail(
                 preview = preview,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(PreviewCardContentInset),
             )
-            if (scrimAlpha > 0f) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha)),
-                )
-            }
         }
     }
 }
