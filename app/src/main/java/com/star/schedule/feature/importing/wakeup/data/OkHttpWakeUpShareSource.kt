@@ -4,6 +4,7 @@ import com.star.schedule.feature.importing.wakeup.data.protocol.WakeUpDevice
 import com.star.schedule.feature.importing.wakeup.data.protocol.WakeUpProtocol
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpProtocolException
 import com.star.schedule.feature.importing.wakeup.domain.WakeUpShareSource
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,8 +22,9 @@ import java.util.concurrent.TimeUnit
 class OkHttpWakeUpShareSource(
     private val client: OkHttpClient = defaultClient(),
     private val device: WakeUpDevice = WakeUpDevice(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : WakeUpShareSource {
-    override suspend fun fetch(key: String): String = withContext(Dispatchers.IO) {
+    override suspend fun fetch(key: String): String = withContext(ioDispatcher) {
         val common = device.commonParams()
         val (signA, rand10) = WakeUpProtocol.makeSignA(device.cuid)
 

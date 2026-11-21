@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -62,7 +63,7 @@ class TimetableSettingsViewModel(
 
     /** 选用最近壁纸失败的一次性事件（UI 弹提示）。 */
     private val _selectRecentFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val selectRecentFailed: SharedFlow<Unit> = _selectRecentFailed
+    val selectRecentFailed: SharedFlow<Unit> = _selectRecentFailed.asSharedFlow()
 
     private val pendingWallpapers = MutableStateFlow<Map<Long, RecentWallpaper>>(emptyMap())
 

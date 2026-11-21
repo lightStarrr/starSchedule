@@ -17,6 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -169,7 +170,7 @@ class AiSettingsViewModel(
     )
 
     private val _usage = MutableStateFlow<AiUsageUiState>(AiUsageUiState.Hidden)
-    val usage: StateFlow<AiUsageUiState> = _usage
+    val usage: StateFlow<AiUsageUiState> = _usage.asStateFlow()
     private var modelRetry: Job? = null
     private var usageRetry: Job? = null
 

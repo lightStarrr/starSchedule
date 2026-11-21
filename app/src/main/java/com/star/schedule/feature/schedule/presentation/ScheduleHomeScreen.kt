@@ -37,12 +37,10 @@ import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.ToggleButtonSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,95 +56,52 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
+import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.LessonTimeEntity
 import com.star.schedule.core.designsystem.component.AppMenu
 import com.star.schedule.core.designsystem.component.MenuEntry
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.TimetableEntity
-import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.presentation.WallpaperBackground
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
-
-private data class HomeTimetableData(
-    val timetable: TimetableEntity?,
-    val courses: List<CourseEntity>,
-    val lessonTimes: List<LessonTimeEntity>,
-)
 
 @Composable
 fun ScheduleHomeRoute(
-    repository: ScheduleRepository,
-    timetableId: Long?,
-    isSelectionLoading: Boolean,
-    wallpaperState: WallpaperState = WallpaperState.None,
+    viewModel: ScheduleHomeViewModel,
     onTimetableSettingsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onContentReady: () -> Unit = {},
 ) {
-    val homeDataFlow: Flow<HomeTimetableData?> = remember(repository, timetableId) {
-        if (timetableId == null) {
-            flowOf(null)
-        } else {
-            combine(
-                repository.observeTimetable(timetableId),
-                repository.observeCourses(timetableId),
-                repository.observeLessonTimes(timetableId),
-            ) { timetable, courses, lessonTimes ->
-                HomeTimetableData(timetable, courses, lessonTimes)
-            }
-        }
-    }
-    val homeData by homeDataFlow.collectAsState(initial = null)
-    val timetable = homeData?.timetable
-    val courses = homeData?.courses.orEmpty()
-    val lessonTimes = homeData?.lessonTimes.orEmpty()
-    val isLoading = isSelectionLoading || (timetableId != null && homeData == null)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentOnContentReady by rememberUpdatedState(onContentReady)
-    LaunchedEffect(isLoading) {
-        if (!isLoading) currentOnContentReady()
-    }
-    val semesterStart = remember(timetable?.startDate) {
-        runCatching { timetable?.startDate?.let(LocalDate::parse) }
-            .getOrNull()
-            ?: LocalDate.now().with(java.time.DayOfWeek.MONDAY)
-    }
-    val realCurrentWeek = remember(semesterStart) {
-        ChronoUnit.DAYS.between(semesterStart, LocalDate.now()).toInt() / 7 + 1
-    }.coerceAtLeast(1)
-    var currentWeek by rememberSaveable(timetableId, timetable?.startDate) {
-        mutableIntStateOf(realCurrentWeek)
+    LaunchedEffect(state.isLoading) {
+        if (!state.isLoading) currentOnContentReady()
     }
 
-    val weekStartDate = semesterStart.plusWeeks((currentWeek - 1).toLong())
+    val weekEndDate = state.weekStartDate.plusDays(6)
     ScheduleHomeScreen(
-        currentWeek = currentWeek,
+        currentWeek = state.currentWeek,
         dateRange = stringResource(
             R.string.home_date_range_template,
-            weekStartDate.monthValue,
-            weekStartDate.dayOfMonth,
-            weekStartDate.plusDays(6).monthValue,
-            weekStartDate.plusDays(6).dayOfMonth,
+            state.weekStartDate.monthValue,
+            state.weekStartDate.dayOfMonth,
+            weekEndDate.monthValue,
+            weekEndDate.dayOfMonth,
         ),
-        lessonTimes = lessonTimes,
-        courses = courses,
-        hasTimetable = timetable != null,
-        isLoading = isLoading,
-        weekStartDate = weekStartDate,
-        // 周末列不再由偏好决定：课表里没有周末的课就不占这两列。
-        showWeekend = courses.any { it.dayOfWeek > 5 },
-        rowHeight = (timetable?.rowHeight ?: 60).dp,
-        wallpaperState = wallpaperState,
+        lessonTimes = state.lessonTimes,
+        courses = state.courses,
+        hasTimetable = state.hasTimetable,
+        isLoading = state.isLoading,
+        weekStartDate = state.weekStartDate,
+        showWeekend = state.showWeekend,
+        rowHeight = state.rowHeightDp.dp,
+        wallpaperState = state.wallpaperState,
         onTimetableSettingsClick = onTimetableSettingsClick,
         onSettingsClick = onSettingsClick,
-        onPreviousWeekClick = { currentWeek = (currentWeek - 1).coerceAtLeast(1) },
-        onNextWeekClick = { currentWeek += 1 },
+        onPreviousWeekClick = viewModel::previousWeek,
+        onNextWeekClick = viewModel::nextWeek,
         onSelectWeekClick = {},
     )
 }

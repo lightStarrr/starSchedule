@@ -19,6 +19,7 @@ import com.star.schedule.feature.wallpaper.domain.promoteRecentEntry
 import java.io.File
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -29,6 +30,7 @@ import kotlinx.coroutines.withContext
 class RoomWallpaperRepository(
     context: Context,
     private val dao: ScheduleDao,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : WallpaperRepository {
     private val appContext = context.applicationContext
     private val cacheStore = WallpaperCacheStore(appContext)
@@ -99,12 +101,12 @@ class RoomWallpaperRepository(
                     }
                 }
             }
-            .flowOn(Dispatchers.IO)
+            .flowOn(ioDispatcher)
 
     override suspend fun applyDesign(
         timetableId: Long,
         design: WallpaperDesign,
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
             commitDesign(timetableId, design)
         }.onFailure { error ->
@@ -155,13 +157,13 @@ class RoomWallpaperRepository(
                     recents + RecentWallpaper.Default
                 }
             }
-            .flowOn(Dispatchers.IO)
+            .flowOn(ioDispatcher)
 
     override suspend fun importFromUri(
         timetableId: Long,
         uriString: String,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 val resolver = appContext.contentResolver
                 val uri = Uri.parse(uriString)
@@ -195,7 +197,7 @@ class RoomWallpaperRepository(
         }
 
     override suspend fun stagePreview(uriString: String): Result<StagedWallpaper> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 previewDir.mkdirs()
                 val staged = File.createTempFile("preview-", ".img", previewDir)
@@ -233,7 +235,7 @@ class RoomWallpaperRepository(
         stagedPath: String,
         blur: WallpaperBlurSpec?,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 val staged = File(stagedPath)
                 check(staged.isFile) { "Staged wallpaper is missing" }
@@ -263,7 +265,7 @@ class RoomWallpaperRepository(
         timetableId: Long,
         recent: RecentWallpaper,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             runCatching {
                 when (recent) {
                     RecentWallpaper.Default -> {
@@ -287,7 +289,7 @@ class RoomWallpaperRepository(
         }
 
     override suspend fun clear(timetableId: Long) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             clearInternal(timetableId)
         }
     }

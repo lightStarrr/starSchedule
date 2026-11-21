@@ -9,6 +9,8 @@ import androidx.lifecycle.lifecycleScope
 import com.star.schedule.app.StarScheduleApp
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.feature.schedule.data.RoomScheduleRepository
+import com.star.schedule.feature.schedule.presentation.ScheduleHomeViewModel
+import com.star.schedule.feature.schedule.presentation.ScheduleHomeViewModelFactory
 import com.star.schedule.feature.settings.data.RoomStartupHintRepository
 import com.star.schedule.feature.settings.presentation.StartupHintViewModel
 import com.star.schedule.feature.settings.presentation.StartupHintViewModelFactory
@@ -43,6 +45,10 @@ class MainActivity : ComponentActivity() {
         installEdgeToEdge()
         val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
         val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.dao())
+        val scheduleHomeViewModel = ViewModelProvider(
+            this,
+            ScheduleHomeViewModelFactory(scheduleRepository, wallpaperRepository),
+        )[ScheduleHomeViewModel::class.java]
         val startupHintViewModel = ViewModelProvider(
             this,
             StartupHintViewModelFactory(RoomStartupHintRepository(DatabaseProvider.dao())),
@@ -57,8 +63,7 @@ class MainActivity : ComponentActivity() {
         )[StartupUpdateViewModel::class.java]
         setContent {
             StarScheduleApp(
-                scheduleRepository = scheduleRepository,
-                wallpaperRepository = wallpaperRepository,
+                scheduleHomeViewModel = scheduleHomeViewModel,
                 startupHintViewModel = startupHintViewModel,
                 startupUpdateViewModel = startupUpdateViewModel,
                 onTimetableSettingsClick = {

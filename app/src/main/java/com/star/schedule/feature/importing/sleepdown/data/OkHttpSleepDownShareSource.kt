@@ -4,6 +4,7 @@ import com.star.schedule.feature.importing.sleepdown.domain.SleepDownProtocolExc
 import com.star.schedule.feature.importing.sleepdown.domain.SleepDownServiceBusyException
 import com.star.schedule.feature.importing.sleepdown.domain.SleepDownShareRejectedException
 import com.star.schedule.feature.importing.sleepdown.domain.SleepDownShareSource
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
@@ -30,6 +31,7 @@ class OkHttpSleepDownShareSource(
     client: OkHttpClient = defaultClient(),
     private val baseUrl: String = DEFAULT_BASE_URL,
     private val json: Json = Json,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : SleepDownShareSource {
     // 注入的 client 也可能开着重定向，一律强制关掉。
     private val client = client.newBuilder()
@@ -37,7 +39,7 @@ class OkHttpSleepDownShareSource(
         .followSslRedirects(false)
         .build()
 
-    override suspend fun fetch(code: String): String = withContext(Dispatchers.IO) {
+    override suspend fun fetch(code: String): String = withContext(ioDispatcher) {
         val body = buildJsonObject { put("code", code) }.toString()
         val request = Request.Builder()
             .url("${baseUrl.trimEnd('/')}/api/v1/short-codes/resolve")
