@@ -1,10 +1,10 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.LessonTimeTemplateEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import kotlinx.coroutines.flow.Flow
 
 interface TimetableRepository {

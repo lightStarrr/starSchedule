@@ -1,8 +1,8 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.schedule.domain.buildCourseBlocksByWeek
 import java.time.DayOfWeek
 import java.time.LocalDate

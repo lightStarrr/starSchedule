@@ -58,8 +58,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.designsystem.component.AppMenu
 import com.star.schedule.core.designsystem.component.MenuEntry
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme

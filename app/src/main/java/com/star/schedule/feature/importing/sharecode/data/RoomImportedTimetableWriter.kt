@@ -1,8 +1,8 @@
 package com.star.schedule.feature.importing.sharecode.data
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.importing.sharecode.domain.ImportedTimetablePlan
 import com.star.schedule.feature.importing.sharecode.domain.ImportedTimetableWriter
 import com.star.schedule.feature.timetable.domain.TimetableRepository

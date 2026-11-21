@@ -1,123 +1,174 @@
 package com.star.schedule.feature.timetable.data
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.LessonTimeTemplateEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
-import com.star.schedule.core.database.ScheduleDao
-import com.star.schedule.core.database.TimetableEntity
-import com.star.schedule.feature.timetable.domain.TimetableRepository
+import androidx.room.withTransaction
+import com.star.schedule.core.database.AppDatabase
+import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.core.database.dao.CourseDao
+import com.star.schedule.core.database.dao.LessonTimeDao
+import com.star.schedule.core.database.dao.LessonTimeTemplateDao
+import com.star.schedule.core.database.dao.PreferenceDao
+import com.star.schedule.core.database.dao.TimetableDao
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.timetable.domain.ReminderScheduler
+import com.star.schedule.feature.timetable.domain.TimetableRepository
 import com.star.schedule.platform.notification.ReminderRefresher
 import kotlinx.coroutines.flow.Flow
 
 class RoomTimetableRepository(
-    private val dao: ScheduleDao,
-    reminderScheduler: ReminderScheduler? = null
+    private val preferenceDao: PreferenceDao,
+    private val timetableDao: TimetableDao,
+    private val courseDao: CourseDao,
+    private val lessonTimeDao: LessonTimeDao,
+    private val lessonTimeTemplateDao: LessonTimeTemplateDao,
+    reminderScheduler: ReminderScheduler? = null,
+    private val runInTransaction: suspend (suspend () -> Any?) -> Any? = { block -> block() },
 ) : TimetableRepository {
-    private val reminderRefresher = ReminderRefresher(dao, reminderScheduler)
+    constructor(
+        database: AppDatabase,
+        reminderScheduler: ReminderScheduler? = null,
+    ) : this(
+        preferenceDao = database.preferenceDao(),
+        timetableDao = database.timetableDao(),
+        courseDao = database.courseDao(),
+        lessonTimeDao = database.lessonTimeDao(),
+        lessonTimeTemplateDao = database.lessonTimeTemplateDao(),
+        reminderScheduler = reminderScheduler,
+        runInTransaction = { block -> database.withTransaction { block() } },
+    )
+
+    private val reminderRefresher = ReminderRefresher(preferenceDao, reminderScheduler)
 
     override fun observeTimetables(): Flow<List<TimetableEntity>> =
-        dao.getAllTimetables()
+        timetableDao.getAllTimetables()
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> =
-        dao.getTimetableFlow(timetableId)
+        timetableDao.getTimetableFlow(timetableId)
 
     override suspend fun getAllTimetablesOnce(): List<TimetableEntity> =
-        dao.getAllTimetablesOnce()
+        timetableDao.getAllTimetablesOnce()
 
     override suspend fun insertTimetableWithReminders(timetable: TimetableEntity): Long {
-        val id = dao.insertTimetableWithReminders(timetable)
+        val id = runInTransaction {
+            val insertedId = timetableDao.insertTimetable(timetable)
+            DatabaseProvider.ensureValidCurrentTimetable(preferenceDao, timetableDao)
+            insertedId
+        } as Long
         reminderRefresher.refreshIfCurrent(id)
         return id
     }
 
     override suspend fun updateTimetableWithReminders(timetable: TimetableEntity) {
-        dao.updateTimetableWithReminders(timetable)
+        runInTransaction {
+            timetableDao.updateTimetable(timetable)
+            DatabaseProvider.ensureValidCurrentTimetable(preferenceDao, timetableDao)
+        }
         reminderRefresher.refreshIfCurrent(timetable.id)
     }
 
     override suspend fun deleteTimetableWithReminders(timetable: TimetableEntity) {
         reminderRefresher.disableIfEnabled(timetable.id)
-        dao.deleteTimetableWithReminders(timetable)
+        runInTransaction {
+            timetableDao.deleteTimetable(timetable)
+            DatabaseProvider.ensureValidCurrentTimetable(preferenceDao, timetableDao)
+        }
     }
 
     override suspend fun replaceCoursesForTimetable(
         timetableId: Long,
-        courses: List<CourseEntity>
+        courses: List<CourseEntity>,
     ) {
-        dao.replaceCoursesForTimetable(timetableId, courses)
+        courseDao.replaceCoursesForTimetable(timetableId, courses)
         reminderRefresher.refreshIfCurrent(timetableId)
     }
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =
-        dao.getLessonTimesFlow(timetableId)
+        lessonTimeDao.getLessonTimesFlow(timetableId)
 
     override suspend fun insertOrUpdateLessonTimeAutoSort(
         lessonTime: LessonTimeEntity,
-        isInsert: Boolean
-    ): Long = dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert).also {
+        isInsert: Boolean,
+    ): Long = lessonTimeDao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert).also {
         reminderRefresher.refreshIfCurrent(lessonTime.timetableId)
     }
 
     override suspend fun deleteLessonTimeAutoSort(lessonTime: LessonTimeEntity) {
-        dao.deleteLessonTimeAutoSort(lessonTime)
+        lessonTimeDao.deleteLessonTimeAutoSort(lessonTime)
         reminderRefresher.refreshIfCurrent(lessonTime.timetableId)
     }
 
     override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> =
-        dao.getCoursesFlow(timetableId)
+        courseDao.getCoursesFlow(timetableId)
 
     override suspend fun insertCourseWithReminders(course: CourseEntity): Long =
-        dao.insertCourseWithReminders(course).also {
+        courseDao.insertCourse(course).also {
             reminderRefresher.refreshIfCurrent(course.timetableId)
         }
 
     override suspend fun updateCourseWithReminders(course: CourseEntity) {
-        dao.updateCourseWithReminders(course)
+        courseDao.updateCourse(course)
         reminderRefresher.refreshIfCurrent(course.timetableId)
     }
 
     override suspend fun deleteCourseWithReminders(course: CourseEntity) {
-        dao.deleteCourseWithReminders(course)
+        courseDao.deleteCourse(course)
         reminderRefresher.refreshIfCurrent(course.timetableId)
     }
 
     override fun observeLessonTimeTemplates(): Flow<List<LessonTimeTemplateEntity>> =
-        dao.getLessonTimeTemplatesFlow()
+        lessonTimeTemplateDao.getLessonTimeTemplatesFlow()
 
     override suspend fun getLessonTimeTemplateByNameOnce(name: String): LessonTimeTemplateEntity? =
-        dao.getLessonTimeTemplateByNameOnce(name)
+        lessonTimeTemplateDao.getLessonTimeTemplateByNameOnce(name)
 
     override suspend fun getLessonTimeTemplateItemsOnce(
-        templateId: Long
-    ): List<LessonTimeTemplateItemEntity> = dao.getLessonTimeTemplateItemsOnce(templateId)
+        templateId: Long,
+    ): List<LessonTimeTemplateItemEntity> =
+        lessonTimeTemplateDao.getLessonTimeTemplateItemsOnce(templateId)
 
     override suspend fun saveLessonTimeTemplateFromItems(
         templateName: String,
         lessonTimes: List<LessonTimeTemplateItemEntity>,
         overwrite: Boolean,
         createdAt: Long,
-        updatedAt: Long
-    ): Long = dao.saveLessonTimeTemplateFromItems(
+        updatedAt: Long,
+    ): Long = lessonTimeTemplateDao.saveLessonTimeTemplateFromItems(
         templateName = templateName,
         lessonTimes = lessonTimes,
         overwrite = overwrite,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
     )
 
     override suspend fun saveLessonTimeTemplateFromTimetable(
         timetableId: Long,
         templateName: String,
-        overwrite: Boolean
-    ): Long = dao.saveLessonTimeTemplateFromTimetable(timetableId, templateName, overwrite)
+        overwrite: Boolean,
+    ): Long = runInTransaction {
+        val now = System.currentTimeMillis()
+        val items = lessonTimeDao.getLessonTimesOnce(timetableId)
+            .sortedBy { it.period }
+            .map { time ->
+                LessonTimeTemplateItemEntity(
+                    templateId = 0L,
+                    period = time.period,
+                    startTime = time.startTime,
+                    endTime = time.endTime,
+                )
+            }
+        lessonTimeTemplateDao.saveLessonTimeTemplateFromItems(
+            templateName = templateName,
+            lessonTimes = items,
+            overwrite = overwrite,
+            createdAt = now,
+            updatedAt = now,
+        )
+    } as Long
 
     override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) {
-        dao.deleteLessonTimeTemplate(template)
-    }
-
-    private companion object {
-        const val TAG = "RoomTimetableRepository"
+        lessonTimeTemplateDao.deleteLessonTimeTemplate(template)
     }
 }

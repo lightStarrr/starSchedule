@@ -1,5 +1,7 @@
 package com.star.schedule.core.database
 
+import com.star.schedule.core.database.entity.LessonTimeEntity
+
 /**
  * 一次「应用模板」的可撤销快照。
  *

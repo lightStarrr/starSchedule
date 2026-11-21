@@ -1,12 +1,12 @@
 package com.star.schedule.feature.timetable.presentation
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.DayNoteEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeApplySnapshot
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.LessonTimeTemplateEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

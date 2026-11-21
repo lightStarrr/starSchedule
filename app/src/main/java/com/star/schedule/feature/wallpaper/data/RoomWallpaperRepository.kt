@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import com.star.schedule.core.common.Constants
-import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.core.database.dao.PreferenceDao
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaperEntry
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaperEntry.Companion.KIND_DEFAULT
@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
 
 class RoomWallpaperRepository(
     context: Context,
-    private val dao: ScheduleDao,
+    private val dao: PreferenceDao,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : WallpaperRepository {
     private val appContext = context.applicationContext

@@ -27,7 +27,7 @@ class AiSettingsActivity : ComponentActivity() {
         // 只看隐私开关与当前服务商两个偏好，复用设置模块的仓库即可，不必为 AI 再造一层
         val settingsRepository = RoomSettingsRepository(
             context = this,
-            dao = DatabaseProvider.dao(),
+            database = DatabaseProvider.db,
             notificationManager = UnifiedNotificationManager(this),
         )
         val viewModel = ViewModelProvider(

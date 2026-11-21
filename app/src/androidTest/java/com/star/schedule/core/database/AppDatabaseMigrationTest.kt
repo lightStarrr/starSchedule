@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.star.schedule.core.database.entity.TimetableEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -98,8 +99,11 @@ class AppDatabaseMigrationTest {
                 .addMigrations(AppDatabase.MIGRATION_11_12)
                 .build()
             try {
-                val dao = migratedDb.scheduleDao()
-                val timetables = dao.getAllTimetablesOnce()
+                val timetableDao = migratedDb.timetableDao()
+                val lessonTimeDao = migratedDb.lessonTimeDao()
+                val courseDao = migratedDb.courseDao()
+                val dayNoteDao = migratedDb.dayNoteDao()
+                val timetables = timetableDao.getAllTimetablesOnce()
                 assertEquals(1, timetables.size)
                 assertEquals(
                     TimetableEntity(
@@ -113,9 +117,9 @@ class AppDatabaseMigrationTest {
                     ),
                     timetables.single(),
                 )
-                assertEquals(1, dao.getLessonTimesOnce(7L).size)
-                assertEquals(1, dao.getCoursesFlow(7L).first().size)
-                assertEquals(1, dao.getDayNotesFlow(7L).first().size)
+                assertEquals(1, lessonTimeDao.getLessonTimesOnce(7L).size)
+                assertEquals(1, courseDao.getCoursesFlow(7L).first().size)
+                assertEquals(1, dayNoteDao.getDayNotesFlow(7L).first().size)
 
                 val columns = mutableSetOf<String>()
                 migratedDb.openHelper.readableDatabase.query("PRAGMA table_info(`timetable`)").use { cursor ->
@@ -127,10 +131,10 @@ class AppDatabaseMigrationTest {
                 assertFalse("autoUpdateJson 应已从 timetable 表移除", "autoUpdateJson" in columns)
 
                 // 删除课表时外键级联仍应生效。
-                dao.deleteTimetable(timetables.single())
-                assertTrue(dao.getLessonTimesOnce(7L).isEmpty())
-                assertTrue(dao.getCoursesFlow(7L).first().isEmpty())
-                assertTrue(dao.getDayNotesFlow(7L).first().isEmpty())
+                timetableDao.deleteTimetable(timetables.single())
+                assertTrue(lessonTimeDao.getLessonTimesOnce(7L).isEmpty())
+                assertTrue(courseDao.getCoursesFlow(7L).first().isEmpty())
+                assertTrue(dayNoteDao.getDayNotesFlow(7L).first().isEmpty())
             } finally {
                 migratedDb.close()
             }

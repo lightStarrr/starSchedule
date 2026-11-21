@@ -33,11 +33,11 @@ class LessonTimeTemplateActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val dao = DatabaseProvider.dao()
+        val db = DatabaseProvider.db
         // 应用模板会重排指定课表的节次，落库后要让提醒跟着重排。
         val repository = RoomScheduleRepository(
-            dao = dao,
-            reminderRefresher = ReminderRefresher(dao, UnifiedNotificationManager(this)),
+            database = db,
+            reminderRefresher = ReminderRefresher(db.preferenceDao(), UnifiedNotificationManager(this)),
         )
         val viewModel = ViewModelProvider(
             this,

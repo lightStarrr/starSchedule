@@ -1,6 +1,6 @@
 package com.star.schedule.feature.schedule.domain
 
-import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.entity.CourseEntity
 
 data class CourseBlock(
     val course: CourseEntity,

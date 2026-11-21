@@ -1,14 +1,21 @@
 package com.star.schedule.feature.schedule.data
 
+import androidx.room.withTransaction
 import com.star.schedule.core.common.Constants
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.DayNoteEntity
+import com.star.schedule.core.database.AppDatabase
 import com.star.schedule.core.database.LessonTimeApplySnapshot
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.LessonTimeTemplateEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
-import com.star.schedule.core.database.ScheduleDao
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.dao.CourseDao
+import com.star.schedule.core.database.dao.DayNoteDao
+import com.star.schedule.core.database.dao.LessonTimeDao
+import com.star.schedule.core.database.dao.LessonTimeTemplateDao
+import com.star.schedule.core.database.dao.PreferenceDao
+import com.star.schedule.core.database.dao.TimetableDao
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.DayNoteEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.timetable.domain.LessonTimeTemplateApply
 import com.star.schedule.platform.notification.ReminderRefresher
@@ -16,84 +23,128 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class RoomScheduleRepository(
-    private val dao: ScheduleDao,
+    private val preferenceDao: PreferenceDao,
+    private val timetableDao: TimetableDao,
+    private val courseDao: CourseDao,
+    private val lessonTimeDao: LessonTimeDao,
+    private val lessonTimeTemplateDao: LessonTimeTemplateDao,
+    private val dayNoteDao: DayNoteDao,
     /** 节次写入与模板应用后重排提醒；只读页面可不传。 */
     private val reminderRefresher: ReminderRefresher? = null,
+    private val runInTransaction: suspend (suspend () -> Any?) -> Any? = { block -> block() },
 ) : ScheduleRepository {
+    constructor(
+        database: AppDatabase,
+        reminderRefresher: ReminderRefresher? = null,
+    ) : this(
+        preferenceDao = database.preferenceDao(),
+        timetableDao = database.timetableDao(),
+        courseDao = database.courseDao(),
+        lessonTimeDao = database.lessonTimeDao(),
+        lessonTimeTemplateDao = database.lessonTimeTemplateDao(),
+        dayNoteDao = database.dayNoteDao(),
+        reminderRefresher = reminderRefresher,
+        runInTransaction = { block -> database.withTransaction { block() } },
+    )
+
     override fun observeCurrentTimetableId(): Flow<Long?> =
-        dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
+        preferenceDao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
             .map { it?.toLongOrNull() }
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> =
-        dao.getTimetableFlow(timetableId)
+        timetableDao.getTimetableFlow(timetableId)
 
     override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> =
-        dao.getCoursesFlow(timetableId)
+        courseDao.getCoursesFlow(timetableId)
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =
-        dao.getLessonTimesFlow(timetableId)
+        lessonTimeDao.getLessonTimesFlow(timetableId)
 
     // 写入统一走 DAO 的 AutoSort 事务：节次号永远等于按开始时间排序后的位置，
     // 时间列从上到下才不会出现「第 3 节比第 2 节还早」。
     override suspend fun insertLessonTime(lessonTime: LessonTimeEntity): Long =
-        dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = true).also {
+        lessonTimeDao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = true).also {
             reminderRefresher?.refreshIfCurrent(lessonTime.timetableId)
         }
 
     override suspend fun updateLessonTime(lessonTime: LessonTimeEntity) {
-        dao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = false)
+        lessonTimeDao.insertOrUpdateLessonTimeAutoSort(lessonTime, isInsert = false)
         reminderRefresher?.refreshIfCurrent(lessonTime.timetableId)
     }
 
     override suspend fun deleteLessonTime(lessonTime: LessonTimeEntity) {
-        dao.deleteLessonTimeAutoSort(lessonTime)
+        lessonTimeDao.deleteLessonTimeAutoSort(lessonTime)
         reminderRefresher?.refreshIfCurrent(lessonTime.timetableId)
     }
 
     override suspend fun getLessonTimeTemplateIdByName(name: String): Long? =
-        dao.getLessonTimeTemplateByNameOnce(name)?.id
+        lessonTimeTemplateDao.getLessonTimeTemplateByNameOnce(name)?.id
 
     override suspend fun saveLessonTimeTemplateFromTimetable(
         timetableId: Long,
         name: String,
         overwrite: Boolean,
-    ): Long = dao.saveLessonTimeTemplateFromTimetable(timetableId, name, overwrite)
+    ): Long = runInTransaction {
+        val now = System.currentTimeMillis()
+        val items = lessonTimeDao.getLessonTimesOnce(timetableId)
+            .sortedBy { it.period }
+            .map { time ->
+                LessonTimeTemplateItemEntity(
+                    templateId = 0L,
+                    period = time.period,
+                    startTime = time.startTime,
+                    endTime = time.endTime,
+                )
+            }
+        lessonTimeTemplateDao.saveLessonTimeTemplateFromItems(
+            templateName = name,
+            lessonTimes = items,
+            overwrite = overwrite,
+            createdAt = now,
+            updatedAt = now,
+        )
+    } as Long
 
     override fun observeLessonTimeTemplates(): Flow<List<LessonTimeTemplateEntity>> =
-        dao.getLessonTimeTemplatesFlow()
+        lessonTimeTemplateDao.getLessonTimeTemplatesFlow()
 
     override fun observeLessonTimeTemplateItems(): Flow<List<LessonTimeTemplateItemEntity>> =
-        dao.getLessonTimeTemplateItemsFlow()
+        lessonTimeTemplateDao.getLessonTimeTemplateItemsFlow()
 
     override suspend fun getLessonTimeTemplateByIdOnce(templateId: Long): LessonTimeTemplateEntity? =
-        dao.getLessonTimeTemplateByIdOnce(templateId)
+        lessonTimeTemplateDao.getLessonTimeTemplateByIdOnce(templateId)
 
     override suspend fun getLessonTimeTemplateItemsOnce(
         templateId: Long,
-    ): List<LessonTimeTemplateItemEntity> = dao.getLessonTimeTemplateItemsOnce(templateId)
+    ): List<LessonTimeTemplateItemEntity> =
+        lessonTimeTemplateDao.getLessonTimeTemplateItemsOnce(templateId)
 
     override suspend fun saveLessonTimeTemplateFromItems(
         templateName: String,
         lessonTimes: List<LessonTimeTemplateItemEntity>,
         overwrite: Boolean,
-    ): Long = dao.saveLessonTimeTemplateFromItems(templateName, lessonTimes, overwrite)
+    ): Long = lessonTimeTemplateDao.saveLessonTimeTemplateFromItems(
+        templateName = templateName,
+        lessonTimes = lessonTimes,
+        overwrite = overwrite,
+    )
 
     override suspend fun replaceLessonTimeTemplate(
         template: LessonTimeTemplateEntity,
         items: List<LessonTimeTemplateItemEntity>,
     ) {
-        dao.replaceLessonTimeTemplate(template, items)
+        lessonTimeTemplateDao.replaceLessonTimeTemplate(template, items)
     }
 
     override suspend fun applyLessonTimeTemplateToTimetable(
         timetableId: Long,
         templateId: Long,
     ): LessonTimeApplySnapshot? {
-        val items = dao.getLessonTimeTemplateItemsOnce(templateId)
+        val items = lessonTimeTemplateDao.getLessonTimeTemplateItemsOnce(templateId)
         // 空模板不是「清空课表」，直接拒绝：界面会提示「这个模板还没有节次」。
         if (items.isEmpty()) return null
         val periods = LessonTimeTemplateApply.normalize(items)
-        val snapshot = dao.applyLessonTimesToTimetable(
+        val snapshot = lessonTimeDao.applyLessonTimesToTimetable(
             timetableId = timetableId,
             lessonTimes = periods.map { period ->
                 LessonTimeEntity(
@@ -109,28 +160,28 @@ class RoomScheduleRepository(
     }
 
     override suspend fun restoreAppliedLessonTimeTemplate(snapshot: LessonTimeApplySnapshot) {
-        dao.restoreLessonTimeApplySnapshot(snapshot)
+        lessonTimeDao.restoreLessonTimeApplySnapshot(snapshot)
         reminderRefresher?.refreshIfCurrent(snapshot.timetableId)
     }
 
     override suspend fun deleteLessonTimeTemplate(template: LessonTimeTemplateEntity) {
-        dao.deleteLessonTimeTemplate(template)
+        lessonTimeTemplateDao.deleteLessonTimeTemplate(template)
     }
 
     override suspend fun restoreLessonTimeTemplate(
         template: LessonTimeTemplateEntity,
         items: List<LessonTimeTemplateItemEntity>,
     ) {
-        dao.restoreLessonTimeTemplate(template, items)
+        lessonTimeTemplateDao.restoreLessonTimeTemplate(template, items)
     }
 
     override fun observeDayNotes(timetableId: Long): Flow<List<DayNoteEntity>> =
-        dao.getDayNotesFlow(timetableId)
+        dayNoteDao.getDayNotesFlow(timetableId)
 
     override suspend fun upsertDayNote(note: DayNoteEntity): Long =
-        dao.upsertDayNote(note)
+        dayNoteDao.upsertDayNote(note)
 
     override suspend fun deleteDayNote(timetableId: Long, date: String) {
-        dao.deleteDayNote(timetableId, date)
+        dayNoteDao.deleteDayNote(timetableId, date)
     }
 }

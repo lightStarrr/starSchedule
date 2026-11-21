@@ -1,12 +1,12 @@
 package com.star.schedule.feature.timetable.presentation
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.DayNoteEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeApplySnapshot
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.LessonTimeTemplateEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -285,7 +285,7 @@ class LessonTimeSettingsViewModelTest {
 /**
  * 只保留测试用得到的行为。
  *
- * [resort] 复刻 `ScheduleDao.deleteLessonTimeAutoSort` 的重排规则（按开始时间重新编号 1..n），
+ * [resort] 复刻 `LessonTimeDao.deleteLessonTimeAutoSort` 的重排规则（按开始时间重新编号 1..n），
  * 没有它造不出「两次删除都是第 3 节」这个复现条件。
  */
 private class FakeScheduleRepository : ScheduleRepository {

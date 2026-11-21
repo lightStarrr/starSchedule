@@ -1,7 +1,7 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

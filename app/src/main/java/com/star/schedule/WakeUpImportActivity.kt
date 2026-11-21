@@ -30,13 +30,13 @@ class WakeUpImportActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val dao = DatabaseProvider.dao()
+        val db = DatabaseProvider.db
         val notificationManager = UnifiedNotificationManager(this)
         val importUseCase = createWakeUpImportUseCase(
-            repository = RoomTimetableRepository(dao, notificationManager),
+            repository = RoomTimetableRepository(db, notificationManager),
             defaultTimetableName = getString(R.string.wakeup_default_timetable_name),
         )
-        val settingsRepository = RoomSettingsRepository(this, dao, notificationManager)
+        val settingsRepository = RoomSettingsRepository(this, db, notificationManager)
         val viewModel = ViewModelProvider(
             this,
             ShareCodeImportViewModelFactory(

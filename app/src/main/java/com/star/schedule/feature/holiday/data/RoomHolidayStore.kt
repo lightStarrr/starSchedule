@@ -1,7 +1,7 @@
 package com.star.schedule.feature.holiday.data
 
-import com.star.schedule.core.database.HolidayDao
-import com.star.schedule.core.database.HolidayEntity
+import com.star.schedule.core.database.dao.HolidayDao
+import com.star.schedule.core.database.entity.HolidayEntity
 import com.star.schedule.feature.holiday.domain.HolidayDay
 import com.star.schedule.feature.holiday.domain.HolidayStore
 import java.time.LocalDate

@@ -1,7 +1,7 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.CourseEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 
 /** 应用模板时真正写进 `lesson_time` 的一节。 */
 data class AppliedPeriod(

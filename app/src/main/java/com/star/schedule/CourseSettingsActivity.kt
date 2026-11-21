@@ -31,7 +31,7 @@ class CourseSettingsActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val repository = RoomScheduleRepository(DatabaseProvider.dao())
+        val repository = RoomScheduleRepository(DatabaseProvider.db)
         val viewModel = ViewModelProvider(
             this,
             CourseSettingsViewModelFactory(repository, timetableId),

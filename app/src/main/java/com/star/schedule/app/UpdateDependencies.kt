@@ -63,7 +63,7 @@ class UpdateDependencies(
 
     val repository: UpdateRepository = DefaultUpdateRepository(
         source = source,
-        preferences = RoomUpdatePreferences(DatabaseProvider.dao()),
+        preferences = RoomUpdatePreferences(DatabaseProvider.preferenceDao()),
         installed = installed,
         scope = scope,
         ioDispatcher = ioDispatcher,

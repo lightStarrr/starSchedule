@@ -3,7 +3,7 @@ package com.star.schedule.feature.timetable.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

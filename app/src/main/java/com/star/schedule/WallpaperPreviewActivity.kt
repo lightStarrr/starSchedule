@@ -45,8 +45,8 @@ class WallpaperPreviewActivity : ComponentActivity() {
             WallpaperPreviewViewModelFactory(
                 timetableId = timetableId,
                 imageUriString = imageUri,
-                scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao()),
-                wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.dao()),
+                scheduleRepository = RoomScheduleRepository(DatabaseProvider.db),
+                wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.preferenceDao()),
                 initialDesign = design,
             ),
         )[WallpaperPreviewViewModel::class.java]

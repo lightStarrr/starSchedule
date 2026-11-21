@@ -26,10 +26,10 @@ class ManualCreateTimetableActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val timetableRepository = RoomTimetableRepository(DatabaseProvider.dao())
+        val timetableRepository = RoomTimetableRepository(DatabaseProvider.db)
         val settingsRepository = RoomSettingsRepository(
             context = this,
-            dao = DatabaseProvider.dao(),
+            database = DatabaseProvider.db,
             notificationManager = UnifiedNotificationManager(this),
         )
         val holidayStore =

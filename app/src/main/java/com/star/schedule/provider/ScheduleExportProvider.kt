@@ -11,10 +11,10 @@ import android.util.Log
 import androidx.core.net.toUri
 import androidx.room.InvalidationTracker
 import com.star.schedule.core.common.Constants
-import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.DatabaseProvider
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -85,7 +85,7 @@ class ScheduleExportProvider : ContentProvider() {
                 fallback = "[{\"id\":1,\"tableName\":\"星课程表\"}]"
             ) {
                 buildJsonArray {
-                    DatabaseProvider.dao().getAllTimetablesOnce().forEach { timetable ->
+                    DatabaseProvider.timetableDao().getAllTimetablesOnce().forEach { timetable ->
                         add(buildJsonObject {
                             put("id", timetable.id)
                             put("tableName", timetable.name)
@@ -109,11 +109,10 @@ class ScheduleExportProvider : ContentProvider() {
     }
 
     private suspend fun courseJson(uri: Uri, tomorrow: Boolean): String {
-        val dao = DatabaseProvider.dao()
         val timetableId = currentTimetableId()
-        val timetable = dao.getTimetableFlow(timetableId).first()
-        val courses = dao.getCoursesFlow(timetableId).first()
-        val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
+        val timetable = DatabaseProvider.timetableDao().getTimetableFlow(timetableId).first()
+        val courses = DatabaseProvider.courseDao().getCoursesFlow(timetableId).first()
+        val lessonTimes = DatabaseProvider.lessonTimeDao().getLessonTimesFlow(timetableId).first()
         val zoneId = ZoneId.systemDefault()
         val now = LocalDateTime.now(zoneId)
         val date = requestedDate(uri).let { if (tomorrow) it.plusDays(1) else it }
@@ -159,9 +158,9 @@ class ScheduleExportProvider : ContentProvider() {
     }
 
     private suspend fun currentTimetableId(): Long {
-        val dao = DatabaseProvider.dao()
-        return dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE).first()?.toLongOrNull()
-            ?: dao.getAllTimetablesOnce().firstOrNull()?.id
+        return DatabaseProvider.preferenceDao()
+            .getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE).first()?.toLongOrNull()
+            ?: DatabaseProvider.timetableDao().getAllTimetablesOnce().firstOrNull()?.id
             ?: 1L
     }
 
@@ -173,7 +172,7 @@ class ScheduleExportProvider : ContentProvider() {
         runBlocking(Dispatchers.IO) {
             withTimeout(QUERY_TIMEOUT_MS) {
                 DatabaseProvider.ensureValidCurrentTimetable()
-                val enabled = DatabaseProvider.dao()
+                val enabled = DatabaseProvider.preferenceDao()
                     .getPreferenceFlow(Constants.PREF_WAKEUP_SIMULATION_ENABLED)
                     .first() == "true"
                 if (!enabled) disabled else block()

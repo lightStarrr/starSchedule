@@ -3,7 +3,7 @@ package com.star.schedule.feature.timetable.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.star.schedule.core.database.TimetableEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.holiday.domain.HolidayStore
 import com.star.schedule.feature.timetable.domain.SemesterStartSuggestion
 import com.star.schedule.feature.timetable.domain.TimetableRepository

@@ -37,10 +37,10 @@ import androidx.core.net.toUri
 import com.star.schedule.core.common.Constants
 import com.star.schedule.MainActivity
 import com.star.schedule.R
-import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.DatabaseProvider
-import com.star.schedule.core.database.LessonTimeEntity
-import com.star.schedule.core.database.ReminderEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.ReminderEntity
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import com.star.schedule.feature.timetable.domain.ReminderScheduler
 import kotlinx.coroutines.CancellationException
@@ -178,7 +178,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
 
     private suspend fun getCustomNotificationIconPath(): String? {
         return runCatching {
-            DatabaseProvider.dao()
+            DatabaseProvider.preferenceDao()
                 .getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH)
                 .first()
         }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -321,12 +321,12 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
         finish: Boolean,
         customIconPath: String?
     ) {
-        val dao = DatabaseProvider.dao()
-        val colorPref = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
-        val templatePref = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE).first()
+        val preferenceDao = DatabaseProvider.preferenceDao()
+        val colorPref = preferenceDao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
+        val templatePref = preferenceDao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE).first()
         val customIconPref =
             customIconPath
-                ?: dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH).first()
+                ?: preferenceDao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH).first()
         val capsuleBgColor = colorPref ?: "#FFE082"
         val template = FlymeLiveTemplate.fromPref(templatePref)
         val iconPath = customIconPref?.takeIf { it.isNotBlank() }
@@ -503,8 +503,8 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
     }
 
     override suspend fun enableRemindersForTimetable(timetableId: Long) = reminderLock.withLock {
-        val dao = DatabaseProvider.dao()
-        dao.setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, timetableId.toString())
+        DatabaseProvider.preferenceDao()
+            .setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, timetableId.toString())
 
         cancelAllReminders()
         scheduleRemindersForTimetable(timetableId)
@@ -516,9 +516,9 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
     }
 
     override suspend fun refreshRemindersForTimetable(timetableId: Long) = reminderLock.withLock {
-        val dao = DatabaseProvider.dao()
-        val currentId = dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE).first()?.toLongOrNull()
-        val enabledId = dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()?.toLongOrNull()
+        val preferenceDao = DatabaseProvider.preferenceDao()
+        val currentId = preferenceDao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE).first()?.toLongOrNull()
+        val enabledId = preferenceDao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()?.toLongOrNull()
         if (currentId != timetableId || enabledId != timetableId) return@withLock
         cancelAllReminders()
         scheduleRemindersForTimetable(timetableId)
@@ -526,27 +526,26 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
     }
 
     override suspend fun disableRemindersForTimetable(timetableId: Long) = reminderLock.withLock {
-        val enabledId = DatabaseProvider.dao()
+        val enabledId = DatabaseProvider.preferenceDao()
             .getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()?.toLongOrNull()
         if (enabledId == timetableId) disableRemindersLocked()
     }
 
     private suspend fun disableRemindersLocked() {
-        val dao = DatabaseProvider.dao()
-        dao.setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, "")
+        DatabaseProvider.preferenceDao().setPreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE, "")
         cancelAllReminders()
         cancelDailyUpdate()
     }
 
     private suspend fun scheduleRemindersForTimetable(timetableId: Long) {
-        val dao = DatabaseProvider.dao()
-        val timetable = dao.getTimetableFlow(timetableId).first() ?: return
-        val courses = dao.getCoursesFlow(timetableId).first()
-        val lessonTimes = dao.getLessonTimesFlow(timetableId).first()
+        val timetable = DatabaseProvider.timetableDao().getTimetableFlow(timetableId).first() ?: return
+        val courses = DatabaseProvider.courseDao().getCoursesFlow(timetableId).first()
+        val lessonTimes = DatabaseProvider.lessonTimeDao().getLessonTimesFlow(timetableId).first()
 
         // 检查是否只在连续课程的第一节课前发送通知
         val notifyOnlyForFirstContinuousClassPref =
-            dao.getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS).first()
+            DatabaseProvider.preferenceDao()
+                .getPreferenceFlow(Constants.PREF_NOTIFY_ONLY_FOR_FIRST_CONTINUOUS_CLASS).first()
         val notifyOnlyForFirstContinuousClass = notifyOnlyForFirstContinuousClassPref == "true"
 
         val startDate =
@@ -641,7 +640,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
                         pendingIntent,
                     )
                     try {
-                        DatabaseProvider.dao().insertReminder(
+                        DatabaseProvider.reminderDao().insertReminder(
                             ReminderEntity(requestCode, course.id, date.toString(), lessonTime.period),
                         )
                     } catch (error: Throwable) {
@@ -660,7 +659,8 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
 
     // ⚡️ 精确取消
     private suspend fun cancelAllReminders() {
-        val reminders = DatabaseProvider.dao().getAllReminders()
+        val reminderDao = DatabaseProvider.reminderDao()
+        val reminders = reminderDao.getAllReminders()
         reminders.forEach { reminder ->
             val intent = Intent(context, CourseReminderReceiver::class.java)
             val pendingIntent = PendingIntent.getBroadcast(
@@ -674,7 +674,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
                 pendingIntent.cancel()
             }
         }
-        DatabaseProvider.dao().deleteAllReminders()
+        reminderDao.deleteAllReminders()
         Log.d("UnifiedNotification", "已取消 ${reminders.size} 个提醒")
     }
 
@@ -751,9 +751,8 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
             Log.d("UnifiedNotification", "应用启动，初始化提醒系统")
 
             // 检查是否有启用的课表提醒
-            val dao = DatabaseProvider.dao()
-            val enabledTimetableId =
-                dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId = DatabaseProvider.preferenceDao()
+                .getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -793,9 +792,8 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
                 DatabaseProvider.init(context)
             }
 
-            val dao = DatabaseProvider.dao()
-            val enabledTimetableId =
-                dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
+            val enabledTimetableId = DatabaseProvider.preferenceDao()
+                .getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
 
             enabledTimetableId?.let { idString ->
                 if (idString.isNotEmpty()) {
@@ -804,7 +802,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
                         Log.d("UnifiedNotification", "重启后恢复课表提醒: $timetableId")
 
                         // 清理数据库中的记录（因为重启后所有闹钟都会被清除）
-                        dao.deleteAllReminders()
+                        DatabaseProvider.reminderDao().deleteAllReminders()
 
                         // 重新设置所有提醒
                         scheduleRemindersForTimetable(timetableId)
@@ -828,7 +826,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
      * 清理过期提醒，添加新的提醒
      */
     suspend fun updateUpcomingReminders() = reminderLock.withLock {
-        val timetableId = DatabaseProvider.dao()
+        val timetableId = DatabaseProvider.preferenceDao()
             .getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE)
             .first()
             ?.toLongOrNull()
@@ -899,8 +897,8 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
      */
     private suspend fun cleanupExpiredReminders() {
         try {
-            val dao = DatabaseProvider.dao()
-            val allReminders = dao.getAllReminders()
+            val reminderDao = DatabaseProvider.reminderDao()
+            val allReminders = reminderDao.getAllReminders()
             val currentDate = LocalDate.now()
 
             val expiredReminders = allReminders.filter { reminder ->
@@ -923,7 +921,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
                 }
 
                 // 从数据库中删除
-                dao.deleteReminder(reminder.requestCode)
+                reminderDao.deleteReminder(reminder.requestCode)
             }
 
             if (expiredReminders.isNotEmpty()) {

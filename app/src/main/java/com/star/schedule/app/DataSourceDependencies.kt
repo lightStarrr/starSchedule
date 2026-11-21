@@ -61,7 +61,7 @@ class DataSourceDependencies(
                 descriptionRes = R.string.datasource_holiday_cn_description,
             ),
         ),
-        dao = DatabaseProvider.dao(),
+        dao = DatabaseProvider.preferenceDao(),
         scheduler = refreshScheduler,
     )
 

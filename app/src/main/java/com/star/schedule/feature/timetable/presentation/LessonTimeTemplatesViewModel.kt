@@ -3,10 +3,10 @@ package com.star.schedule.feature.timetable.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.LessonTimeApplySnapshot
-import com.star.schedule.core.database.LessonTimeTemplateEntity
-import com.star.schedule.core.database.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.timetable.domain.LessonTimeApplyPreview
 import com.star.schedule.feature.timetable.domain.LessonTimeTemplateApply

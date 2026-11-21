@@ -31,7 +31,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     // 已投递的旧广播也要检查课表，防止关闭或切换后仍显示提醒。
                     // 测试提醒与旧版本闹钟没有此字段，保持原来的兼容行为。
                     if (timetableId != -1L) {
-                        val enabledId = DatabaseProvider.dao()
+                        val enabledId = DatabaseProvider.preferenceDao()
                             .getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE)
                             .first()
                             ?.toLongOrNull()

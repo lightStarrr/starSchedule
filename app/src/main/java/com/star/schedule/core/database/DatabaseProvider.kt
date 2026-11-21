@@ -3,8 +3,19 @@ package com.star.schedule.core.database
 import android.content.Context
 import androidx.room.Room
 import androidx.room.migration.Migration
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.star.schedule.core.common.Constants
+import com.star.schedule.core.database.dao.CourseDao
+import com.star.schedule.core.database.dao.DayNoteDao
+import com.star.schedule.core.database.dao.HolidayDao
+import com.star.schedule.core.database.dao.LessonTimeDao
+import com.star.schedule.core.database.dao.LessonTimeTemplateDao
+import com.star.schedule.core.database.dao.PreferenceDao
+import com.star.schedule.core.database.dao.ReminderDao
+import com.star.schedule.core.database.dao.TimetableDao
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -28,7 +39,7 @@ object DatabaseProvider {
                 db = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "schedule.db"
+                    "schedule.db",
                 )
                     .addMigrations(
                         MIGRATION_2_3,
@@ -60,13 +71,47 @@ object DatabaseProvider {
         initValidationLock.withLock {
             if (currentTimetableValidated || !::db.isInitialized) return
             withContext(Dispatchers.IO) {
-                db.scheduleDao().ensureValidCurrentTimetable()
+                db.withTransaction {
+                    ensureValidCurrentTimetable(db.preferenceDao(), db.timetableDao())
+                }
             }
             currentTimetableValidated = true
         }
     }
 
-    fun dao(): ScheduleDao = db.scheduleDao()
+    /**
+     * 校验当前课表偏好指向：
+     * 1) 若库里没有任何课表，置空偏好；
+     * 2) 若当前指向不存在（如被删除），回退到第一条课表。
+     */
+    suspend fun ensureValidCurrentTimetable(
+        preferenceDao: PreferenceDao,
+        timetableDao: TimetableDao,
+    ) {
+        val currentId = preferenceDao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
+            .firstOrNull()?.toLongOrNull()
+        val timetables = timetableDao.getAllTimetablesOnce()
+
+        if (timetables.isEmpty()) {
+            preferenceDao.setPreference(Constants.PREF_CURRENT_TIMETABLE, "")
+            return
+        }
+
+        val firstId = timetables.first().id
+        val exists = currentId != null && timetables.any { it.id == currentId }
+        if (!exists) {
+            preferenceDao.setPreference(Constants.PREF_CURRENT_TIMETABLE, firstId.toString())
+        }
+    }
+
+    fun preferenceDao(): PreferenceDao = db.preferenceDao()
+    fun timetableDao(): TimetableDao = db.timetableDao()
+    fun lessonTimeDao(): LessonTimeDao = db.lessonTimeDao()
+    fun lessonTimeTemplateDao(): LessonTimeTemplateDao = db.lessonTimeTemplateDao()
+    fun courseDao(): CourseDao = db.courseDao()
+    fun reminderDao(): ReminderDao = db.reminderDao()
+    fun dayNoteDao(): DayNoteDao = db.dayNoteDao()
+    fun holidayDao(): HolidayDao = db.holidayDao()
 
     val MIGRATION_2_3 = object : Migration(2, 3) {
         override fun migrate(db: SupportSQLiteDatabase) {

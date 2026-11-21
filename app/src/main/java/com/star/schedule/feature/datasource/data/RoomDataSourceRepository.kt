@@ -2,7 +2,7 @@ package com.star.schedule.feature.datasource.data
 
 import android.util.Log
 import com.star.schedule.core.common.Constants
-import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.core.database.dao.PreferenceDao
 import com.star.schedule.feature.datasource.domain.DataSourceDescriptor
 import com.star.schedule.feature.datasource.domain.DataSourceRefreshResult
 import com.star.schedule.feature.datasource.domain.DataSourceRefreshScheduler
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.map
 
 class RoomDataSourceRepository(
     override val sources: List<DataSourceDescriptor>,
-    private val dao: ScheduleDao,
+    private val dao: PreferenceDao,
     private val scheduler: DataSourceRefreshScheduler,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) : DataSourceRepository {

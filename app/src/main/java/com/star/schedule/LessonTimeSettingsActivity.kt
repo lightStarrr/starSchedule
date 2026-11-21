@@ -33,10 +33,10 @@ class LessonTimeSettingsActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val dao = DatabaseProvider.dao()
+        val db = DatabaseProvider.db
         val repository = RoomScheduleRepository(
-            dao = dao,
-            reminderRefresher = ReminderRefresher(dao, UnifiedNotificationManager(applicationContext)),
+            database = db,
+            reminderRefresher = ReminderRefresher(db.preferenceDao(), UnifiedNotificationManager(applicationContext)),
         )
         val viewModel = ViewModelProvider(
             this,

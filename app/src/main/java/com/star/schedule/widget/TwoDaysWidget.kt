@@ -396,13 +396,16 @@ class TwoDaysWidget : GlanceAppWidget() {
                 DatabaseProvider.ensureValidCurrentTimetable()
 
                 val database = DatabaseProvider.db
-                val dao = database.scheduleDao()
+                val preferenceDao = database.preferenceDao()
+                val timetableDao = database.timetableDao()
+                val courseDao = database.courseDao()
+                val lessonTimeDao = database.lessonTimeDao()
                 val now = LocalDateTime.now()
                 val updateTimeStr = now.format(DateTimeFormatter.ofPattern("HH:mm"))
 
-                val currentTimetableId = dao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
+                val currentTimetableId = preferenceDao.getPreferenceFlow(Constants.PREF_CURRENT_TIMETABLE)
                     .firstOrNull()?.toLongOrNull()
-                val timetable = currentTimetableId?.let { dao.getTimetableFlow(it).firstOrNull() }
+                val timetable = currentTimetableId?.let { timetableDao.getTimetableFlow(it).firstOrNull() }
 
                 val widgetData = if (currentTimetableId == null || timetable == null) {
                     // 当前课表不存在或已删除时必须清空 DataStore，避免小组件永久残留过期课表。
@@ -417,9 +420,9 @@ class TwoDaysWidget : GlanceAppWidget() {
                         .getOrElse { today }
                     val currentWeekNumber = today.getWeekOfSemester(startDate)
 
-                    val courses = dao.getCoursesFlow(currentTimetableId).firstOrNull() ?: emptyList()
+                    val courses = courseDao.getCoursesFlow(currentTimetableId).firstOrNull() ?: emptyList()
                     val lessonTimes =
-                        dao.getLessonTimesFlow(currentTimetableId).firstOrNull() ?: emptyList()
+                        lessonTimeDao.getLessonTimesFlow(currentTimetableId).firstOrNull() ?: emptyList()
 
                     val thisWeekCourses = courses.filter { it.weeks.contains(currentWeekNumber) }
                     val todayCourses = thisWeekCourses.filter { it.dayOfWeek == today.dayOfWeek.value }

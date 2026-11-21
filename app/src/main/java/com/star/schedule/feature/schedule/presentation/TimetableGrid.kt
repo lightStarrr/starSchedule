@@ -44,10 +44,10 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.star.schedule.R
-import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.designsystem.CourseBlockCornerRadius
 import com.star.schedule.core.designsystem.rememberAnimationsEnabled
-import com.star.schedule.core.database.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.feature.schedule.domain.CourseBlock
 import com.star.schedule.feature.schedule.domain.buildCourseBlocksByWeek
 import kotlinx.coroutines.coroutineScope

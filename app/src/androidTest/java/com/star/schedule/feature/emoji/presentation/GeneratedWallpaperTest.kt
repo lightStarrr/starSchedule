@@ -52,9 +52,9 @@ class GeneratedWallpaperTest {
         val id = Long.MAX_VALUE
         val folder = File(context.filesDir, "wallpapers/$id")
         try {
-            var repository = RoomWallpaperRepository(context, database.scheduleDao())
+            var repository = RoomWallpaperRepository(context, database.preferenceDao())
             repository.applyDesign(id, design).getOrThrow()
-            repository = RoomWallpaperRepository(context, database.scheduleDao())
+            repository = RoomWallpaperRepository(context, database.preferenceDao())
             assertEquals(WallpaperState.Generated(design), repository.observe(id).first())
             assertTrue(repository.observeRecents().first().contains(RecentWallpaper.Generated(design)))
             val solid = WallpaperDesign(solidArgb = 0xff123456.toInt())

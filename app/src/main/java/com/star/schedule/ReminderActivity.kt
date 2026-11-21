@@ -29,7 +29,7 @@ class ReminderActivity : ComponentActivity() {
 
         val settingsRepository = RoomSettingsRepository(
             context = this,
-            dao = DatabaseProvider.dao(),
+            database = DatabaseProvider.db,
             notificationManager = UnifiedNotificationManager(this),
         )
         val viewModel = ViewModelProvider(

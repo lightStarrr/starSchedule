@@ -1,6 +1,6 @@
 package com.star.schedule.feature.schedule.domain
 
-import com.star.schedule.core.database.CourseEntity
+import com.star.schedule.core.database.entity.CourseEntity
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

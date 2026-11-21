@@ -1,7 +1,7 @@
 package com.star.schedule.feature.emoji.data
 
 import com.star.schedule.core.common.Constants
-import com.star.schedule.core.database.ScheduleDao
+import com.star.schedule.core.database.dao.PreferenceDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -13,7 +13,7 @@ import kotlinx.serialization.json.Json
  * 表情选择器的「最近使用」：JSON 字符串数组存偏好，最多 32 个、最新在前。
  */
 class EmojiPickerRecentsRepository(
-    private val dao: ScheduleDao,
+    private val dao: PreferenceDao,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = ListSerializer(String.serializer())

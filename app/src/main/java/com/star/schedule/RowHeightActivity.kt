@@ -33,10 +33,10 @@ class RowHeightActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
+        val scheduleRepository = RoomScheduleRepository(DatabaseProvider.db)
         val settingsRepository = RoomSettingsRepository(
             context = this,
-            dao = DatabaseProvider.dao(),
+            database = DatabaseProvider.db,
             notificationManager = UnifiedNotificationManager(this),
         )
         val viewModel = ViewModelProvider(

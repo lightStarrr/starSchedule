@@ -24,14 +24,14 @@ class TimetableSettingsActivity : ComponentActivity() {
 
         val settingsRepository = RoomSettingsRepository(
             context = this,
-            dao = DatabaseProvider.dao(),
+            database = DatabaseProvider.db,
             notificationManager = UnifiedNotificationManager(this),
         )
         val viewModel = ViewModelProvider(
             this,
             TimetableSettingsViewModelFactory(
                 settingsRepository,
-                RoomWallpaperRepository(this, DatabaseProvider.dao()),
+                RoomWallpaperRepository(this, DatabaseProvider.preferenceDao()),
             ),
         )[TimetableSettingsViewModel::class.java]
 

@@ -27,7 +27,7 @@ class LessonTimeTemplateEditActivity : ComponentActivity() {
         // EXTRA 缺省为 NEW_TEMPLATE_ID（-1）：不带 id 打开就是新建模式。
         val templateId = intent.getLongExtra(EXTRA_TEMPLATE_ID, NEW_TEMPLATE_ID)
 
-        val repository = RoomScheduleRepository(DatabaseProvider.dao())
+        val repository = RoomScheduleRepository(DatabaseProvider.db)
         val viewModel = ViewModelProvider(
             this,
             LessonTimeTemplateEditViewModelFactory(repository, templateId),

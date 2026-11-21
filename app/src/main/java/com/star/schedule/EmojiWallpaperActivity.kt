@@ -50,7 +50,7 @@ class EmojiWallpaperActivity : ComponentActivity() {
             EmojiWallpaperViewModelFactory(
                 appContext = applicationContext,
                 optionalResources = dependencies.optionalResources,
-                recentsRepository = EmojiPickerRecentsRepository(DatabaseProvider.dao()),
+                recentsRepository = EmojiPickerRecentsRepository(DatabaseProvider.preferenceDao()),
                 systemSeedArgb = dynamicLightColorScheme(this).primary.toArgb(),
             ),
         )[EmojiWallpaperViewModel::class.java]

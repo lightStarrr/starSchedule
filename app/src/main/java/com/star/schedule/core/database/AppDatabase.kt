@@ -1,4 +1,3 @@
-// AppDatabase.kt
 package com.star.schedule.core.database
 
 import androidx.room.Database
@@ -6,6 +5,24 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.star.schedule.core.database.converter.Converters
+import com.star.schedule.core.database.dao.CourseDao
+import com.star.schedule.core.database.dao.DayNoteDao
+import com.star.schedule.core.database.dao.HolidayDao
+import com.star.schedule.core.database.dao.LessonTimeDao
+import com.star.schedule.core.database.dao.LessonTimeTemplateDao
+import com.star.schedule.core.database.dao.PreferenceDao
+import com.star.schedule.core.database.dao.ReminderDao
+import com.star.schedule.core.database.dao.TimetableDao
+import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.DayNoteEntity
+import com.star.schedule.core.database.entity.HolidayEntity
+import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
+import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.database.entity.PreferenceEntity
+import com.star.schedule.core.database.entity.ReminderEntity
+import com.star.schedule.core.database.entity.TimetableEntity
 
 @Database(
     entities = [
@@ -17,21 +34,26 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CourseEntity::class,
         ReminderEntity::class,
         DayNoteEntity::class,
-        HolidayEntity::class
+        HolidayEntity::class,
     ],
     version = 12,
-    exportSchema = false
+    exportSchema = false,
 )
-@TypeConverters(Converters::class) // 注册 TypeConverter
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun scheduleDao(): ScheduleDao
+    abstract fun preferenceDao(): PreferenceDao
+    abstract fun timetableDao(): TimetableDao
+    abstract fun lessonTimeDao(): LessonTimeDao
+    abstract fun lessonTimeTemplateDao(): LessonTimeTemplateDao
+    abstract fun courseDao(): CourseDao
+    abstract fun reminderDao(): ReminderDao
+    abstract fun dayNoteDao(): DayNoteDao
     abstract fun holidayDao(): HolidayDao
 
     companion object {
         // 从版本3迁移到版本4，添加rowHeight字段
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 添加rowHeight列，默认值为60
                 db.execSQL("ALTER TABLE timetable ADD COLUMN rowHeight INTEGER NOT NULL DEFAULT 60")
             }
         }
@@ -39,7 +61,6 @@ abstract class AppDatabase : RoomDatabase() {
         // 从版本4迁移到版本5，添加reminderTime字段
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 添加reminderTime列，默认值为15
                 db.execSQL("ALTER TABLE timetable ADD COLUMN reminderTime INTEGER NOT NULL DEFAULT 15")
             }
         }
@@ -47,7 +68,6 @@ abstract class AppDatabase : RoomDatabase() {
         // 从版本5迁移到版本6，添加teacher字段
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 添加teacher列，默认值为空字符串
                 db.execSQL("ALTER TABLE course ADD COLUMN teacher TEXT NOT NULL DEFAULT ''")
             }
         }
@@ -64,7 +84,7 @@ abstract class AppDatabase : RoomDatabase() {
                         content TEXT NOT NULL,
                         FOREIGN KEY(timetableId) REFERENCES timetable(id) ON DELETE CASCADE
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_day_note_timetableId_date ON day_note(timetableId, date)")
             }
@@ -81,7 +101,7 @@ abstract class AppDatabase : RoomDatabase() {
                         createdAt INTEGER NOT NULL,
                         updatedAt INTEGER NOT NULL
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_lesson_time_template_name ON lesson_time_template(name)")
 
@@ -95,7 +115,7 @@ abstract class AppDatabase : RoomDatabase() {
                         endTime TEXT NOT NULL,
                         FOREIGN KEY(templateId) REFERENCES lesson_time_template(id) ON DELETE CASCADE
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_lesson_time_template_item_templateId ON lesson_time_template_item(templateId)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_lesson_time_template_item_templateId_period ON lesson_time_template_item(templateId, period)")
@@ -109,10 +129,9 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // 从版本9迁移到版本10：修复旧版本写入的 JSON 缺少 type 字段的问题
+        // 从版本9迁移到版本10：历史占位迁移
         val MIGRATION_9_10 = object : Migration(9, 10) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-            }
+            override fun migrate(db: SupportSQLiteDatabase) = Unit
         }
 
         // 从版本10迁移到版本11：新增法定节假日缓存表
@@ -125,7 +144,7 @@ abstract class AppDatabase : RoomDatabase() {
                         name TEXT NOT NULL,
                         isOffDay INTEGER NOT NULL
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
             }
         }
@@ -145,13 +164,13 @@ abstract class AppDatabase : RoomDatabase() {
                         `rowHeight` INTEGER NOT NULL,
                         `reminderTime` INTEGER NOT NULL
                     )
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 db.execSQL(
                     """
                     INSERT INTO `_new_timetable` (`id`, `name`, `showWeekend`, `startDate`, `showFuture`, `rowHeight`, `reminderTime`)
                     SELECT `id`, `name`, `showWeekend`, `startDate`, `showFuture`, `rowHeight`, `reminderTime` FROM `timetable`
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
                 db.execSQL("DROP TABLE `timetable`")
                 db.execSQL("ALTER TABLE `_new_timetable` RENAME TO `timetable`")

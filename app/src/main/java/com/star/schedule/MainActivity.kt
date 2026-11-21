@@ -43,15 +43,15 @@ class MainActivity : ComponentActivity() {
             UnifiedNotificationManager(applicationContext).initializeOnAppStart()
         }
         installEdgeToEdge()
-        val scheduleRepository = RoomScheduleRepository(DatabaseProvider.dao())
-        val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.dao())
+        val scheduleRepository = RoomScheduleRepository(DatabaseProvider.db)
+        val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.preferenceDao())
         val scheduleHomeViewModel = ViewModelProvider(
             this,
             ScheduleHomeViewModelFactory(scheduleRepository, wallpaperRepository),
         )[ScheduleHomeViewModel::class.java]
         val startupHintViewModel = ViewModelProvider(
             this,
-            StartupHintViewModelFactory(RoomStartupHintRepository(DatabaseProvider.dao())),
+            StartupHintViewModelFactory(RoomStartupHintRepository(DatabaseProvider.preferenceDao())),
         )[StartupHintViewModel::class.java]
         val updateDependencies = (application as ScheduleApplication).updateDependencies
         val startupUpdateViewModel = ViewModelProvider(

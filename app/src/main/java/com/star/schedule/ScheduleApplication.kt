@@ -76,7 +76,7 @@ class ScheduleApplication : Application(), Configuration.Provider {
      */
     private fun observeRecentsPreference() {
         applicationScope.launch {
-            DatabaseProvider.dao()
+            DatabaseProvider.preferenceDao()
                 .getPreferenceFlow(Constants.PREF_HIDE_FROM_RECENTS)
                 .collect { value ->
                     val enabled = value == "true"
@@ -94,12 +94,12 @@ class ScheduleApplication : Application(), Configuration.Provider {
      */
     private fun observePrivacyPreference() {
         applicationScope.launch {
-            val dao = DatabaseProvider.dao()
+            val preferenceDao = DatabaseProvider.preferenceDao()
             combine(
-                dao.getPreferenceFlow(Constants.PREF_PRIVACY_DATA_ENABLED),
-                dao.getPreferenceFlow(Constants.PREF_AI_PROVIDER_ID),
-                dao.getPreferenceFlow(Constants.PREF_AI_MODEL_ALIAS),
-                dao.getPreferenceFlow(Constants.PREF_AI_REASONING_EFFORT),
+                preferenceDao.getPreferenceFlow(Constants.PREF_PRIVACY_DATA_ENABLED),
+                preferenceDao.getPreferenceFlow(Constants.PREF_AI_PROVIDER_ID),
+                preferenceDao.getPreferenceFlow(Constants.PREF_AI_MODEL_ALIAS),
+                preferenceDao.getPreferenceFlow(Constants.PREF_AI_REASONING_EFFORT),
             ) { dataCollection, providerId, modelAlias, effort ->
                 AiPreferences(dataCollection, providerId, modelAlias, effort)
             }
@@ -113,13 +113,13 @@ class ScheduleApplication : Application(), Configuration.Provider {
                     // 偏好里留着 cloud / alias / 档位的话，以后任何直接读偏好的入口（比如构造 chat 请求）
                     // 都会绕过隐私开关，也会让重开开关后显示用户没设过的档位。
                     if (prefs.providerId == Constants.AI_PROVIDER_CLOUD) {
-                        dao.setPreference(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_NONE)
+                        preferenceDao.setPreference(Constants.PREF_AI_PROVIDER_ID, Constants.AI_PROVIDER_NONE)
                     }
                     if (!prefs.modelAlias.isNullOrEmpty()) {
-                        dao.setPreference(Constants.PREF_AI_MODEL_ALIAS, "")
+                        preferenceDao.setPreference(Constants.PREF_AI_MODEL_ALIAS, "")
                     }
                     if (!prefs.reasoningEffort.isNullOrEmpty()) {
-                        dao.setPreference(Constants.PREF_AI_REASONING_EFFORT, "")
+                        preferenceDao.setPreference(Constants.PREF_AI_REASONING_EFFORT, "")
                     }
                 }
         }
