@@ -25,12 +25,15 @@ fun WallpaperBackground(
     state: WallpaperState,
     modifier: Modifier = Modifier,
 ) {
-    val ready = state as? WallpaperState.Ready
-    WallpaperBackground(
-        path = ready?.localPath,
-        blurRadius = 0f,
-        modifier = modifier,
-    )
+    when (state) {
+        WallpaperState.None -> Unit
+        is WallpaperState.Ready -> WallpaperBackground(
+            path = state.localPath,
+            blurRadius = 0f,
+            modifier = modifier,
+        )
+        is WallpaperState.Generated -> GeneratedWallpaperBackground(state.design, modifier)
+    }
 }
 
 /**

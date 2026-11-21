@@ -46,7 +46,6 @@ class EmojiWallpaperRenderTest {
             pickerOpen = false,
             pickerGroupId = EMOJI_GROUP_RECENT,
             recents = emptyList(),
-            exporting = false,
         ))
         compose.setContent {
             StarScheduleTheme {

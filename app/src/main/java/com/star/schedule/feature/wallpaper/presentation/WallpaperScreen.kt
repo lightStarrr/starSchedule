@@ -2,19 +2,19 @@ package com.star.schedule.feature.wallpaper.presentation
 
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +40,8 @@ import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.feature.datasource.domain.OptionalResourceState
 import com.star.schedule.feature.emoji.presentation.WallpaperViewModel
+import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
+import com.star.schedule.core.designsystem.navigationBarBottomInset
 
 @Composable
 fun WallpaperRoute(
@@ -47,6 +49,7 @@ fun WallpaperRoute(
     onBack: () -> Unit,
     onPickPhoto: () -> Unit,
     onMakeEmojiWallpaper: () -> Unit,
+    onPreview: (WallpaperDesign?) -> Unit,
 ) {
     val fontState by viewModel.emojiFontState.collectAsStateWithLifecycle()
     WallpaperScreen(
@@ -55,6 +58,7 @@ fun WallpaperRoute(
         onBack = onBack,
         onPickPhoto = onPickPhoto,
         onMakeEmojiWallpaper = onMakeEmojiWallpaper,
+        onPreview = onPreview,
         onDownloadFont = viewModel::downloadEmojiFont,
         onCancelFontDownload = viewModel::cancelEmojiFontDownload,
     )
@@ -72,6 +76,7 @@ fun WallpaperScreen(
     onBack: () -> Unit,
     onPickPhoto: () -> Unit,
     onMakeEmojiWallpaper: () -> Unit,
+    onPreview: (WallpaperDesign?) -> Unit,
     onDownloadFont: () -> Unit,
     onCancelFontDownload: () -> Unit,
 ) {
@@ -95,41 +100,35 @@ fun WallpaperScreen(
             )
         },
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center,
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp + navigationBarBottomInset()),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            Spacer(Modifier.height(24.dp))
+            FilledTonalButton(
+                onClick = onPickPhoto,
+                modifier = Modifier.height(56.dp),
             ) {
-                Button(onClick = onPickPhoto) {
-                    Icon(
-                        imageVector = Icons.Rounded.PhotoLibrary,
-                        contentDescription = null,
-                    )
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.wallpaper_pick_photo))
-                }
-                FilledTonalButton(
-                    onClick = {
-                        if (emojiFontState is OptionalResourceState.Installed) {
-                            onMakeEmojiWallpaper()
-                        } else {
-                            showFontDialog = true
-                        }
-                    },
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.EmojiEmotions,
-                        contentDescription = null,
-                    )
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.wallpaper_make_emoji))
-                }
+                Icon(Icons.Rounded.PhotoLibrary, contentDescription = null)
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(stringResource(R.string.wallpaper_pick_photo))
             }
+            Spacer(Modifier.height(24.dp))
+            WallpaperStudio(
+                onMakeEmojiWallpaper = {
+                    if (emojiFontState is OptionalResourceState.Installed) {
+                        onMakeEmojiWallpaper()
+                    } else {
+                        showFontDialog = true
+                    }
+                },
+                onPreview = onPreview,
+            )
         }
     }
 

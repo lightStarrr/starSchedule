@@ -11,6 +11,8 @@ import com.star.schedule.feature.timetable.domain.timetablePreviewGrid
 import com.star.schedule.feature.wallpaper.domain.StagedWallpaper
 import com.star.schedule.feature.wallpaper.domain.WallpaperBlurSpec
 import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
+import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
+import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,8 +28,9 @@ sealed interface WallpaperPreviewUiState {
     data object LoadFailed : WallpaperPreviewUiState
 
     data class Ready(
-        val stagedPath: String,
-        val seedArgb: Int,
+        val stagedPath: String?,
+        val seedArgb: Int?,
+        val design: WallpaperDesign?,
         val blurEnabled: Boolean,
         // 单位 dp；开关没打开时保留上次滑到的值，写库时按 0 处理。
         val blurRadius: Float,
@@ -51,14 +54,15 @@ sealed interface WallpaperPreviewUiState {
  */
 class WallpaperPreviewViewModel(
     private val timetableId: Long,
-    imageUriString: String,
+    imageUriString: String?,
     scheduleRepository: ScheduleRepository,
     private val wallpaperRepository: WallpaperRepository,
+    private val initialDesign: WallpaperDesign? = null,
 ) : ViewModel() {
     private sealed interface StageResult {
         data object Loading : StageResult
         data object Failed : StageResult
-        data class Ok(val staged: StagedWallpaper) : StageResult
+        data class Ok(val staged: StagedWallpaper?) : StageResult
     }
 
     private data class EditState(
@@ -67,6 +71,7 @@ class WallpaperPreviewViewModel(
         val isApplying: Boolean = false,
         val applyFailed: Boolean = false,
         val applied: Boolean = false,
+        val solidArgb: Int? = null,
     )
 
     private val staged = MutableStateFlow<StageResult>(StageResult.Loading)
@@ -84,6 +89,14 @@ class WallpaperPreviewViewModel(
 
     init {
         viewModelScope.launch {
+            if (imageUriString == null) {
+                staged.value = if (initialDesign == null || initialDesign.isValid()) {
+                    StageResult.Ok(null)
+                } else {
+                    StageResult.Failed
+                }
+                return@launch
+            }
             val result = wallpaperRepository.stagePreview(imageUriString)
             result.onSuccess { stagedPath = it.path }
             staged.value = result.fold(
@@ -112,8 +125,13 @@ class WallpaperPreviewViewModel(
                     fallbackRowHeight = DEFAULT_ROW_HEIGHT,
                 )
                 WallpaperPreviewUiState.Ready(
-                    stagedPath = staged.staged.path,
-                    seedArgb = staged.staged.seedArgb,
+                    stagedPath = staged.staged?.path,
+                    seedArgb = edit.solidArgb ?: initialDesign?.seedArgb ?: staged.staged?.seedArgb,
+                    design = if (initialDesign?.solidArgb != null && edit.solidArgb != null) {
+                        initialDesign.copy(solidArgb = edit.solidArgb)
+                    } else {
+                        initialDesign
+                    },
                     blurEnabled = edit.blurEnabled,
                     blurRadius = edit.blurRadius,
                     isApplying = edit.isApplying,
@@ -138,6 +156,12 @@ class WallpaperPreviewViewModel(
         edit.update { it.copy(blurEnabled = enabled) }
     }
 
+    fun selectSolidColor(colorArgb: Int) {
+        if (initialDesign?.solidArgb != null && colorArgb ushr 24 == 255) {
+            edit.update { it.copy(solidArgb = colorArgb) }
+        }
+    }
+
     fun setBlurRadius(radius: Float) {
         edit.update { it.copy(blurRadius = radius.coerceIn(BLUR_RADIUS_MIN, BLUR_RADIUS_MAX)) }
     }
@@ -151,9 +175,18 @@ class WallpaperPreviewViewModel(
         if (state.isApplying) return
         edit.update { it.copy(isApplying = true, applyFailed = false) }
         viewModelScope.launch {
-            wallpaperRepository.applyStaged(timetableId, state.stagedPath, blur)
+            val result = when {
+                state.stagedPath != null ->
+                    wallpaperRepository.applyStaged(timetableId, state.stagedPath, blur)
+                state.design != null -> wallpaperRepository.applyDesign(
+                    timetableId,
+                    state.design.copy(blurRadius = if (state.blurEnabled) state.blurRadius else 0f),
+                )
+                else -> wallpaperRepository.applyRecent(timetableId, RecentWallpaper.Default)
+            }
+            result
                 .onSuccess {
-                    wallpaperRepository.discardStaged(state.stagedPath)
+                    state.stagedPath?.let(wallpaperRepository::discardStaged)
                     stagedPath = null
                     edit.update { it.copy(isApplying = false, applied = true) }
                 }
@@ -177,9 +210,10 @@ class WallpaperPreviewViewModel(
 
 class WallpaperPreviewViewModelFactory(
     private val timetableId: Long,
-    private val imageUriString: String,
+    private val imageUriString: String?,
     private val scheduleRepository: ScheduleRepository,
     private val wallpaperRepository: WallpaperRepository,
+    private val initialDesign: WallpaperDesign? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(WallpaperPreviewViewModel::class.java)) {
@@ -189,6 +223,7 @@ class WallpaperPreviewViewModelFactory(
                 imageUriString = imageUriString,
                 scheduleRepository = scheduleRepository,
                 wallpaperRepository = wallpaperRepository,
+                initialDesign = initialDesign,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

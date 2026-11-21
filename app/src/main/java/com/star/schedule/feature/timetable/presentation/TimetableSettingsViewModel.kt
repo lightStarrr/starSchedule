@@ -145,6 +145,8 @@ class TimetableSettingsViewModel(
 
 private fun WallpaperState.matches(recent: RecentWallpaper): Boolean = when (recent) {
     RecentWallpaper.Default -> this is WallpaperState.None
+    is RecentWallpaper.Generated ->
+        (this as? WallpaperState.Generated)?.design == recent.design
     is RecentWallpaper.Image ->
         (this as? WallpaperState.Ready)?.contentHash == recent.contentHash
 }

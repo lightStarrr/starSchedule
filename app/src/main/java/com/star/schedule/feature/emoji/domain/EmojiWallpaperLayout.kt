@@ -5,6 +5,7 @@ import kotlin.math.roundToInt
 
 enum class EmojiPattern { MOSAIC, LOTUS, STACK, SCATTER, PRISM }
 
+@kotlinx.serialization.Serializable
 data class EmojiWallpaperSpec(
     val emojis: List<String>,
     val pattern: EmojiPattern,

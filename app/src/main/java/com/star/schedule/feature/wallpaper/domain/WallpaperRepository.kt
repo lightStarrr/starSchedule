@@ -43,5 +43,7 @@ interface WallpaperRepository {
      */
     suspend fun applyRecent(timetableId: Long, recent: RecentWallpaper): Result<Unit>
 
+    suspend fun applyDesign(timetableId: Long, design: WallpaperDesign): Result<Unit>
+
     suspend fun clear(timetableId: Long)
 }

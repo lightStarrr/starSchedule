@@ -14,6 +14,7 @@ import com.star.schedule.feature.wallpaper.domain.WallpaperBlurSpec
 import com.star.schedule.feature.wallpaper.domain.WallpaperPreference
 import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
+import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
 import com.star.schedule.feature.wallpaper.domain.promoteRecentEntry
 import java.io.File
 import java.security.MessageDigest
@@ -38,6 +39,7 @@ class RoomWallpaperRepository(
     override fun observe(timetableId: Long): Flow<WallpaperState> =
         dao.getPreferenceFlow(Constants.timetableWallpaperPreference(timetableId))
             .map { value ->
+                WallpaperPreferenceFormat.decodeGenerated(value)?.let { return@map it }
                 val preference = WallpaperPreferenceFormat.decode(value)
                 if (preference == null) {
                     if (!value.isNullOrBlank()) {
@@ -99,6 +101,29 @@ class RoomWallpaperRepository(
             }
             .flowOn(Dispatchers.IO)
 
+    override suspend fun applyDesign(
+        timetableId: Long,
+        design: WallpaperDesign,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            commitDesign(timetableId, design)
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+        }
+    }
+
+    private suspend fun commitDesign(timetableId: Long, design: WallpaperDesign) {
+        require(design.isValid())
+        val key = Constants.timetableWallpaperPreference(timetableId)
+        val old = WallpaperPreferenceFormat.decode(dao.getPreferenceFlow(key).firstOrNull())
+        dao.setPreference(key, WallpaperPreferenceFormat.encodeGenerated(design))
+        old?.let { cacheStore.delete(timetableId, it.fileName) }
+        recordRecent(
+            RecentWallpaperEntry(kind = RecentWallpaperEntry.KIND_GENERATED, design = design),
+            sourceFile = null,
+        )
+    }
+
     override fun observeRecents(): Flow<List<RecentWallpaper>> =
         dao.getPreferenceFlow(Constants.PREF_WALLPAPER_RECENTS)
             .map { value ->
@@ -108,6 +133,9 @@ class RoomWallpaperRepository(
                 val recents = entries.mapNotNull { entry ->
                     when (entry.kind) {
                         KIND_DEFAULT -> RecentWallpaper.Default
+                        RecentWallpaperEntry.KIND_GENERATED -> entry.design
+                            ?.takeIf(WallpaperDesign::isValid)
+                            ?.let(RecentWallpaper::Generated)
                         KIND_IMAGE -> {
                             val hash = entry.contentHash ?: return@mapNotNull null
                             val file = cacheStore.recentFile(hash)
@@ -241,6 +269,9 @@ class RoomWallpaperRepository(
                     RecentWallpaper.Default -> {
                         clearInternal(timetableId)
                         recordRecent(defaultEntry(), sourceFile = null)
+                    }
+                    is RecentWallpaper.Generated -> {
+                        commitDesign(timetableId, recent.design)
                     }
                     is RecentWallpaper.Image -> {
                         val source = File(recent.path)

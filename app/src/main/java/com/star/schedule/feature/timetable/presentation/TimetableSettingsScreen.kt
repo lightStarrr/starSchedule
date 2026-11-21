@@ -168,11 +168,13 @@ fun TimetableSettingsRoute(
 
 private fun RecentWallpaper.toWallpaperOption(): WallpaperOption = when (this) {
     RecentWallpaper.Default -> WallpaperOption.Default
+    is RecentWallpaper.Generated -> WallpaperOption.Generated(design)
     is RecentWallpaper.Image -> WallpaperOption.Image(path, contentHash)
 }
 
 private fun WallpaperOption.toRecentWallpaper(): RecentWallpaper = when (this) {
     WallpaperOption.Default -> RecentWallpaper.Default
+    is WallpaperOption.Generated -> RecentWallpaper.Generated(design)
     is WallpaperOption.Image -> RecentWallpaper.Image(path, contentHash)
 }
 
@@ -329,10 +331,12 @@ private fun TimetableSettingsScreen(
                 if (previewed != null) {
                     Spacer(Modifier.height(24.dp))
                     SettingsGroup {
-                        val currentWallpaper = (
-                            state.wallpapers[previewed.id] as? WallpaperState.Ready
-                            )?.let { WallpaperOption.Image(it.localPath, it.contentHash) }
-                            ?: WallpaperOption.Default
+                        val currentWallpaper = when (val wallpaper = state.wallpapers[previewed.id]) {
+                            is WallpaperState.Ready ->
+                                WallpaperOption.Image(wallpaper.localPath, wallpaper.contentHash)
+                            is WallpaperState.Generated -> WallpaperOption.Generated(wallpaper.design)
+                            else -> WallpaperOption.Default
+                        }
                         WallpaperSettingsCard(
                             timetableId = previewed.id,
                             available = listOf(currentWallpaper) + recentWallpaperOptions(

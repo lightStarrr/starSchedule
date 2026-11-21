@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,7 @@ import com.star.schedule.core.designsystem.component.cornerRadiiPx
 import com.star.schedule.feature.settings.presentation.settingsItemColors
 import com.star.schedule.feature.wallpaper.presentation.WallpaperOption
 import com.star.schedule.feature.wallpaper.presentation.WallpaperThumbnail
+import com.star.schedule.feature.wallpaper.presentation.GeneratedWallpaperBackground
 import com.star.schedule.feature.wallpaper.presentation.reconcileWallpaperOrder
 import com.star.schedule.feature.wallpaper.presentation.sameAs
 import com.star.schedule.feature.wallpaper.presentation.wallpaperStripLayout
@@ -211,6 +213,7 @@ private fun WallpaperStripSlot(
                 when (current) {
                     null -> "empty"
                     WallpaperOption.Default -> "default"
+                    is WallpaperOption.Generated -> current.design
                     is WallpaperOption.Image -> current.contentHash
                 }
             },
@@ -279,6 +282,7 @@ private fun WallpaperOptionTile(
             .background(
                 when (option) {
                     WallpaperOption.Default -> MaterialTheme.colorScheme.surfaceContainer
+                    is WallpaperOption.Generated -> MaterialTheme.colorScheme.surfaceContainerHighest
                     is WallpaperOption.Image -> MaterialTheme.colorScheme.surfaceContainerHighest
                 },
             ),
@@ -287,6 +291,13 @@ private fun WallpaperOptionTile(
             WallpaperThumbnail(
                 path = option.path,
                 cacheKey = option.contentHash,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (option is WallpaperOption.Generated) {
+            GeneratedWallpaperBackground(
+                design = option.design,
+                previewViewport = LocalWindowInfo.current.containerSize,
                 modifier = Modifier.fillMaxSize(),
             )
         }

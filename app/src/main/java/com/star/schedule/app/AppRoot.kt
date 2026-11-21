@@ -22,6 +22,7 @@ import com.star.schedule.feature.update.presentation.StartupUpdateRoute
 import com.star.schedule.feature.update.presentation.StartupUpdateViewModel
 import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
+import com.star.schedule.feature.wallpaper.domain.seedArgb
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
@@ -48,8 +49,7 @@ fun StarScheduleApp(
         val wallpaperState by remember(timetableId) {
             timetableId?.let(wallpaperRepository::observe) ?: flowOf(WallpaperState.None)
         }.collectAsState(initial = WallpaperState.None)
-        val seedColor = (wallpaperState as? WallpaperState.Ready)
-            ?.seedArgb
+        val seedColor = wallpaperState.seedArgb
             ?.let { argb -> Color(argb) }
 
         StarScheduleTheme(

@@ -61,6 +61,7 @@ fun WallpaperPreviewRoute(
             onBlurEnabledChange = viewModel::setBlurEnabled,
             onBlurRadiusChange = viewModel::setBlurRadius,
             onApply = viewModel::apply,
+            onSelectSolidColor = viewModel::selectSolidColor,
         )
     }
 }
@@ -78,6 +79,7 @@ private fun WallpaperPreviewScreen(
     onBlurEnabledChange: (Boolean) -> Unit,
     onBlurRadiusChange: (Float) -> Unit,
     onApply: (WallpaperBlurSpec?) -> Unit,
+    onSelectSolidColor: (Int) -> Unit,
 ) {
     val ready = state as? WallpaperPreviewUiState.Ready
     var effectsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -98,13 +100,24 @@ private fun WallpaperPreviewScreen(
 
     Box(Modifier.fillMaxSize()) {
         if (ready != null) {
-            WallpaperBackground(
-                path = ready.stagedPath,
-                blurRadius = if (ready.blurEnabled) ready.blurRadius else 0f,
-                modifier = Modifier.fillMaxSize(),
-            )
+            if (ready.design != null) {
+                GeneratedWallpaperBackground(
+                    design = ready.design.copy(
+                        blurRadius = if (ready.blurEnabled) ready.blurRadius else 0f,
+                    ),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (ready.stagedPath != null) {
+                WallpaperBackground(
+                    path = ready.stagedPath,
+                    blurRadius = if (ready.blurEnabled) ready.blurRadius else 0f,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer))
+            }
             // 与主页一致：壁纸上盖一层 surface 46% 遮罩，前景内容才读得清。
-            Box(
+            if (ready.design != null || ready.stagedPath != null) Box(
                 Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f)),
@@ -186,7 +199,7 @@ private fun WallpaperPreviewScreen(
             }
         }
 
-        if (ready != null) {
+        if (ready != null && (ready.stagedPath != null || ready.design?.emoji != null)) {
             WallpaperEffectsIsland(
                 expanded = effectsExpanded,
                 onExpandedChange = { effectsExpanded = it },
@@ -195,6 +208,13 @@ private fun WallpaperPreviewScreen(
                 blurRadius = ready.blurRadius,
                 onBlurRadiusChange = onBlurRadiusChange,
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (ready?.design?.solidArgb != null) {
+            SolidWallpaperColors(
+                selectedArgb = ready.design.solidArgb,
+                onSelectColor = onSelectSolidColor,
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }

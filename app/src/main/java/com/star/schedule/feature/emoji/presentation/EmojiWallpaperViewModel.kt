@@ -1,8 +1,6 @@
 package com.star.schedule.feature.emoji.presentation
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Typeface
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -22,9 +20,7 @@ import com.star.schedule.feature.emoji.domain.EMOJI_LAYOUT_SEED
 import com.star.schedule.feature.emoji.domain.quantizedEmojiScale
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperColors
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperSpec
-import com.star.schedule.feature.emoji.domain.emojiWallpaperLayout
 import com.star.schedule.feature.emoji.domain.emojiWallpaperPalettes
-import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -46,9 +42,7 @@ const val EMOJI_WALLPAPER_MAX_EMOJIS = 14
 const val EMOJI_GROUP_RECENT = "recent"
 
 sealed interface EmojiWallpaperEvent {
-    /** 导出完成，把文件交给调用方打开预览页。 */
-    data class Exported(val file: File) : EmojiWallpaperEvent
-    data object ExportFailed : EmojiWallpaperEvent
+    data class Prepared(val spec: EmojiWallpaperSpec) : EmojiWallpaperEvent
     /** 已选表情达到上限，提示一下即可。 */
     data object PickerFull : EmojiWallpaperEvent
 }
@@ -73,7 +67,6 @@ sealed interface EmojiWallpaperUiState {
         /** 选择器当前页签：组 id 或 [EMOJI_GROUP_RECENT]。 */
         val pickerGroupId: String,
         val recents: List<String>,
-        val exporting: Boolean,
     ) : EmojiWallpaperUiState {
         val spec: EmojiWallpaperSpec
             get() = EmojiWallpaperSpec(
@@ -89,7 +82,7 @@ sealed interface EmojiWallpaperUiState {
 /**
  * 表情壁纸编辑页：负责加载字体与表情目录、保存编辑中的
  * [EmojiWallpaperSpec]（拆成可序列化字段存 [SavedStateHandle]，旋转/进程重建不丢）、
- * 以及在 Default 上把当前组合导出成 PNG。
+ * 以及把组合参数交给课表预览页。
  */
 class EmojiWallpaperViewModel(
     private val savedStateHandle: SavedStateHandle,
@@ -104,14 +97,12 @@ class EmojiWallpaperViewModel(
 
     private val editing = MutableStateFlow(Editing())
     private val picker = MutableStateFlow(Picker())
-    private val exporting = MutableStateFlow(false)
 
     val uiState: StateFlow<EmojiWallpaperUiState> = combine(
         editing,
         picker,
-        exporting,
         recentsRepository.observe(),
-    ) { editing, picker, exporting, recents ->
+    ) { editing, picker, recents ->
         when {
             editing.status != Status.Ready -> when (editing.status) {
                 Status.Loading -> EmojiWallpaperUiState.Loading
@@ -130,7 +121,6 @@ class EmojiWallpaperViewModel(
                 pickerOpen = picker.open,
                 pickerGroupId = picker.groupId,
                 recents = recents,
-                exporting = exporting,
             )
         }
     }.stateIn(
@@ -183,14 +173,14 @@ class EmojiWallpaperViewModel(
                     status = Status.Ready,
                     typeface = typeface,
                     groups = groups,
-                    emojis = restored?.emojis.orEmpty(),
+                    emojis = restored?.emojis ?: listOf("🐢", "✌"),
                     pattern = restored?.pattern ?: EmojiPattern.STACK,
                     scale = restored?.scale ?: 0.5f,
                     paletteIndex = restored?.paletteIndex ?: 0,
                     seed = EMOJI_LAYOUT_SEED,
                 )
             }
-            if (restored == null) lucky()
+            if (restored == null) persistSpec()
         }
     }
 
@@ -303,52 +293,13 @@ class EmojiWallpaperViewModel(
         if (editing.value.emojis.isNotEmpty()) closePicker()
     }
 
-    // ---------- 导出 ----------
+    // ---------- 课表预览 ----------
 
-    /** 把当前组合按窗口像素渲成 PNG 写进缓存目录；结果走 [events]。 */
-    fun export(widthPx: Int, heightPx: Int) {
+    /** 只传递绘制参数，预览与课表按各自画布重新计算布局。 */
+    fun preparePreview() {
         val state = uiState.value as? EmojiWallpaperUiState.Ready ?: return
-        if (state.exporting) return
-        exporting.value = true
-        viewModelScope.launch(Dispatchers.Default) {
-            val file = runCatching {
-                val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
-                try {
-                    val canvas = Canvas(bitmap)
-                    val layout = emojiWallpaperLayout(
-                        pattern = state.pattern,
-                        emojiCount = state.emojis.size,
-                        scale = state.scale,
-                        seed = state.seed,
-                        width = widthPx.toFloat(),
-                        height = heightPx.toFloat(),
-                    )
-                    drawEmojiWallpaper(
-                        canvas = canvas,
-                        width = widthPx,
-                        height = heightPx,
-                        spec = state.spec,
-                        layout = layout,
-                        typeface = state.typeface,
-                    )
-                    val dir = File(appContext.cacheDir, EXPORT_DIR).apply { mkdirs() }
-                    val out = File(dir, "render-${System.currentTimeMillis()}.png")
-                    try {
-                        out.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-                    } catch (exception: Exception) {
-                        out.delete()
-                        throw exception
-                    }
-                    out
-                } finally {
-                    bitmap.recycle()
-                }
-            }.getOrNull()
-            exporting.value = false
-            mutableEvents.emit(
-                file?.let(EmojiWallpaperEvent::Exported) ?: EmojiWallpaperEvent.ExportFailed,
-            )
-        }
+        if (state.emojis.isEmpty()) return
+        viewModelScope.launch { mutableEvents.emit(EmojiWallpaperEvent.Prepared(state.spec)) }
     }
 
     private companion object {
@@ -357,7 +308,6 @@ class EmojiWallpaperViewModel(
         const val KEY_SCALE = "spec_scale"
         const val KEY_PALETTE = "spec_palette"
         const val KEY_SEED = "spec_seed"
-        const val EXPORT_DIR = "emoji-wallpaper"
     }
 }
 

@@ -10,6 +10,7 @@ import com.google.android.material.color.utilities.SchemeTonalSpot
  * 表情壁纸的一组配色：背景色 + 表情色 + 生成它的种子。
  * [seedArgb] 同时用作编辑页界面主题的种子，UI 跟所选配色变。
  */
+@kotlinx.serialization.Serializable
 data class EmojiWallpaperColors(
     val backgroundArgb: Int,
     val emojiArgb: Int,

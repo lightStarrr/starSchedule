@@ -9,7 +9,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.net.toUri
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.feature.emoji.data.EmojiPickerRecentsRepository
@@ -17,22 +16,17 @@ import com.star.schedule.feature.emoji.presentation.EmojiWallpaperRoute
 import com.star.schedule.feature.emoji.presentation.EmojiWallpaperViewModel
 import com.star.schedule.feature.emoji.presentation.EmojiWallpaperViewModelFactory
 import com.star.schedule.platform.systembar.installEdgeToEdge
-import java.io.File
+import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
 
 /**
  * 表情壁纸编辑页：作用于打开时指定的课表。
- * 编辑完导出的静态 PNG 交给照片预览页走统一的「应用」流程。
+ * 编辑后的绘制参数交给课表预览页，应用后仍按窗口实时绘制。
  */
 class EmojiWallpaperActivity : ComponentActivity() {
-
-    private var pendingExportFile: File? = null
-
-    // 预览页「应用」成功后这里也结束；无论结果如何都要删掉导出的临时 PNG。
+    // 预览页应用成功后返回课表设置。
     private val previewLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
-        pendingExportFile?.delete()
-        pendingExportFile = null
         if (result.resultCode == Activity.RESULT_OK) {
             setResult(Activity.RESULT_OK)
             finish()
@@ -65,13 +59,12 @@ class EmojiWallpaperActivity : ComponentActivity() {
             EmojiWallpaperRoute(
                 viewModel = viewModel,
                 onBack = ::finish,
-                onExported = { file ->
-                    pendingExportFile = file
+                onPrepared = { spec ->
                     previewLauncher.launch(
                         WallpaperPreviewActivity.intent(
                             this,
                             timetableId,
-                            file.toUri().toString(),
+                            WallpaperDesign(emoji = spec),
                         ),
                     )
                 },

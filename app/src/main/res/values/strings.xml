@@ -634,4 +634,8 @@
     <string name="manual_create_semester_spring">%1$d Spring</string>
     <string name="manual_create_semester_fall">%1$d Fall</string>
     <string name="manual_create_create">Create timetable</string>
+    <string name="wallpaper_studio">Wallpaper studio</string>
+    <string name="wallpaper_solid">Solid color</string>
+    <string name="wallpaper_none">None</string>
+    <string name="wallpaper_color_option">Color option %1$d</string>
 </resources>

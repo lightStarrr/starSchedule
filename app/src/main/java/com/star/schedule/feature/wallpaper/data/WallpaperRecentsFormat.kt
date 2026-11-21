@@ -40,6 +40,10 @@ internal object WallpaperRecentsFormat {
                 hash.matches(hashPattern) &&
                 entry.fileName == "wallpaper-$hash"
         }
+        RecentWallpaperEntry.KIND_GENERATED ->
+            entry.design?.isValid() == true &&
+                entry.fileName == null &&
+                entry.contentHash == null
         else -> false
     }
 }

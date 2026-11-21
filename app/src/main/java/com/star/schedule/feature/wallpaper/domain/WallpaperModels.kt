@@ -1,9 +1,12 @@
 package com.star.schedule.feature.wallpaper.domain
 
 import kotlinx.serialization.Serializable
+import com.star.schedule.feature.emoji.domain.EmojiWallpaperSpec
 
 sealed interface WallpaperState {
     data object None : WallpaperState
+
+    data class Generated(val design: WallpaperDesign) : WallpaperState
 
     data class Ready(
         val localPath: String,
@@ -39,6 +42,8 @@ data class WallpaperBlurSpec(
 sealed interface RecentWallpaper {
     data object Default : RecentWallpaper
 
+    data class Generated(val design: WallpaperDesign) : RecentWallpaper
+
     data class Image(
         val path: String,
         val contentHash: String,
@@ -55,7 +60,7 @@ data class WallpaperPreference(
 
 /**
  * 最近壁纸列表里的一条记录，序列化进偏好 JSON。
- * [kind] 只会是 [KIND_DEFAULT] 或 [KIND_IMAGE]；image 条目必须带文件名与内容哈希。
+ * image 条目带文件名与内容哈希，generated 条目保存绘制参数，default 表示默认背景。
  */
 @Serializable
 data class RecentWallpaperEntry(
@@ -63,9 +68,40 @@ data class RecentWallpaperEntry(
     val fileName: String? = null,
     val contentHash: String? = null,
     val seedArgb: Int? = null,
+    val design: WallpaperDesign? = null,
 ) {
     companion object {
         const val KIND_DEFAULT = "default"
         const val KIND_IMAGE = "image"
+        const val KIND_GENERATED = "generated"
     }
 }
+
+/** 保存参数而非整屏位图；每个窗口按实际画布尺寸重新计算表情布局。 */
+@Serializable
+data class WallpaperDesign(
+    val emoji: EmojiWallpaperSpec? = null,
+    val solidArgb: Int? = null,
+    val blurRadius: Float = 0f,
+) {
+    val seedArgb: Int get() = emoji?.colors?.seedArgb ?: requireNotNull(solidArgb)
+
+    fun isValid(): Boolean =
+        (emoji == null) != (solidArgb == null) &&
+            blurRadius.isFinite() && blurRadius in 0f..25f &&
+            (solidArgb == null || solidArgb ushr 24 == 255) &&
+            (emoji?.let { spec ->
+                spec.emojis.size in 1..14 &&
+                    spec.emojis.all { it.isNotBlank() && it.length <= 64 } &&
+                    spec.scale.isFinite() && spec.scale in 0f..1f &&
+                    spec.colors.backgroundArgb ushr 24 == 255 &&
+                    spec.colors.emojiArgb ushr 24 == 255
+            } ?: true)
+}
+
+val WallpaperState.seedArgb: Int?
+    get() = when (this) {
+        WallpaperState.None -> null
+        is WallpaperState.Ready -> seedArgb
+        is WallpaperState.Generated -> design.seedArgb
+    }

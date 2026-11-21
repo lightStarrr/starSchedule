@@ -80,6 +80,9 @@ class WallpaperActivity : ComponentActivity() {
                                 .build(),
                         )
                     },
+                    onPreview = { design ->
+                        previewLauncher.launch(WallpaperPreviewActivity.intent(this, timetableId, design))
+                    },
                     onMakeEmojiWallpaper = {
                         emojiLauncher.launch(
                             EmojiWallpaperActivity.intent(this, timetableId),

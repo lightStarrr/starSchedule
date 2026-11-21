@@ -115,7 +115,6 @@ import com.star.schedule.feature.emoji.domain.EmojiPattern
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperColors
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperSpec
 import com.star.schedule.feature.emoji.domain.emojiWallpaperLayout
-import java.io.File
 
 private enum class EmojiEditorTab { EMOJI, PATTERN, COLOR }
 
@@ -123,7 +122,7 @@ private enum class EmojiEditorTab { EMOJI, PATTERN, COLOR }
 fun EmojiWallpaperRoute(
     viewModel: EmojiWallpaperViewModel,
     onBack: () -> Unit,
-    onExported: (File) -> Unit,
+    onPrepared: (EmojiWallpaperSpec) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ready = state as? EmojiWallpaperUiState.Ready
@@ -143,13 +142,10 @@ fun EmojiWallpaperRoute(
         val pickerFullMessage = stringResource(
             R.string.emoji_wallpaper_max_toast, EMOJI_WALLPAPER_MAX_EMOJIS,
         )
-        val exportFailedMessage = stringResource(R.string.emoji_wallpaper_export_failed)
         LaunchedEffect(Unit) {
             viewModel.events.collect { event ->
                 when (event) {
-                    is EmojiWallpaperEvent.Exported -> onExported(event.file)
-                    EmojiWallpaperEvent.ExportFailed ->
-                        snackbarHostState.showSnackbar(exportFailedMessage)
+                    is EmojiWallpaperEvent.Prepared -> onPrepared(event.spec)
                     EmojiWallpaperEvent.PickerFull ->
                         snackbarHostState.showSnackbar(pickerFullMessage)
                 }
@@ -160,7 +156,7 @@ fun EmojiWallpaperRoute(
             snackbarHostState = snackbarHostState,
             onBack = onBack,
             onLucky = viewModel::lucky,
-            onExport = viewModel::export,
+            onPreview = viewModel::preparePreview,
             onSelectPattern = viewModel::selectPattern,
             onScaleChange = viewModel::setScale,
             onSelectPalette = viewModel::selectPalette,
@@ -176,8 +172,8 @@ fun EmojiWallpaperRoute(
 }
 
 /**
- * 表情壁纸编辑页：整屏实时预览 + 顶部 ✓ 导出 + 底部卡片与三段页签。
- * 壁纸本身是静态图，点 ✓ 导出后交给照片预览页走「应用」流程。
+ * 表情壁纸编辑页：整屏实时预览 + 顶部完成 + 底部卡片与三段页签。
+ * 点 ✓ 把组合参数交给课表预览页走「应用」流程。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -186,7 +182,7 @@ private fun EmojiWallpaperScreen(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onLucky: () -> Unit,
-    onExport: (widthPx: Int, heightPx: Int) -> Unit,
+    onPreview: () -> Unit,
     onSelectPattern: (EmojiPattern) -> Unit,
     onScaleChange: (Float) -> Unit,
     onSelectPalette: (Int) -> Unit,
@@ -282,9 +278,9 @@ private fun EmojiWallpaperScreen(
                         if (ready != null) {
                             Button(
                                 onClick = {
-                                    onExport(windowSize.width, windowSize.height)
+                                    onPreview()
                                 },
-                                enabled = ready.emojis.isNotEmpty() && !ready.exporting,
+                                enabled = ready.emojis.isNotEmpty(),
                                 shapes = ButtonDefaults.shapes(
                                     shape = RoundedCornerShape(50),
                                 ),

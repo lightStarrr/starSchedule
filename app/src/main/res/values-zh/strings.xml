@@ -634,4 +634,8 @@
     <string name="manual_create_semester_spring">%1$d 春季</string>
     <string name="manual_create_semester_fall">%1$d 秋季</string>
     <string name="manual_create_create">创建课表</string>
+    <string name="wallpaper_studio">壁纸工作室</string>
+    <string name="wallpaper_solid">纯色</string>
+    <string name="wallpaper_none">无</string>
+    <string name="wallpaper_color_option">配色 %1$d</string>
 </resources>

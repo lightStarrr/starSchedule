@@ -1,6 +1,7 @@
 package com.star.schedule.feature.wallpaper.presentation
 
 import androidx.compose.runtime.Immutable
+import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
 
 /**
  * 壁纸选项：系统默认背景，或一张本地图片。
@@ -10,6 +11,7 @@ import androidx.compose.runtime.Immutable
 @Immutable
 internal sealed interface WallpaperOption {
     data object Default : WallpaperOption
+    data class Generated(val design: WallpaperDesign) : WallpaperOption
     data class Image(val path: String, val contentHash: String) : WallpaperOption
 }
 
@@ -19,6 +21,8 @@ internal sealed interface WallpaperOption {
  */
 internal fun WallpaperOption.sameAs(other: WallpaperOption?): Boolean = when {
     this is WallpaperOption.Default && other is WallpaperOption.Default -> true
+    this is WallpaperOption.Generated && other is WallpaperOption.Generated ->
+        design == other.design
     this is WallpaperOption.Image && other is WallpaperOption.Image ->
         contentHash == other.contentHash
     else -> false

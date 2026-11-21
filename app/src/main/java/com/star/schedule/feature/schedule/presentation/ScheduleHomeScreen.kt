@@ -184,7 +184,7 @@ fun ScheduleHomeScreen(
             state = wallpaperState,
             modifier = Modifier.fillMaxSize(),
         )
-        if (wallpaperState is WallpaperState.Ready) {
+        if (wallpaperState !is WallpaperState.None) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
