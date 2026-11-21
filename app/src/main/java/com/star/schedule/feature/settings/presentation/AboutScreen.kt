@@ -1,5 +1,6 @@
 package com.star.schedule.feature.settings.presentation
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.Settings
 import androidx.annotation.DrawableRes
@@ -70,7 +71,13 @@ fun AboutRoute(onBack: () -> Unit) {
     val context = LocalContext.current
     AboutScreen(
         onBack = onBack,
-        onOpenLink = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) },
+        onOpenLink = { url ->
+            try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+            } catch (_: ActivityNotFoundException) {
+                // 设备未安装可处理该链接的应用时安全忽略，避免崩溃
+            }
+        },
     )
 }
 

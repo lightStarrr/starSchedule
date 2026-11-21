@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -19,6 +20,8 @@ import android.media.AudioAttributes
 import androidx.core.graphics.drawable.IconCompat
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.RemoteViews
 import android.widget.Toast
@@ -41,12 +44,9 @@ import com.star.schedule.core.database.ReminderEntity
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import com.star.schedule.feature.timetable.domain.ReminderScheduler
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -56,13 +56,15 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicBoolean
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 
-class UnifiedNotificationManager(private val context: Context) : ReminderScheduler {
+class UnifiedNotificationManager(context: Context) : ReminderScheduler {
 
-    private val notificationManager = context.getSystemService<NotificationManager>()!!
-    private val alarmManager = context.getSystemService<AlarmManager>()!!
+    private val context: Context = context.applicationContext
+    private val notificationManager = this.context.getSystemService<NotificationManager>()!!
+    private val alarmManager = this.context.getSystemService<AlarmManager>()!!
 
     companion object {
         const val CHANNEL_ID = "course_reminder"
@@ -75,10 +77,24 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
 
         // 页面、广播和后台任务会创建不同实例，调度与取消必须共享同一把锁。
         private val reminderLock = Mutex()
+        private val channelsCreated = AtomicBoolean(false)
+        private val mainHandler = Handler(Looper.getMainLooper())
     }
 
     init {
-        createNotificationChannels()
+        ensureNotificationChannels()
+    }
+
+    private fun ensureNotificationChannels() {
+        if (channelsCreated.compareAndSet(false, true)) {
+            createNotificationChannels()
+        }
+    }
+
+    private fun showToastOnMain(message: String) {
+        mainHandler.post {
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun createNotificationChannels() {
@@ -160,13 +176,11 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         return tinted
     }
 
-    private fun getCustomNotificationIconPath(): String? {
+    private suspend fun getCustomNotificationIconPath(): String? {
         return runCatching {
-            runBlocking {
-                DatabaseProvider.dao()
-                    .getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH)
-                    .first()
-            }
+            DatabaseProvider.dao()
+                .getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH)
+                .first()
         }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
@@ -178,27 +192,23 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
     }
 
     fun isFlymeLiveNotificationEnabled(context: Context): Boolean {
-        try {
-        } catch (_: java.lang.Exception) {
-            Log.d("LiveUtil", "isNotificationAllowed  error")
-        }
         if (context.checkSelfPermission("flyme.permission.READ_NOTIFICATION_LIVE_STATE") != PackageManager.PERMISSION_GRANTED) {
             Log.e("LiveUtil", "Missing permission: flyme.permission.READ_NOTIFICATION_LIVE_STATE")
             return false
         }
-        val call: Bundle? = context.contentResolver.call(
-            "content://com.android.systemui.notification.provider".toUri(),
-            "isNotificationLiveEnabled",
-            null as String?,
-            null as Bundle?
-        )
-        Log.d("LiveUtil", "result=" + call + ", context package=" + context.packageName)
-        if (call != null) {
-            val z = call.getBoolean("result", false)
-            Log.d("LiveUtil", "result1 = $z")
-            return z
+        return try {
+            val call: Bundle? = context.contentResolver.call(
+                "content://com.android.systemui.notification.provider".toUri(),
+                "isNotificationLiveEnabled",
+                null as String?,
+                null as Bundle?
+            )
+            Log.d("LiveUtil", "result=$call, context package=${context.packageName}")
+            call?.getBoolean("result", false) ?: false
+        } catch (e: Exception) {
+            Log.w("LiveUtil", "查询 Flyme 灵动通知状态失败", e)
+            false
         }
-        return false
     }
 
     fun isLiveCapsuleCustomizationAvailable(): Boolean {
@@ -207,12 +217,12 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                 isFlymeLiveNotificationEnabled(context)
     }
 
-    fun showCourseNotificationImmediate(
+    suspend fun showCourseNotificationImmediate(
         courseName: String = context.getString(R.string.notification_course_reminder),
         location: String = "",
         startTime: String = "",
         finish: Boolean
-    ) {
+    ) = withContext(Dispatchers.IO) {
         val customIconPath = getCustomNotificationIconPath()
         if (isLiveCapsuleCustomizationAvailable()) {
             showMeizuLiveNotification(courseName, location, startTime, finish, customIconPath)
@@ -225,7 +235,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         notificationManager.cancel(NOTIFICATION_ID)
     }
 
-    fun showCourseNotification(
+    suspend fun showCourseNotification(
         courseName: String = context.getString(R.string.notification_course_reminder),
         location: String = "",
         startTime: String = ""
@@ -233,8 +243,6 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         showCourseNotificationImmediate(courseName, location, startTime, false)
 
         try {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
             val formatter = DateTimeFormatter.ofPattern("HH:mm")
             val courseStart = LocalTime.parse(startTime, formatter)
             val triggerTime = courseStart.atDate(LocalDate.now())
@@ -306,36 +314,31 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         )
     }
 
-    private fun showMeizuLiveNotification(
+    private suspend fun showMeizuLiveNotification(
         courseName: String,
         location: String,
         startTime: String,
         finish: Boolean,
         customIconPath: String?
     ) {
-        // 获取数据库实例
         val dao = DatabaseProvider.dao()
+        val colorPref = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
+        val templatePref = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE).first()
+        val customIconPref =
+            customIconPath
+                ?: dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH).first()
+        val capsuleBgColor = colorPref ?: "#FFE082"
+        val template = FlymeLiveTemplate.fromPref(templatePref)
+        val iconPath = customIconPref?.takeIf { it.isNotBlank() }
 
-        // 获取用户配置：背景色与模板
-        val (capsuleBgColor, template, iconPath) = runBlocking {
-            val colorPref = dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_BG_COLOR).first()
-            val templatePref = dao.getPreferenceFlow(Constants.PREF_FLYME_LIVE_TEMPLATE).first()
-            val customIconPref =
-                customIconPath
-                    ?: dao.getPreferenceFlow(Constants.PREF_LIVE_CAPSULE_ICON_PATH).first()
-            Triple(
-                colorPref ?: "#FFE082",
-                FlymeLiveTemplate.fromPref(templatePref),
-                customIconPref?.takeIf { it.isNotBlank() }
-            )
-        }
         fun autoContentColorFor(background: Color): Color {
             return if (background.luminance() > 0.7f) Color.Black else Color.White
         }
 
         val textColor = autoContentColorFor(Color(capsuleBgColor.toColorInt()))
         val textColorInt = textColor.toArgb()
-        val customCapsuleIconBitmap = loadLiveIconBitmap(iconPath)?.let { src ->
+        val rawLiveIconBitmap = loadLiveIconBitmap(iconPath)
+        val customCapsuleIconBitmap = rawLiveIconBitmap?.let { src ->
             tintBitmap(src, textColorInt)
         }
         val defaultIconBitmap =
@@ -345,8 +348,19 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                     drawable.toBitmap()
                 }
         val capsuleIconBitmap = customCapsuleIconBitmap ?: defaultIconBitmap
-        val customSmallIconBitmap = iconPath?.let { path ->
-            loadSmallIconBitmap(path)?.let { tintBitmap(it, android.graphics.Color.WHITE) }
+        val customSmallIconBitmap = rawLiveIconBitmap?.let { src ->
+            val smallTarget =
+                (28 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            val maxSide = maxOf(src.width, src.height).coerceAtLeast(1)
+            val scaled = if (maxSide <= smallTarget) {
+                src
+            } else {
+                src.scale(
+                    (src.width * smallTarget / maxSide).coerceAtLeast(1),
+                    (src.height * smallTarget / maxSide).coerceAtLeast(1),
+                )
+            }
+            tintBitmap(scaled, android.graphics.Color.WHITE)
         }
 
         val capsuleBundle = Bundle().apply {
@@ -379,9 +393,9 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                 setTextViewText(R.id.location, location)
                 setTextViewText(R.id.live_time, startTime)
                 when {
-                    capsuleIconBitmap != null -> setImageViewBitmap(
+                    rawLiveIconBitmap != null -> setImageViewBitmap(
                         R.id.live_icon,
-                        loadLiveIconBitmap(iconPath)
+                        rawLiveIconBitmap
                     )
                     else -> setImageViewResource(R.id.live_icon, R.drawable.star)
                 }
@@ -401,7 +415,11 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
 
         val notification = notificationBuilder.build()
 
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        try {
+            notificationManager.notify(NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            Log.w("UnifiedNotification", "缺少通知权限，跳过发送灵动通知", e)
+        }
     }
 
     private fun showNormalNotification(
@@ -477,7 +495,11 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
             setRequestPromotedOngoing(true)
         }.build()
 
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        try {
+            notificationManager.notify(NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            Log.w("UnifiedNotification", "缺少通知权限，跳过发送课程通知", e)
+        }
     }
 
     override suspend fun enableRemindersForTimetable(timetableId: Long) = reminderLock.withLock {
@@ -533,6 +555,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         val endDate = currentDate.plusWeeks(2)
 
         var date = currentDate
+        var exactAlarmFailedNotified = false
         while (!date.isAfter(endDate)) {
             val weekNumber = date.getWeekOfSemester(startDate)
             val dayOfWeek = date.dayOfWeek.value
@@ -563,7 +586,16 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
 
                     val lessonTime = lessonTimes.find { it.period == period }
                     if (lessonTime != null) {
-                        scheduleReminderForCourse(course, lessonTime, date, timetable.reminderTime)
+                        val scheduled = scheduleReminderForCourse(
+                            course = course,
+                            lessonTime = lessonTime,
+                            date = date,
+                            reminderTime = timetable.reminderTime,
+                        )
+                        if (!scheduled && !exactAlarmFailedNotified) {
+                            exactAlarmFailedNotified = true
+                            showToastOnMain(context.getString(R.string.exact_alarm_setup_failed))
+                        }
                     }
                 }
             }
@@ -576,7 +608,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
         lessonTime: LessonTimeEntity,
         date: LocalDate,
         reminderTime: Int = 15
-    ) {
+    ): Boolean {
         val startTime = LocalTime.parse(lessonTime.startTime, DateTimeFormatter.ofPattern("HH:mm"))
         val courseDateTime = LocalDateTime.of(date, startTime)
         val reminderDateTime = courseDateTime.minusMinutes(reminderTime.toLong())
@@ -601,7 +633,6 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                 reminderDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
             try {
-
                 // 系统闹钟与登记一起完成，不能在页面销毁取消协程时留下无法查询的闹钟。
                 withContext(NonCancellable) {
                     alarmManager.setExactAndAllowWhileIdle(
@@ -620,15 +651,10 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                     }
                 }
             } catch (_: SecurityException) {
-                CoroutineScope(Dispatchers.Main).launch {
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.exact_alarm_setup_failed),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+                return false
             }
         }
+        return true
     }
 
 
@@ -655,7 +681,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
     private fun generateRequestCode(courseId: Long, date: LocalDate, period: Int): Int =
         ("$courseId${date.toEpochDay()}$period").hashCode().and(0x7FFFFFFF)
 
-    fun sendTestNotification() {
+    suspend fun sendTestNotification() {
         val startTime = LocalTime.now().plusMinutes(1)
             .format(DateTimeFormatter.ofPattern("HH:mm"))
 
@@ -665,13 +691,7 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
             startTime = startTime,
         )
 
-        CoroutineScope(Dispatchers.Main).launch {
-            Toast.makeText(
-                context,
-                context.getString(R.string.notification_test_scheduled),
-                Toast.LENGTH_LONG
-            ).show()
-        }
+        showToastOnMain(context.getString(R.string.notification_test_scheduled))
     }
 
     fun scheduleTestReminder() {
@@ -702,51 +722,23 @@ class UnifiedNotificationManager(private val context: Context) : ReminderSchedul
                     pendingIntent
                 )
 
-                CoroutineScope(Dispatchers.Main).launch {
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.reminder_test_scheduled),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+                showToastOnMain(context.getString(R.string.reminder_test_scheduled))
             } else {
                 // 如果无法设置精确闹钟，引导用户开启权限
                 val settingsIntent =
                     Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        data = "package:${context.packageName}".toUri()
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                try {
+                    context.startActivity(settingsIntent)
+                } catch (e: ActivityNotFoundException) {
+                    Log.w("UnifiedNotification", "无法打开精确闹钟权限设置页", e)
                 }
-                context.startActivity(settingsIntent)
-                CoroutineScope(Dispatchers.Main).launch {
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.exact_alarm_permission_required),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+                showToastOnMain(context.getString(R.string.exact_alarm_permission_required))
             }
         } catch (_: SecurityException) {
-            CoroutineScope(Dispatchers.Main).launch {
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.reminder_setup_failed),
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-    }
-
-    // 保留 isReminderEnabledForTimetableSync
-    fun isReminderEnabledForTimetableSync(timetableId: Long): Boolean {
-        return try {
-            val dao = DatabaseProvider.dao()
-            runBlocking {
-                val enabledTimetableId =
-                    dao.getPreferenceFlow(Constants.PREF_REMINDER_ENABLED_TIMETABLE).first()
-                enabledTimetableId == timetableId.toString()
-            }
-        } catch (e: Exception) {
-            Log.e("UnifiedNotification", "检查提醒状态失败", e)
-            false
+            showToastOnMain(context.getString(R.string.reminder_setup_failed))
         }
     }
 

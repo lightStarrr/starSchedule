@@ -13,7 +13,8 @@ class LiveNotification : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("LiveNotification", "Service started")
-        return START_STICKY
+        stopSelf(startId)
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? {

@@ -2,13 +2,18 @@ package com.star.schedule.platform.notification
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.AlertDialog
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.star.schedule.R
@@ -30,23 +35,49 @@ class NotificationPermissionGate(private val activity: ComponentActivity) {
         pendingAction = null
         if (granted && action != null) {
             request(action)
+        } else if (!granted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(
+                activity,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+            if (permanentlyDenied) {
+                openAppDetailsSettings()
+                Toast.makeText(
+                    activity,
+                    R.string.notification_permission_settings_required,
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
         }
     }
 
     fun request(action: () -> Unit) {
         if (!hasNotificationPermission()) {
             pendingAction = action
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                )
+            ) {
+                showNotificationRationaleDialog()
+            } else {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
             return
         }
 
         val alarmManager = activity.getSystemService(AlarmManager::class.java)
         if (alarmManager?.canScheduleExactAlarms() != true) {
-            activity.startActivity(
-                Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                    data = "package:${activity.packageName}".toUri()
-                },
-            )
+            try {
+                activity.startActivity(
+                    Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        data = "package:${activity.packageName}".toUri()
+                    },
+                )
+            } catch (e: ActivityNotFoundException) {
+                Log.w(TAG, "无法打开精确闹钟权限设置页", e)
+            }
             Toast.makeText(
                 activity,
                 R.string.exact_alarm_permission_required,
@@ -70,10 +101,41 @@ class NotificationPermissionGate(private val activity: ComponentActivity) {
         action()
     }
 
+    private fun showNotificationRationaleDialog() {
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.notification_permission_rationale_title)
+            .setMessage(R.string.notification_permission_rationale_message)
+            .setPositiveButton(R.string.action_continue) { _, _ ->
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            .setNegativeButton(R.string.action_cancel) { _, _ ->
+                pendingAction = null
+            }
+            .setOnCancelListener {
+                pendingAction = null
+            }
+            .show()
+    }
+
+    private fun openAppDetailsSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = "package:${activity.packageName}".toUri()
+        }
+        try {
+            activity.startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "无法打开应用详情设置页", e)
+        }
+    }
+
     private fun hasNotificationPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(
                 activity,
                 Manifest.permission.POST_NOTIFICATIONS,
             ) == PackageManager.PERMISSION_GRANTED
+
+    private companion object {
+        const val TAG = "NotificationPermission"
+    }
 }

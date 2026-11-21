@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.notification.UnifiedNotificationManager
 import kotlinx.coroutines.CancellationException
 
@@ -12,6 +13,8 @@ class CourseReminderUpdateWorker(
     parameters: WorkerParameters,
 ) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {
+        DatabaseProvider.init(applicationContext)
+        DatabaseProvider.ensureValidCurrentTimetable()
         UnifiedNotificationManager(applicationContext).updateUpcomingReminders()
         Result.success()
     } catch (cancel: CancellationException) {

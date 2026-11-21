@@ -18,6 +18,7 @@ import com.star.schedule.core.database.TimetableEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -68,14 +69,21 @@ class ScheduleExportProvider : ContentProvider() {
         selectionArgs: Array<out String>?,
         sortOrder: String?
     ): Cursor? = when (uri.pathSegments.firstOrNull()) {
-        "has_init" -> oneRow(if (isWakeUpSimulationEnabled()) "{\"has_init\":true}" else "{\"has_init\":false}")
-        "show_table_id" -> oneRow(if (isWakeUpSimulationEnabled()) {
-            databaseJson("{\"table_id\":1}") {
+        "has_init" -> oneRow(
+            queryWithSimulation(disabled = "{\"has_init\":false}", fallback = "{\"has_init\":false}") {
+                "{\"has_init\":true}"
+            }
+        )
+        "show_table_id" -> oneRow(
+            queryWithSimulation(disabled = "{\"table_id\":0}", fallback = "{\"table_id\":1}") {
                 "{\"table_id\":${currentTimetableId()}}"
             }
-        } else "{\"table_id\":0}")
-        "table_list" -> oneRow(if (isWakeUpSimulationEnabled()) {
-            databaseJson("[{\"id\":1,\"tableName\":\"星课程表\"}]") {
+        )
+        "table_list" -> oneRow(
+            queryWithSimulation(
+                disabled = "[]",
+                fallback = "[{\"id\":1,\"tableName\":\"星课程表\"}]"
+            ) {
                 buildJsonArray {
                     DatabaseProvider.dao().getAllTimetablesOnce().forEach { timetable ->
                         add(buildJsonObject {
@@ -85,14 +93,22 @@ class ScheduleExportProvider : ContentProvider() {
                     }
                 }.toString()
             }
-        } else "[]")
-        "course_list" -> oneRow(if (isWakeUpSimulationEnabled()) courseJson(uri, tomorrow = false) else "[]")
-        "next_course_list" -> oneRow(if (isWakeUpSimulationEnabled()) courseJson(uri, tomorrow = true) else "[]")
+        )
+        "course_list" -> oneRow(
+            queryWithSimulation(disabled = "[]", fallback = "[]") {
+                courseJson(uri, tomorrow = false)
+            }
+        )
+        "next_course_list" -> oneRow(
+            queryWithSimulation(disabled = "[]", fallback = "[]") {
+                courseJson(uri, tomorrow = true)
+            }
+        )
         "refresh" -> null
         else -> null
     }
 
-    private fun courseJson(uri: Uri, tomorrow: Boolean): String = databaseJson("[]") {
+    private suspend fun courseJson(uri: Uri, tomorrow: Boolean): String {
         val dao = DatabaseProvider.dao()
         val timetableId = currentTimetableId()
         val timetable = dao.getTimetableFlow(timetableId).first()
@@ -113,7 +129,7 @@ class ScheduleExportProvider : ContentProvider() {
                 now = now
             )
         )
-        WakeUpScheduleMapper.toJson(date, timetable, courses, lessonTimes, zoneId, now)
+        return WakeUpScheduleMapper.toJson(date, timetable, courses, lessonTimes, zoneId, now)
     }
 
     /**
@@ -149,16 +165,20 @@ class ScheduleExportProvider : ContentProvider() {
             ?: 1L
     }
 
-    private fun isWakeUpSimulationEnabled(): Boolean = runCatching {
+    private fun queryWithSimulation(
+        disabled: String,
+        fallback: String,
+        block: suspend () -> String,
+    ): String = try {
         runBlocking(Dispatchers.IO) {
-            DatabaseProvider.dao()
-                .getPreferenceFlow(Constants.PREF_WAKEUP_SIMULATION_ENABLED)
-                .first() == "true"
+            withTimeout(QUERY_TIMEOUT_MS) {
+                DatabaseProvider.ensureValidCurrentTimetable()
+                val enabled = DatabaseProvider.dao()
+                    .getPreferenceFlow(Constants.PREF_WAKEUP_SIMULATION_ENABLED)
+                    .first() == "true"
+                if (!enabled) disabled else block()
+            }
         }
-    }.getOrDefault(false)
-
-    private fun databaseJson(fallback: String, block: suspend () -> String): String = try {
-        runBlocking(Dispatchers.IO) { block() }
     } catch (error: Exception) {
         Log.e(TAG, "读取课程数据失败", error)
         fallback
@@ -200,6 +220,7 @@ class ScheduleExportProvider : ContentProvider() {
 
     companion object {
         private const val TAG = "ScheduleExportProvider"
+        private const val QUERY_TIMEOUT_MS = 2_000L
         private const val REFRESH_DEBOUNCE_MS = 250L
         private const val SECOND_REFRESH_DELAY_MS = 1_000L
         private const val BOUNDARY_SLACK_MS = 1_000L

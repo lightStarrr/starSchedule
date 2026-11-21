@@ -16,15 +16,19 @@ import android.util.Log;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class WakeUpProxyProvider extends ContentProvider {
     private static final String TAG = "WakeUpProxyProvider";
@@ -32,22 +36,37 @@ public final class WakeUpProxyProvider extends ContentProvider {
     private static final String[] COLUMNS = {"code", "data"};
     private static final long CACHE_TTL_MS = 500L;
     private static final long SOURCE_TIMEOUT_MS = 400L;
+    private static final int MAX_SNAPSHOTS = 16;
+    private static final int MAX_SOURCE_THREADS = 4;
+    private static final int MAX_SOURCE_QUEUE = 16;
     private static final Uri REFRESH_URI =
             Uri.parse("content://com.suda.yzune.wakeupschedule.provider/refresh");
 
     // ponytail: a small process-local snapshot is enough; persistence would make stale data harder to reason about.
     private static final ConcurrentHashMap<String, Snapshot> SNAPSHOTS = new ConcurrentHashMap<>();
-    private static final ExecutorService SOURCE_EXECUTOR = Executors.newCachedThreadPool(
-            new ThreadFactory() {
-                private int nextId;
+    private static final ExecutorService SOURCE_EXECUTOR = createSourceExecutor();
 
-                @Override
-                public Thread newThread(Runnable runnable) {
-                    Thread thread = new Thread(runnable, "wakeup-source-" + ++nextId);
-                    thread.setDaemon(true);
-                    return thread;
-                }
-            });
+    private static ExecutorService createSourceExecutor() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                MAX_SOURCE_THREADS,
+                MAX_SOURCE_THREADS,
+                30L,
+                TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(MAX_SOURCE_QUEUE),
+                new ThreadFactory() {
+                    private final AtomicInteger nextId = new AtomicInteger();
+
+                    @Override
+                    public Thread newThread(Runnable runnable) {
+                        Thread thread = new Thread(
+                                runnable, "wakeup-source-" + nextId.incrementAndGet());
+                        thread.setDaemon(true);
+                        return thread;
+                    }
+                });
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
+    }
 
     @Override
     public boolean onCreate() {
@@ -80,7 +99,7 @@ public final class WakeUpProxyProvider extends ContentProvider {
         if (response.isUsable(path)) {
             Snapshot fresh = new Snapshot(response.code, response.data,
                     SystemClock.elapsedRealtime());
-            SNAPSHOTS.put(key, fresh);
+            putBoundedSnapshot(key, fresh);
             long cost = SystemClock.elapsedRealtime() - startedAt;
             Log.d(TAG, "实时取源成功 path=" + uri.getPath() + " jsonLength="
                     + response.data.length() + " costMs=" + cost);
@@ -104,8 +123,15 @@ public final class WakeUpProxyProvider extends ContentProvider {
         SourceResponse last = SourceResponse.failure("未执行");
         for (int attempt = 1; attempt <= 2; attempt++) {
             CancellationSignal cancellation = new CancellationSignal();
-            Future<SourceResponse> future = SOURCE_EXECUTOR.submit(
-                    () -> readSourceOnce(sourceUri, cancellation));
+            Future<SourceResponse> future;
+            try {
+                future = SOURCE_EXECUTOR.submit(
+                        () -> readSourceOnce(sourceUri, cancellation));
+            } catch (RejectedExecutionException error) {
+                last = SourceResponse.failure("查询队列已满");
+                Log.w(TAG, "源查询队列已满 path=" + uri.getPath() + " attempt=" + attempt);
+                break;
+            }
             try {
                 SourceResponse response = future.get(SOURCE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                 if (response.isUsable(path)) {
@@ -161,17 +187,53 @@ public final class WakeUpProxyProvider extends ContentProvider {
         }
     }
 
+    private static void putBoundedSnapshot(String key, Snapshot snapshot) {
+        SNAPSHOTS.put(key, snapshot);
+        if (SNAPSHOTS.size() <= MAX_SNAPSHOTS) {
+            return;
+        }
+        String oldestKey = null;
+        long oldestTime = Long.MAX_VALUE;
+        for (Map.Entry<String, Snapshot> entry : SNAPSHOTS.entrySet()) {
+            long createdAt = entry.getValue().createdAtMs;
+            if (createdAt < oldestTime) {
+                oldestTime = createdAt;
+                oldestKey = entry.getKey();
+            }
+        }
+        if (oldestKey != null) {
+            SNAPSHOTS.remove(oldestKey);
+        }
+    }
+
     private static String cacheKey(Uri uri, String path) {
         if (!("course_list".equals(path) || "next_course_list".equals(path))) {
             return path;
         }
         List<String> segments = uri.getPathSegments();
         if (segments.size() > 1) {
-            return path + "|" + String.join("/", segments.subList(1, segments.size()));
+            String suffix = segments.get(segments.size() - 1);
+            if (isValidDateSuffix(suffix)) {
+                return path + "|" + suffix;
+            }
         }
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
         return path + "|" + ("next_course_list".equals(path)
                 ? today.plusDays(1) : today);
+    }
+
+    private static boolean isValidDateSuffix(String suffix) {
+        int len = suffix.length();
+        if (len != 8 && len != 10 && len != 13) {
+            return false;
+        }
+        for (int i = 0; i < len; i++) {
+            char c = suffix.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isSupported(String path) {

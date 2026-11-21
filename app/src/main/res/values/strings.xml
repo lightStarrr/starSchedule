@@ -24,6 +24,10 @@
     <string name="reminder_test_scheduled">Test reminder set; will send in 10 seconds</string>
     <string name="exact_alarm_setup_failed">Unable to set exact alarm; check system settings</string>
     <string name="exact_alarm_permission_required">Please allow exact alarms for the app and retry</string>
+    <string name="notification_permission_rationale_title">Notification permission required</string>
+    <string name="notification_permission_rationale_message">Notification permission is needed to deliver upcoming class reminders on time.</string>
+    <string name="notification_permission_settings_required">Notifications are disabled. Please enable them in app settings and try again.</string>
+    <string name="action_continue">Continue</string>
     <string name="reminder_setup_failed">Unable to set reminder; check system settings</string>
     <string name="action_confirm">Confirm</string>
     <string name="action_cancel">Cancel</string>

@@ -4,29 +4,29 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.star.schedule.platform.notification.BootReminderRestoreWorker
 
 class BootCompletedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
-            intent.action == Intent.ACTION_PACKAGE_REPLACED
-        ) {
-            Log.d("BootCompleted", "收到系统启动广播: ${intent.action}")
-
-            val pendingResult = goAsync()
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    UnifiedNotificationManager(context).restoreRemindersAfterBoot()
-                } catch (exception: Exception) {
-                    Log.e("BootCompleted", "重新设置提醒失败", exception)
-                } finally {
-                    // 某些情况下 goAsync() 会返回 null，直接 finish() 会 NPE。
-                    pendingResult?.finish()
-                }
-            }
+        val shouldRestore = when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            -> true
+            Intent.ACTION_PACKAGE_REPLACED ->
+                intent.data?.schemeSpecificPart == context.packageName
+            else -> false
         }
+        if (!shouldRestore) return
+
+        Log.d("BootCompleted", "收到系统启动/更新广播: ${intent.action}")
+        // 两周全量闹钟重建可能超过广播时限，统一交给持久化 WorkManager 任务执行。
+        WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+            "course_reminder_boot_restore",
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<BootReminderRestoreWorker>().build(),
+        )
     }
 }

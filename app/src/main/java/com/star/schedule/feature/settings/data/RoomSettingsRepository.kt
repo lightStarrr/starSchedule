@@ -138,9 +138,6 @@ class RoomSettingsRepository(
         dao.setPreference(Constants.PREF_LIVE_CAPSULE_ICON_PATH, "")
     }
 
-    override fun isReminderEnabledForTimetable(timetableId: Long): Boolean =
-        notificationManager.isReminderEnabledForTimetableSync(timetableId)
-
     override suspend fun enableRemindersForTimetable(timetableId: Long) {
         notificationManager.enableRemindersForTimetable(timetableId)
     }
@@ -149,7 +146,7 @@ class RoomSettingsRepository(
         notificationManager.disableReminders()
     }
 
-    override fun sendTestNotification() {
+    override suspend fun sendTestNotification() {
         notificationManager.sendTestNotification()
     }
 

@@ -55,6 +55,9 @@ class ScheduleApplication : Application(), Configuration.Provider {
         Telemetry.install(this, applicationScope, processStartElapsedMillis)
         Telemetry.onProcessStart()
         DatabaseProvider.init(this)
+        applicationScope.launch(Dispatchers.IO) {
+            DatabaseProvider.ensureValidCurrentTimetable()
+        }
         // 触发 lazy 初始化：灌内置节假日快照、按偏好断言定时刷新任务。
         dataSourceDependencies
         observeRecentsPreference()

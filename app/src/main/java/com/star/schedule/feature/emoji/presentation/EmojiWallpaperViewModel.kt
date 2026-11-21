@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 /** 编辑页一次最多可选的表情数。 */
@@ -156,7 +157,9 @@ class EmojiWallpaperViewModel(
                 .observeState(NotoEmojiFontResource.ID)
                 .first() as? OptionalResourceState.Installed)?.file
             val typeface = file?.let {
-                runCatching { EmojiTypefaceLoader.load(it) }.getOrNull()
+                withContext(ioDispatcher) {
+                    runCatching { EmojiTypefaceLoader.load(it) }.getOrNull()
+                }
             }
             val groups = typeface?.let {
                 runCatching {

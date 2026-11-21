@@ -47,10 +47,14 @@ class UpdateDependencies(
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val cacheStore = FileUpdateCacheStore(
-        directory = File(context.noBackupFilesDir, "update-cache"),
-        ioDispatcher = ioDispatcher,
-    )
+    private val appContext = context.applicationContext
+
+    private val cacheStore by lazy {
+        FileUpdateCacheStore(
+            directory = File(appContext.noBackupFilesDir, "update-cache"),
+            ioDispatcher = ioDispatcher,
+        )
+    }
 
     private val source = GitHubReleaseSource(
         httpClient = httpClient,
@@ -67,24 +71,30 @@ class UpdateDependencies(
 
     val startupGate: StartupUpdateGate = StartupUpdateGate(repository, scope)
 
-    private val updatesDirectory = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-        ?.let { File(it, "updates") }
+    private val updatesDirectory: File? by lazy {
+        appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?.let { File(it, "updates") }
+    }
 
-    val downloadRepository: UpdateDownloadRepository = DefaultUpdateDownloadRepository(
-        downloader = AndroidUpdateDownloader(context, ioDispatcher),
-        verifier = AndroidUpdatePackageVerifier(context, ioDispatcher),
-        recordStore = cacheStore,
-        updatesDirectory = updatesDirectory,
-        installed = installed,
-        expectedPackageName = context.packageName,
-        scope = scope,
-        ioDispatcher = ioDispatcher,
-    )
+    val downloadRepository: UpdateDownloadRepository by lazy {
+        DefaultUpdateDownloadRepository(
+            downloader = AndroidUpdateDownloader(appContext, ioDispatcher),
+            verifier = AndroidUpdatePackageVerifier(appContext, ioDispatcher),
+            recordStore = cacheStore,
+            updatesDirectory = updatesDirectory,
+            installed = installed,
+            expectedPackageName = appContext.packageName,
+            scope = scope,
+            ioDispatcher = ioDispatcher,
+        )
+    }
 
-    val installer = AndroidUpdateInstaller(context, updatesDirectory)
+    val installer: AndroidUpdateInstaller by lazy {
+        AndroidUpdateInstaller(appContext, updatesDirectory)
+    }
 
     init {
-        scope.launch {
+        scope.launch(ioDispatcher) {
             (downloadRepository as? DefaultUpdateDownloadRepository)?.cleanupAfterInstall()
         }
     }

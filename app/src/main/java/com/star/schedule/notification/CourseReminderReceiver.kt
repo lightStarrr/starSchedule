@@ -9,6 +9,7 @@ import com.star.schedule.core.database.DatabaseProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -22,10 +23,11 @@ class CourseReminderReceiver : BroadcastReceiver() {
         val appContext = context.applicationContext
         val pendingResult = goAsync()
 
-        CoroutineScope(Dispatchers.IO).launch {
+        receiverScope.launch {
             try {
                 withTimeout(9_000) {
                     DatabaseProvider.init(appContext)
+                    DatabaseProvider.ensureValidCurrentTimetable()
                     // 已投递的旧广播也要检查课表，防止关闭或切换后仍显示提醒。
                     // 测试提醒与旧版本闹钟没有此字段，保持原来的兼容行为。
                     if (timetableId != -1L) {
@@ -53,5 +55,6 @@ class CourseReminderReceiver : BroadcastReceiver() {
 
     internal companion object {
         const val EXTRA_TIMETABLE_ID = "timetable_id"
+        private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

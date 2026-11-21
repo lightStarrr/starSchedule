@@ -6,11 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.star.schedule.core.common.Constants
 import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.feature.settings.domain.TimetableSummary
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ReminderSettingsUiState(
     val isLoading: Boolean = true,
@@ -32,6 +36,7 @@ private data class ReminderPreferences(
 
 class ReminderSettingsViewModel(
     private val repository: SettingsRepository,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val preferences = combine(
@@ -42,28 +47,36 @@ class ReminderSettingsViewModel(
     ) { notifyOnly, bgColor, iconPath, template ->
         ReminderPreferences(
             notifyOnlyFirst = notifyOnly == "true",
-            liveCapsuleBgColor = bgColor as String?,
-            liveCapsuleIconPath = (iconPath as String?)?.takeIf { it.isNotBlank() },
-            liveNotificationTemplate = template as String?,
+            liveCapsuleBgColor = bgColor,
+            liveCapsuleIconPath = iconPath?.takeIf { it.isNotBlank() },
+            liveNotificationTemplate = template,
         )
     }
 
-    private val liveCapsuleCustomizationAvailable =
-        repository.isLiveCapsuleCustomizationAvailable()
+    private val liveCapsuleCustomizationAvailable = MutableStateFlow(false)
+
+    init {
+        viewModelScope.launch {
+            liveCapsuleCustomizationAvailable.value = withContext(ioDispatcher) {
+                repository.isLiveCapsuleCustomizationAvailable()
+            }
+        }
+    }
 
     val uiState: StateFlow<ReminderSettingsUiState> = combine(
         repository.observeTimetables(),
         repository.observePreference(Constants.PREF_CURRENT_TIMETABLE),
         repository.observePreference(Constants.PREF_REMINDER_ENABLED_TIMETABLE),
         preferences,
-    ) { timetables, currentIdValue, reminderIdValue, prefs ->
+        liveCapsuleCustomizationAvailable,
+    ) { timetables, currentIdValue, reminderIdValue, prefs, liveCapsuleAvailable ->
         val currentId = currentIdValue?.toLongOrNull()
         ReminderSettingsUiState(
             isLoading = false,
             currentTimetable = timetables.firstOrNull { it.id == currentId },
             reminderEnabled = currentId != null && currentId == reminderIdValue?.toLongOrNull(),
             notifyOnlyForFirstContinuousClass = prefs.notifyOnlyFirst,
-            liveCapsuleCustomizationAvailable = liveCapsuleCustomizationAvailable,
+            liveCapsuleCustomizationAvailable = liveCapsuleAvailable,
             liveCapsuleBgColor = prefs.liveCapsuleBgColor,
             liveCapsuleIconPath = prefs.liveCapsuleIconPath,
             liveNotificationTemplate = prefs.liveNotificationTemplate,
@@ -71,9 +84,7 @@ class ReminderSettingsViewModel(
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        ReminderSettingsUiState(
-            liveCapsuleCustomizationAvailable = liveCapsuleCustomizationAvailable,
-        ),
+        ReminderSettingsUiState(),
     )
 
     fun setReminderEnabled(enabled: Boolean) {
@@ -123,7 +134,11 @@ class ReminderSettingsViewModel(
         }
     }
 
-    fun sendTestNotification() = repository.sendTestNotification()
+    fun sendTestNotification() {
+        viewModelScope.launch {
+            repository.sendTestNotification()
+        }
+    }
 
     fun scheduleTestReminder() = repository.scheduleTestReminder()
 }

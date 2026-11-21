@@ -31,13 +31,11 @@ interface SettingsRepository {
 
     suspend fun clearLiveCapsuleIcon()
 
-    fun isReminderEnabledForTimetable(timetableId: Long): Boolean
-
     suspend fun enableRemindersForTimetable(timetableId: Long)
 
     suspend fun disableReminders()
 
-    fun sendTestNotification()
+    suspend fun sendTestNotification()
 
     fun scheduleTestReminder()
 }

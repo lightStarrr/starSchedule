@@ -521,13 +521,11 @@ private class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun clearLiveCapsuleIcon() = Unit
 
-    override fun isReminderEnabledForTimetable(timetableId: Long): Boolean = false
-
     override suspend fun enableRemindersForTimetable(timetableId: Long) = Unit
 
     override suspend fun disableReminders() = Unit
 
-    override fun sendTestNotification() = Unit
+    override suspend fun sendTestNotification() = Unit
 
     override fun scheduleTestReminder() = Unit
 }

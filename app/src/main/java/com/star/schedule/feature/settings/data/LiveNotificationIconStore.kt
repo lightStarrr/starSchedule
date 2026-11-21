@@ -6,15 +6,19 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.core.graphics.scale
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal class LiveNotificationIconStore(context: Context) {
+internal class LiveNotificationIconStore(
+    context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
     private val appContext = context.applicationContext
     private val iconFile: File
         get() = File(File(appContext.filesDir, "live_icons").apply { mkdirs() }, FILE_NAME)
 
-    suspend fun importFromUri(uriString: String): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun importFromUri(uriString: String): Result<String> = withContext(ioDispatcher) {
         runCatching {
             val source = appContext.contentResolver.openInputStream(Uri.parse(uriString))
                 ?: error("Unable to open image")
@@ -43,7 +47,7 @@ internal class LiveNotificationIconStore(context: Context) {
         }
     }
 
-    fun delete(path: String?) {
+    suspend fun delete(path: String?) = withContext(ioDispatcher) {
         path?.takeIf { it.isNotBlank() }?.let { runCatching { File(it).delete() } }
         if (iconFile.exists()) runCatching { iconFile.delete() }
     }

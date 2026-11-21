@@ -24,6 +24,10 @@
     <string name="reminder_test_scheduled">测试提醒已设置，将在10秒后推送通知</string>
     <string name="exact_alarm_setup_failed">无法设置精确闹钟，请检查系统设置</string>
     <string name="exact_alarm_permission_required">请允许应用使用精确闹钟，然后重试</string>
+    <string name="notification_permission_rationale_title">需要通知权限</string>
+    <string name="notification_permission_rationale_message">开启通知权限后才能按时推送上课提醒。</string>
+    <string name="notification_permission_settings_required">通知权限已被关闭，请前往应用设置开启后重试</string>
+    <string name="action_continue">继续</string>
     <string name="reminder_setup_failed">无法设置提醒，请检查系统设置</string>
     <string name="action_confirm">确定</string>
     <string name="action_cancel">取消</string>

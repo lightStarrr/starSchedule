@@ -83,7 +83,7 @@ class DataSourceDependencies(
     )
 
     init {
-        scope.launch {
+        scope.launch(ioDispatcher) {
             seedBundledHolidaysIfEmpty()
             reconcileRefreshSchedule()
         }
