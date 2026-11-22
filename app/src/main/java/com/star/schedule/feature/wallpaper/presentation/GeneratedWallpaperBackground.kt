@@ -16,9 +16,10 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import com.star.schedule.feature.emoji.data.EmojiTypefaceLoader
+import com.star.schedule.feature.emoji.data.NotoEmojiFontResource
 import com.star.schedule.feature.emoji.domain.emojiWallpaperLayout
 import com.star.schedule.feature.emoji.presentation.drawEmojiWallpaper
 import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
@@ -33,19 +34,31 @@ internal fun GeneratedWallpaperBackground(
     previewViewport: IntSize? = null,
 ) {
     val context = LocalContext.current
-    val fontFile = remember(context) {
-        File(context.filesDir, "optional-resources/noto-emoji/NotoEmoji-3.002.ttf")
+    val spec = design.emoji
+    val fontFile = remember(context) { NotoEmojiFontResource.fontFile(context.filesDir) }
+    val cachedTypeface = remember(fontFile, spec != null) {
+        if (spec != null) EmojiTypefaceLoader.peekCached(fontFile) else null
     }
-    val typeface by produceState(Typeface.DEFAULT_BOLD, fontFile) {
-        value = withContext(Dispatchers.IO) {
+    // 字体加载完成前保持 null，绝不回退到系统默认字体，避免先画系统彩色 emoji 再跳变到 Noto Emoji。
+    val typeface by produceState<Typeface?>(
+        initialValue = cachedTypeface,
+        key1 = fontFile,
+        key2 = spec != null,
+    ) {
+        if (spec == null) {
+            value = null
+            return@produceState
+        }
+        val loaded = withContext(Dispatchers.IO) {
             fontFile.takeIf(File::isFile)
                 ?.let { runCatching { EmojiTypefaceLoader.load(it) }.getOrNull() }
-                ?: Typeface.DEFAULT_BOLD
         }
+        value = loaded
     }
-    val spec = design.emoji
+
     Box(
-        modifier.fillMaxSize()
+        modifier
+            .fillMaxSize()
             .then(
                 if (design.blurRadius > 0f) {
                     Modifier.blur(design.blurRadius.dp, BlurredEdgeTreatment.Rectangle)
@@ -72,9 +85,13 @@ internal fun GeneratedWallpaperBackground(
                 }
                 onDrawBehind {
                     drawRect(Color(spec?.colors?.backgroundArgb ?: requireNotNull(design.solidArgb)))
-                    if (spec != null && layout != null) {
+                    val loadedTypeface = typeface
+                    if (spec != null && layout != null && loadedTypeface != null) {
                         withTransform({
-                            translate((size.width - width * scale) / 2, (size.height - height * scale) / 2)
+                            translate(
+                                (size.width - width * scale) / 2,
+                                (size.height - height * scale) / 2,
+                            )
                             scale(scale, scale, androidx.compose.ui.geometry.Offset.Zero)
                         }) {
                             drawIntoCanvas { canvas ->
@@ -84,7 +101,7 @@ internal fun GeneratedWallpaperBackground(
                                     height = height.toInt(),
                                     spec = spec,
                                     layout = layout,
-                                    typeface = typeface,
+                                    typeface = loadedTypeface,
                                 )
                             }
                         }
@@ -93,4 +110,3 @@ internal fun GeneratedWallpaperBackground(
             },
     )
 }
-

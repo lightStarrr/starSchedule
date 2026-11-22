@@ -4,6 +4,7 @@ import android.graphics.Typeface
 import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Noto Emoji 字体加载：同一文件只建一个 Typeface（进程内缓存）。
@@ -19,12 +20,31 @@ object EmojiTypefaceLoader {
     /** 绘制时的可变字重：画布绘制只认 fontVariationSettings。 */
     const val ARG_WEIGHT: String = "'wght' 700"
 
-    private val cache = HashMap<String, Typeface>()
+    private val cache = ConcurrentHashMap<String, Typeface>()
 
-    @Synchronized
-    fun load(file: File): Typeface = cache.getOrPut(file.absolutePath) {
-        Typeface.CustomFallbackBuilder(
-            FontFamily.Builder(Font.Builder(file).setFontVariationSettings(ARG_WEIGHT).setWeight(700).build()).build(),
-        ).build()
+    /** 只读内存缓存：已加载过时供首帧同步命中，不触碰磁盘 I/O。 */
+    fun peekCached(file: File): Typeface? = cache[file.absolutePath]
+
+    fun load(file: File): Typeface {
+        val path = file.absolutePath
+        cache[path]?.let { return it }
+        synchronized(this) {
+            cache[path]?.let { return it }
+            val loaded = Typeface.CustomFallbackBuilder(
+                FontFamily.Builder(
+                    Font.Builder(file)
+                        .setFontVariationSettings(ARG_WEIGHT)
+                        .setWeight(700)
+                        .build(),
+                ).build(),
+            ).build()
+            cache[path] = loaded
+            return loaded
+        }
+    }
+
+    /** 删除或替换字体文件后清除缓存，避免继续复用已失效的字体句柄。 */
+    fun evict(file: File) {
+        cache.remove(file.absolutePath)
     }
 }

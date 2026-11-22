@@ -39,6 +39,7 @@ class NotoEmojiFontResource(
     }
 
     override suspend fun delete() = withContext(ioDispatcher) {
+        EmojiTypefaceLoader.evict(file)
         // 删掉已安装文件与取消/失败后残留的 .part。
         dir.listFiles()?.forEach { it.delete() }
         Unit
@@ -46,6 +47,9 @@ class NotoEmojiFontResource(
 
     companion object {
         const val ID = "noto_emoji_font"
+
+        fun fontFile(filesDir: File): File =
+            File(File(filesDir, "optional-resources/noto-emoji"), FILE_NAME)
 
         /** google/fonts 提交与路径（[wght] 必须 URL 编码）。 */
         const val FONT_VERSION = "3.002"

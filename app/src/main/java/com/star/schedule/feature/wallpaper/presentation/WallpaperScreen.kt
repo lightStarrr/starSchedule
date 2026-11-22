@@ -120,6 +120,7 @@ fun WallpaperScreen(
             }
             Spacer(Modifier.height(24.dp))
             WallpaperStudio(
+                emojiFontInstalled = emojiFontState is OptionalResourceState.Installed,
                 onMakeEmojiWallpaper = {
                     if (emojiFontState is OptionalResourceState.Installed) {
                         onMakeEmojiWallpaper()
