@@ -37,6 +37,7 @@ import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.schedule.presentation.TimetableGrid
 import com.star.schedule.feature.wallpaper.domain.WallpaperBlurSpec
+import com.star.schedule.feature.wallpaper.presentation.components.SolidWallpaperColorIsland
 import com.star.schedule.feature.wallpaper.presentation.components.WallpaperEffectsIsland
 
 @Composable
@@ -83,6 +84,7 @@ private fun WallpaperPreviewScreen(
 ) {
     val ready = state as? WallpaperPreviewUiState.Ready
     var effectsExpanded by rememberSaveable { mutableStateOf(false) }
+    var colorPaletteExpanded by rememberSaveable { mutableStateOf(true) }
     val snackbarHostState = remember { SnackbarHostState() }
     val applyFailedMessage = stringResource(R.string.wallpaper_apply_failed)
     // 烘焙模糊需要窗口尺寸与 density：1 屏幕像素 = 烘焙后 1 像素。
@@ -216,10 +218,12 @@ private fun WallpaperPreviewScreen(
             )
         }
         if (ready?.design?.solidArgb != null) {
-            SolidWallpaperColors(
+            SolidWallpaperColorIsland(
                 selectedArgb = ready.design.solidArgb,
+                expanded = colorPaletteExpanded,
+                onExpandedChange = { colorPaletteExpanded = it },
                 onSelectColor = onSelectSolidColor,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

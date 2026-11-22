@@ -613,5 +613,7 @@
     <string name="wallpaper_studio">壁纸工作室</string>
     <string name="wallpaper_solid">纯色</string>
     <string name="wallpaper_none">无</string>
-    <string name="wallpaper_color_option">配色 %1$d</string>
+    <string name="wallpaper_solid_palette">调色盘</string>
+    <string name="wallpaper_solid_sv_description">调整饱和度与明度</string>
+    <string name="wallpaper_solid_hue_description">调整色相</string>
 </resources>

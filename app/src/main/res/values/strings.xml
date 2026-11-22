@@ -613,5 +613,7 @@
     <string name="wallpaper_studio">Wallpaper studio</string>
     <string name="wallpaper_solid">Solid color</string>
     <string name="wallpaper_none">None</string>
-    <string name="wallpaper_color_option">Color option %1$d</string>
+    <string name="wallpaper_solid_palette">Palette</string>
+    <string name="wallpaper_solid_sv_description">Adjust saturation and brightness</string>
+    <string name="wallpaper_solid_hue_description">Adjust hue</string>
 </resources>
