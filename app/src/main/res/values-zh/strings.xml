@@ -617,4 +617,10 @@
     <string name="wallpaper_solid_palette">调色盘</string>
     <string name="wallpaper_solid_sv_description">调整饱和度与明度</string>
     <string name="wallpaper_solid_hue_description">调整色相</string>
+    <string name="wallpaper_cached_title">已缓存的壁纸</string>
+    <string name="wallpaper_cached_empty">暂无已缓存的壁纸</string>
+    <string name="wallpaper_cached_delete_description">移除已缓存的壁纸</string>
+    <string name="wallpaper_cached_delete_failed">清理缓存壁纸失败，请重试</string>
+    <string name="wallpaper_cached_photo_label">照片 · %1$s</string>
+    <string name="wallpaper_cached_photo_fallback">照片</string>
 </resources>

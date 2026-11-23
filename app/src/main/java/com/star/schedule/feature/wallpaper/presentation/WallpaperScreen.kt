@@ -22,12 +22,15 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,10 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
+import com.star.schedule.core.designsystem.navigationBarBottomInset
 import com.star.schedule.feature.datasource.domain.OptionalResourceState
 import com.star.schedule.feature.emoji.presentation.WallpaperViewModel
+import com.star.schedule.feature.wallpaper.domain.CachedWallpaper
+import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
-import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.feature.wallpaper.presentation.components.CachedWallpapersSection
 
 @Composable
 fun WallpaperRoute(
@@ -50,22 +56,43 @@ fun WallpaperRoute(
     onPickPhoto: () -> Unit,
     onMakeEmojiWallpaper: () -> Unit,
     onPreview: (WallpaperDesign?) -> Unit,
+    onPreviewCachedPhoto: (String) -> Unit,
 ) {
     val fontState by viewModel.emojiFontState.collectAsStateWithLifecycle()
+    val cachedWallpapers by viewModel.cachedWallpapers.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val deleteFailedMessage = stringResource(R.string.wallpaper_cached_delete_failed)
+
+    LaunchedEffect(Unit) {
+        viewModel.cacheActionFailed.collect {
+            snackbarHostState.showSnackbar(deleteFailedMessage)
+        }
+    }
+
     WallpaperScreen(
         emojiFontState = fontState,
         emojiFontExpectedBytes = viewModel.emojiFontExpectedBytes,
+        cachedWallpapers = cachedWallpapers,
+        snackbarHostState = snackbarHostState,
         onBack = onBack,
         onPickPhoto = onPickPhoto,
         onMakeEmojiWallpaper = onMakeEmojiWallpaper,
         onPreview = onPreview,
+        onPreviewCached = { wallpaper ->
+            when (wallpaper) {
+                RecentWallpaper.Default -> onPreview(null)
+                is RecentWallpaper.Generated -> onPreview(wallpaper.design)
+                is RecentWallpaper.Image -> onPreviewCachedPhoto(wallpaper.path)
+            }
+        },
+        onDeleteCached = viewModel::deleteCachedWallpaper,
         onDownloadFont = viewModel::downloadEmojiFont,
         onCancelFontDownload = viewModel::cancelEmojiFontDownload,
     )
 }
 
 /**
- * 壁纸页：选照片，或进表情壁纸编辑器。
+ * 壁纸页：选照片、壁纸工作室，以及已缓存壁纸管理。
  * 表情字体没下载时点「制作表情壁纸」弹下载对话框，下完自动进编辑器。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,10 +100,14 @@ fun WallpaperRoute(
 fun WallpaperScreen(
     emojiFontState: OptionalResourceState,
     emojiFontExpectedBytes: Long,
+    cachedWallpapers: List<CachedWallpaper> = emptyList(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onBack: () -> Unit,
     onPickPhoto: () -> Unit,
     onMakeEmojiWallpaper: () -> Unit,
     onPreview: (WallpaperDesign?) -> Unit,
+    onPreviewCached: (RecentWallpaper) -> Unit = {},
+    onDeleteCached: (RecentWallpaper) -> Unit = {},
     onDownloadFont: () -> Unit,
     onCancelFontDownload: () -> Unit,
 ) {
@@ -93,6 +124,12 @@ fun WallpaperScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = navigationBarBottomInset()),
+            )
+        },
         topBar = {
             CompactPageTopBar(
                 title = stringResource(R.string.wallpaper_title),
@@ -129,6 +166,12 @@ fun WallpaperScreen(
                     }
                 },
                 onPreview = onPreview,
+            )
+            Spacer(Modifier.height(28.dp))
+            CachedWallpapersSection(
+                items = cachedWallpapers,
+                onPreview = onPreviewCached,
+                onDelete = onDeleteCached,
             )
         }
     }

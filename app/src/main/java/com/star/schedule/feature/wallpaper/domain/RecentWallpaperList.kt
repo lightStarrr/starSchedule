@@ -32,3 +32,12 @@ internal fun sameRecentEntry(
     a.kind == KIND_GENERATED -> a.design == b.design
     else -> true
 }
+
+/** 从最近壁纸列表中移除指定条目（不移除系统「默认」条目）。 */
+internal fun removeRecentEntry(
+    entries: List<RecentWallpaperEntry>,
+    target: RecentWallpaperEntry,
+): List<RecentWallpaperEntry> {
+    if (target.kind == RecentWallpaperEntry.KIND_DEFAULT) return entries
+    return entries.filterNot { existing -> sameRecentEntry(existing, target) }
+}

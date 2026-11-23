@@ -8,6 +8,7 @@ import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
+import com.star.schedule.feature.wallpaper.domain.CachedWallpaper
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import com.star.schedule.feature.wallpaper.domain.StagedWallpaper
 import com.star.schedule.feature.wallpaper.domain.WallpaperBlurSpec
@@ -213,6 +214,9 @@ private class FakeScheduleRepository(
 private class FakeWallpaperRepository : WallpaperRepository {
     override fun observe(timetableId: Long): Flow<WallpaperState> = flowOf(WallpaperState.None)
     override fun observeRecents(): Flow<List<RecentWallpaper>> = emptyFlow()
+    override fun observeCachedWallpapers(): Flow<List<CachedWallpaper>> = flowOf(emptyList())
+    override suspend fun deleteCachedWallpaper(wallpaper: RecentWallpaper): Result<Unit> =
+        Result.success(Unit)
     override suspend fun importFromUri(timetableId: Long, uriString: String): Result<Unit> =
         Result.success(Unit)
 

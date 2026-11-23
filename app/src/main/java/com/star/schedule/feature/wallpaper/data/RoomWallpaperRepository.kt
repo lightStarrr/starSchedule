@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.dao.PreferenceDao
+import com.star.schedule.feature.wallpaper.domain.CachedWallpaper
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaperEntry
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaperEntry.Companion.KIND_DEFAULT
@@ -16,12 +17,14 @@ import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
 import com.star.schedule.feature.wallpaper.domain.promoteRecentEntry
+import com.star.schedule.feature.wallpaper.domain.removeRecentEntry
 import java.io.File
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -163,6 +166,106 @@ class RoomWallpaperRepository(
                 }
             }
             .flowOn(ioDispatcher)
+
+    override fun observeCachedWallpapers(): Flow<List<CachedWallpaper>> =
+        combine(
+            dao.getPreferenceFlow(Constants.PREF_WALLPAPER_RECENTS),
+            dao.observeValuesForTimetables(Constants.PREF_TIMETABLE_WALLPAPER_PREFIX),
+        ) { recentsValue, activeValues ->
+            val (activeHashes, activeDesigns) = parseActiveWallpapers(activeValues)
+            val entries = WallpaperRecentsFormat.decode(recentsValue).orEmpty()
+            entries.mapNotNull { entry ->
+                when (entry.kind) {
+                    RecentWallpaperEntry.KIND_GENERATED -> entry.design
+                        ?.takeIf(WallpaperDesign::isValid)
+                        ?.let { design ->
+                            CachedWallpaper(
+                                wallpaper = RecentWallpaper.Generated(design),
+                                sizeBytes = 0L,
+                                inUse = design in activeDesigns,
+                            )
+                        }
+                    KIND_IMAGE -> {
+                        val hash = entry.contentHash ?: return@mapNotNull null
+                        val file = cacheStore.recentFile(hash)
+                        if (WallpaperFileHash.matches(file, hash)) {
+                            CachedWallpaper(
+                                wallpaper = RecentWallpaper.Image(
+                                    path = file.absolutePath,
+                                    contentHash = hash,
+                                    scrimEnabled = entry.scrimEnabled,
+                                ),
+                                sizeBytes = file.length().coerceAtLeast(0L),
+                                inUse = hash in activeHashes,
+                            )
+                        } else {
+                            null
+                        }
+                    }
+                    else -> null
+                }
+            }
+        }
+            .flowOn(ioDispatcher)
+
+    override suspend fun deleteCachedWallpaper(wallpaper: RecentWallpaper): Result<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                val activeValues = dao.observeValuesForTimetables(
+                    Constants.PREF_TIMETABLE_WALLPAPER_PREFIX,
+                ).firstOrNull().orEmpty()
+                val (activeHashes, activeDesigns) = parseActiveWallpapers(activeValues)
+                val target = when (wallpaper) {
+                    RecentWallpaper.Default -> return@runCatching
+                    is RecentWallpaper.Generated -> {
+                        if (wallpaper.design in activeDesigns) return@runCatching
+                        RecentWallpaperEntry(
+                            kind = RecentWallpaperEntry.KIND_GENERATED,
+                            design = wallpaper.design,
+                        )
+                    }
+                    is RecentWallpaper.Image -> {
+                        if (wallpaper.contentHash in activeHashes) return@runCatching
+                        RecentWallpaperEntry(
+                            kind = KIND_IMAGE,
+                            fileName = "wallpaper-${wallpaper.contentHash}",
+                            contentHash = wallpaper.contentHash,
+                            scrimEnabled = wallpaper.scrimEnabled,
+                        )
+                    }
+                }
+                val key = Constants.PREF_WALLPAPER_RECENTS
+                val old = WallpaperRecentsFormat.decode(
+                    dao.getPreferenceFlow(key).firstOrNull(),
+                ) ?: listOf(defaultEntry())
+                val updated = removeRecentEntry(old, target)
+                if (updated != old) {
+                    dao.setPreference(key, WallpaperRecentsFormat.encode(updated))
+                }
+                if (wallpaper is RecentWallpaper.Image) {
+                    cacheStore.deleteRecent(wallpaper.contentHash)
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+            }
+        }
+
+    private fun parseActiveWallpapers(
+        values: List<String>,
+    ): Pair<Set<String>, Set<WallpaperDesign>> {
+        val activeHashes = HashSet<String>()
+        val activeDesigns = HashSet<WallpaperDesign>()
+        values.forEach { raw ->
+            WallpaperPreferenceFormat.decodeGenerated(raw)?.let {
+                activeDesigns.add(it.design)
+                return@forEach
+            }
+            WallpaperPreferenceFormat.decode(raw)?.let {
+                activeHashes.add(it.contentHash)
+            }
+        }
+        return activeHashes to activeDesigns
+    }
 
     override suspend fun importFromUri(
         timetableId: Long,

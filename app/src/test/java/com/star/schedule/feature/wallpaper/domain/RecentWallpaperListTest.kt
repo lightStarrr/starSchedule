@@ -1,6 +1,7 @@
 package com.star.schedule.feature.wallpaper.domain
 
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaperEntry.Companion.KIND_DEFAULT
+import com.star.schedule.feature.wallpaper.domain.RecentWallpaperEntry.Companion.KIND_GENERATED
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaperEntry.Companion.KIND_IMAGE
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -71,5 +72,20 @@ class RecentWallpaperListTest {
 
         assertEquals(11, updated.size)
         assertEquals(default, updated.first())
+    }
+
+    @Test
+    fun `removing cached entry drops matching item without touching default`() {
+        val imgA = image("a".repeat(64))
+        val imgB = image("b".repeat(64))
+        val solid = RecentWallpaperEntry(
+            kind = KIND_GENERATED,
+            design = WallpaperDesign(solidArgb = 0xFF336699.toInt()),
+        )
+        val entries = listOf(imgA, solid, imgB, default)
+
+        assertEquals(listOf(solid, imgB, default), removeRecentEntry(entries, imgA))
+        assertEquals(listOf(imgA, imgB, default), removeRecentEntry(entries, solid))
+        assertEquals(entries, removeRecentEntry(entries, default))
     }
 }

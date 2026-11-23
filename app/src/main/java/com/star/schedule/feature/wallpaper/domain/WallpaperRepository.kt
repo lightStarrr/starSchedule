@@ -11,6 +11,14 @@ interface WallpaperRepository {
      */
     fun observeRecents(): Flow<List<RecentWallpaper>>
 
+    /**
+     * 已缓存的历史壁纸（不含「默认」），附带磁盘占用字节数（生成类壁纸为 0）。
+     */
+    fun observeCachedWallpapers(): Flow<List<CachedWallpaper>>
+
+    /** 删除单条已缓存壁纸（仅移出共享缓存与历史，正被课表使用的壁纸不可删除）。 */
+    suspend fun deleteCachedWallpaper(wallpaper: RecentWallpaper): Result<Unit>
+
     suspend fun importFromUri(timetableId: Long, uriString: String): Result<Unit>
 
     /**

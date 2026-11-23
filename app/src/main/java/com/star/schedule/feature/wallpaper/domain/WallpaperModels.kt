@@ -52,6 +52,16 @@ sealed interface RecentWallpaper {
     ) : RecentWallpaper
 }
 
+/**
+ * 已缓存的壁纸条目（不含系统「默认」），供壁纸页展示占用空间与清理管理。
+ * [inUse] 为 true 表示正被至少一张现存课表使用，不可删除。
+ */
+data class CachedWallpaper(
+    val wallpaper: RecentWallpaper,
+    val sizeBytes: Long,
+    val inUse: Boolean = false,
+)
+
 @Serializable
 data class WallpaperPreference(
     val fileName: String,

@@ -3,17 +3,21 @@ package com.star.schedule.app
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
+import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.emoji.presentation.WallpaperViewModel
 import com.star.schedule.feature.emoji.presentation.WallpaperViewModelFactory
+import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
 import com.star.schedule.feature.wallpaper.presentation.WallpaperRoute
 import com.star.schedule.platform.systembar.installEdgeToEdge
+import java.io.File
 
 /**
  * 壁纸页：作用于打开时指定的课表；没带 id 就没有目标。
@@ -55,14 +59,19 @@ class WallpaperActivity : ComponentActivity() {
         }
         this.timetableId = timetableId
 
+        DatabaseProvider.init(this)
         installEdgeToEdge()
 
         val viewModel = ViewModelProvider(
             this,
             WallpaperViewModelFactory(
-                (application as ScheduleApplication)
+                optionalResources = (application as ScheduleApplication)
                     .dataSourceDependencies
                     .optionalResources,
+                wallpaperRepository = RoomWallpaperRepository(
+                    this,
+                    DatabaseProvider.preferenceDao(),
+                ),
             ),
         )[WallpaperViewModel::class.java]
 
@@ -82,6 +91,15 @@ class WallpaperActivity : ComponentActivity() {
                     },
                     onPreview = { design ->
                         previewLauncher.launch(WallpaperPreviewActivity.intent(this, timetableId, design))
+                    },
+                    onPreviewCachedPhoto = { path ->
+                        previewLauncher.launch(
+                            WallpaperPreviewActivity.intent(
+                                this,
+                                timetableId,
+                                Uri.fromFile(File(path)).toString(),
+                            ),
+                        )
                     },
                     onMakeEmojiWallpaper = {
                         emojiLauncher.launch(

@@ -617,4 +617,10 @@
     <string name="wallpaper_solid_palette">Palette</string>
     <string name="wallpaper_solid_sv_description">Adjust saturation and brightness</string>
     <string name="wallpaper_solid_hue_description">Adjust hue</string>
+    <string name="wallpaper_cached_title">Cached wallpapers</string>
+    <string name="wallpaper_cached_empty">No cached wallpapers yet</string>
+    <string name="wallpaper_cached_delete_description">Remove cached wallpaper</string>
+    <string name="wallpaper_cached_delete_failed">Couldn\'t remove cached wallpaper, try again</string>
+    <string name="wallpaper_cached_photo_label">Photo · %1$s</string>
+    <string name="wallpaper_cached_photo_fallback">Photo</string>
 </resources>

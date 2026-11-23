@@ -13,6 +13,15 @@ abstract class PreferenceDao {
     @Query("SELECT value FROM preference WHERE prefKey = :prefKey LIMIT 1")
     abstract fun getPreferenceFlow(prefKey: String): Flow<String?>
 
+    @Query(
+        """
+        SELECT p.value FROM preference AS p
+        INNER JOIN timetable AS t ON p.prefKey = :prefix || t.id
+        WHERE p.value != ''
+        """,
+    )
+    abstract fun observeValuesForTimetables(prefix: String): Flow<List<String>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertPreference(preference: PreferenceEntity)
 
