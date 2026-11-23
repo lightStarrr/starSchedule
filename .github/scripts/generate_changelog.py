@@ -11,7 +11,7 @@ from pathlib import Path
 
 VERSION = re.compile(r"v(\d+)\.(\d+)\.(\d+)")
 SUBJECT = re.compile(
-    r"^(feat|fix|docs|style|refactor|test|chore)\([^()\r\n]+\)!?:[ \t]+(.+)$",
+    r"^(feat|fix|docs|style|refactor|perf|test|chore)\([^()\r\n]+\)!?:[ \t]+(.+)$",
 )
 GROUPS = (
     ("added", "\u65b0\u589e"),
@@ -51,9 +51,39 @@ def parse_message(message, cwd=None):
     return markers[0], match.group(2).strip()
 
 
+def is_ancestor(ancestor, descendant, cwd=None):
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise RuntimeError(result.stderr.decode("utf-8", errors="replace"))
+
+
+def merge_base(first, second, cwd=None):
+    result = subprocess.run(
+        ["git", "merge-base", first, second],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+    )
+    if result.returncode == 0:
+        return result.stdout.strip()
+    if result.returncode == 1:
+        return None
+    raise RuntimeError(result.stderr)
+
+
 def select_base(ref, mode, tag=None, cwd=None):
     target = git("rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}", cwd=cwd).strip()
     limit = None
+    has_snapshot = False
     if mode == "release":
         match = VERSION.fullmatch(tag or "")
         if not match:
@@ -65,20 +95,10 @@ def select_base(ref, mode, tag=None, cwd=None):
         if tagged != target:
             raise ValueError("Release tag does not point to the requested commit")
     elif "snapshot" in git("tag", "--list", "snapshot", cwd=cwd).splitlines():
-        result = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", "refs/tags/snapshot", target],
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if result.returncode == 0:
+        has_snapshot = True
+        if is_ancestor("refs/tags/snapshot", target, cwd=cwd):
             return target, "snapshot"
-        if result.returncode != 1:
-            raise RuntimeError(result.stderr.decode("utf-8", errors="replace"))
-        print(
-            "Previous snapshot is not an ancestor; falling back to a stable release baseline.",
-            file=sys.stderr,
-        )
+
     candidates = []
     for name in git("tag", "--list", cwd=cwd).splitlines():
         match = VERSION.fullmatch(name)
@@ -87,25 +107,59 @@ def select_base(ref, mode, tag=None, cwd=None):
         version = tuple(map(int, match.groups()))
         if limit is not None and version >= limit:
             continue
-        result = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", f"refs/tags/{name}", target],
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if result.returncode == 0:
+        if is_ancestor(f"refs/tags/{name}", target, cwd=cwd):
             candidates.append((version, name))
-        elif result.returncode != 1:
-            raise RuntimeError(result.stderr.decode("utf-8", errors="replace"))
-    return target, max(candidates)[1] if candidates else None
+    stable_base = max(candidates)[1] if candidates else None
+
+    if has_snapshot:
+        common = merge_base("refs/tags/snapshot", target, cwd=cwd)
+        if common is not None:
+            if stable_base is None:
+                print(
+                    "Previous snapshot diverged (force-push/rebase); using patch-aware incremental diff from snapshot.",
+                    file=sys.stderr,
+                )
+                return target, "snapshot"
+            stable_commit = git(
+                "rev-parse", "--verify", "--end-of-options", f"refs/tags/{stable_base}^{{commit}}",
+                cwd=cwd,
+            ).strip()
+            # 只要旧 snapshot 与当前分支的共同祖先严格晚于最近正式版标签，说明是当前开发周期内的强推/改写历史，
+            # 继续以 snapshot 为基线配合 --cherry-pick 增量对比，避免退回正式版把所有历史提交全列出来。
+            if common != stable_commit and is_ancestor(stable_commit, common, cwd=cwd):
+                print(
+                    "Previous snapshot diverged after latest release (force-push/rebase); using patch-aware incremental diff from snapshot.",
+                    file=sys.stderr,
+                )
+                return target, "snapshot"
+        print(
+            "Previous snapshot is not an ancestor; falling back to a stable release baseline.",
+            file=sys.stderr,
+        )
+    return target, stable_base
 
 
 def collect_entries(target, base=None, cwd=None):
-    revision = f"refs/tags/{base}..{target}" if base else target
-    messages = git(
-        "log", "--no-merges", "--reverse", "--topo-order", "--encoding=UTF-8",
-        "--format=%B%x00", revision, "--", cwd=cwd,
-    )
+    if base:
+        base_ref = f"refs/tags/{base}"
+        if is_ancestor(base_ref, target, cwd=cwd):
+            args = [
+                "log", "--no-merges", "--reverse", "--topo-order", "--encoding=UTF-8",
+                "--format=%B%x00", f"{base_ref}..{target}", "--",
+            ]
+        else:
+            # 强推/rebase 后用对称差 + --cherry-pick --right-only，只提取当前分支新增或补丁发生变化的提交。
+            args = [
+                "log", "--no-merges", "--reverse", "--topo-order", "--cherry-pick",
+                "--right-only", "--encoding=UTF-8",
+                "--format=%B%x00", f"{base_ref}...{target}", "--",
+            ]
+    else:
+        args = [
+            "log", "--no-merges", "--reverse", "--topo-order", "--encoding=UTF-8",
+            "--format=%B%x00", target, "--",
+        ]
+    messages = git(*args, cwd=cwd)
     entries = []
     seen = set()
     for record in messages.split("\0"):

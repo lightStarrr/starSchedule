@@ -22,6 +22,10 @@ def message(title, kind):
 class MessageTests(unittest.TestCase):
     def test_explicit_classification_is_independent_of_type(self):
         self.assertEqual(parse_message(message("Improve layout", "changed")), ("changed", "Improve layout"))
+        self.assertEqual(
+            parse_message("perf(ui): Reduce render overhead\n\nChangelog: changed\n"),
+            ("changed", "Reduce render overhead"),
+        )
         self.assertIsNone(parse_message(message("Internal work", "none")))
         self.assertIsNone(parse_message("fix(app): Legacy message\n"))
 
@@ -85,8 +89,15 @@ class HistoryTests(unittest.TestCase):
         git("config", "commit.gpgsign", "false", cwd=self.repo)
         self.initial = self.commit(message("Original feature", "added"))
 
-    def commit(self, text):
-        git("commit", "--allow-empty", "-F", "-", cwd=self.repo, input_text=text)
+    def commit(self, text, filename=None, content=None):
+        if filename is not None:
+            path = self.repo / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content if content is not None else text, encoding="utf-8")
+            git("add", filename, cwd=self.repo)
+            git("commit", "-F", "-", cwd=self.repo, input_text=text)
+        else:
+            git("commit", "--allow-empty", "-F", "-", cwd=self.repo, input_text=text)
         return git("rev-parse", "HEAD", cwd=self.repo).strip()
 
     def tag(self, name):
@@ -157,6 +168,42 @@ class HistoryTests(unittest.TestCase):
         target, base = select_base("HEAD", "snapshot", cwd=self.repo)
         self.assertEqual(base, "v1.0.0")
         self.assertEqual(collect_entries(target, base, cwd=self.repo), [("fixed", "Current history")])
+
+    def test_force_push_after_snapshot_stays_incremental_instead_of_dumping_since_release(self):
+        self.tag("v1.0.0")
+        c1 = self.commit(message("Old feature 1", "added"), "f1.txt", "v1\n")
+        c2 = self.commit(message("Old feature 2", "added"), "f2.txt", "v1\n")
+        self.commit(message("Last snapshot fix", "fixed"), "f3.txt", "v1\n")
+        self.tag("snapshot")
+
+        # 模拟修改最近一次提交并新增提交后强推：只应列出修改后的提交与新提交，不重复列出 Old feature 1/2。
+        git("reset", "--hard", c2, cwd=self.repo)
+        self.commit(message("Amended fix", "fixed"), "f3.txt", "v2\n")
+        self.commit(message("Brand new fix", "fixed"), "f4.txt", "v1\n")
+        target, base = select_base("HEAD", "snapshot", cwd=self.repo)
+        self.assertEqual(base, "snapshot")
+        self.assertEqual(
+            collect_entries(target, base, cwd=self.repo),
+            [("fixed", "Amended fix"), ("fixed", "Brand new fix")],
+        )
+
+        # 模拟在旧提交上 rebase（补丁内容不变，仅多出一个新提交）：--cherry-pick 过滤重复补丁。
+        git("reset", "--hard", c1, cwd=self.repo)
+        self.commit(message("Old feature 2", "added"), "f2.txt", "v1\n")
+        self.commit(message("Last snapshot fix", "fixed"), "f3.txt", "v1\n")
+        self.commit(message("Post-rebase addition", "added"), "f5.txt", "v1\n")
+        target, base = select_base("HEAD", "snapshot", cwd=self.repo)
+        self.assertEqual(base, "snapshot")
+        self.assertEqual(
+            collect_entries(target, base, cwd=self.repo),
+            [("added", "Post-rebase addition")],
+        )
+
+        # 模拟回退掉最后一次提交并强推：增量应为空，不退回 v1.0.0 全量输出。
+        git("reset", "--hard", c2, cwd=self.repo)
+        target, base = select_base("HEAD", "snapshot", cwd=self.repo)
+        self.assertEqual(base, "snapshot")
+        self.assertEqual(collect_entries(target, base, cwd=self.repo), [])
 
     def test_merged_branch_entries_are_included_but_merge_summary_is_not(self):
         self.tag("v1.0.0")
