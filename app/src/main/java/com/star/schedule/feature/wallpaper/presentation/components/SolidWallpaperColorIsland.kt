@@ -77,6 +77,7 @@ private val PalettePillCorner = 64.dp
 private val PaletteBoardHeight = 160.dp
 private val PaletteBoardCorner = 20.dp
 private val PaletteHueHeight = 28.dp
+private const val MAX_PENDING_EMISSIONS = 16
 
 private val HueSpectrumColors = listOf(
     Color(0xFFFF0000),
@@ -142,17 +143,42 @@ internal fun SolidWallpaperColorIsland(
     )
 
     var hsv by remember { mutableStateOf(SolidColorHsv.fromArgb(selectedArgb)) }
-    LaunchedEffect(selectedArgb) {
+    // 调色盘交互期间以浮点 HSV 作为单一真相源：
+    // ViewModel 经 combine 异步回传的 8-bit ARGB 在暗部/浅色区反算会丢色相精度，
+    // 用有序队列追踪自身发出的 ARGB 回声，无论拖动中还是抬手瞬间收到晚一帧回传，
+    // 都不会把自身回声再反算覆盖 hsv，彻底消除底部色相条抖动。
+    var interacting by remember { mutableStateOf(false) }
+    val emittedQueue = remember { ArrayDeque<Int>() }
+
+    LaunchedEffect(selectedArgb, interacting) {
+        val echoIndex = emittedQueue.indexOfFirst { it == selectedArgb }
+        if (echoIndex >= 0) {
+            repeat(echoIndex + 1) { emittedQueue.removeFirst() }
+            return@LaunchedEffect
+        }
+        if (interacting || emittedQueue.isNotEmpty()) return@LaunchedEffect
         if (hsv.toOpaqueArgb() != selectedArgb) {
             hsv = SolidColorHsv.fromArgb(selectedArgb, fallbackHue = hsv.hue)
         }
     }
 
-    val updateHsv: (SolidColorHsv) -> Unit = { next ->
+    val applyHsv: (SolidColorHsv) -> Unit = { next ->
         val normalized = next.normalized()
+        val argb = normalized.toOpaqueArgb()
         hsv = normalized
-        onSelectColor(normalized.toOpaqueArgb())
+        if (argb == selectedArgb && emittedQueue.isEmpty()) {
+            // 与上游当前值一致且无在途回声，无需重复发射。
+        } else if (emittedQueue.lastOrNull() != argb) {
+            if (emittedQueue.size >= MAX_PENDING_EMISSIONS) {
+                emittedQueue.removeFirst()
+            }
+            emittedQueue.addLast(argb)
+            onSelectColor(argb)
+        }
     }
+
+    // 预览展示优先用本地实时算出的颜色，避免等待 ViewModel 回环造成的 1 帧滞后。
+    val displayArgb = remember(hsv) { hsv.toOpaqueArgb() }
 
     Box(modifier.fillMaxSize()) {
         if (expanded) {
@@ -192,14 +218,20 @@ internal fun SolidWallpaperColorIsland(
             ) { isExpanded ->
                 if (isExpanded) {
                     SolidColorPaletteCardContent(
-                        selectedArgb = selectedArgb,
+                        selectedArgb = displayArgb,
                         hsv = hsv,
                         animationsEnabled = animationsEnabled,
-                        onHsvChange = updateHsv,
+                        onSaturationValueChange = { s, v ->
+                            applyHsv(hsv.copy(saturation = s, value = v))
+                        },
+                        onHueChange = { newHue ->
+                            applyHsv(hsv.copy(hue = newHue))
+                        },
+                        onInteractingChange = { interacting = it },
                         onCollapse = { onExpandedChange(false) },
                     )
                 } else {
-                    SolidColorPillContent(selectedArgb = selectedArgb)
+                    SolidColorPillContent(selectedArgb = displayArgb)
                 }
             }
         }
@@ -235,7 +267,9 @@ private fun SolidColorPaletteCardContent(
     selectedArgb: Int,
     hsv: SolidColorHsv,
     animationsEnabled: Boolean,
-    onHsvChange: (SolidColorHsv) -> Unit,
+    onSaturationValueChange: (Float, Float) -> Unit,
+    onHueChange: (Float) -> Unit,
+    onInteractingChange: (Boolean) -> Unit,
     onCollapse: () -> Unit,
 ) {
     val cookieShape = MaterialShapes.Cookie7Sided.toShape()
@@ -291,9 +325,8 @@ private fun SolidColorPaletteCardContent(
             value = hsv.value,
             selectedColor = Color(selectedArgb),
             animationsEnabled = animationsEnabled,
-            onSaturationValueChange = { s, v ->
-                onHsvChange(hsv.copy(saturation = s, value = v))
-            },
+            onSaturationValueChange = onSaturationValueChange,
+            onInteractingChange = onInteractingChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(PaletteBoardHeight),
@@ -302,9 +335,8 @@ private fun SolidColorPaletteCardContent(
         HueSliderTrack(
             hue = hsv.hue,
             animationsEnabled = animationsEnabled,
-            onHueChange = { newHue ->
-                onHsvChange(hsv.copy(hue = newHue))
-            },
+            onHueChange = onHueChange,
+            onInteractingChange = onInteractingChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(PaletteHueHeight),
@@ -321,9 +353,11 @@ private fun SaturationValueBoard(
     selectedColor: Color,
     animationsEnabled: Boolean,
     onSaturationValueChange: (Float, Float) -> Unit,
+    onInteractingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val latestOnChange by rememberUpdatedState(onSaturationValueChange)
+    val latestOnInteracting by rememberUpdatedState(onInteractingChange)
     var pressed by remember { mutableStateOf(false) }
     val handleRadiusState = animateDpAsState(
         targetValue = if (pressed) 14.dp else 11.dp,
@@ -346,6 +380,7 @@ private fun SaturationValueBoard(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     pressed = true
+                    latestOnInteracting(true)
                     fun emitAt(position: Offset) {
                         val width = size.width.coerceAtLeast(1).toFloat()
                         val height = size.height.coerceAtLeast(1).toFloat()
@@ -370,6 +405,7 @@ private fun SaturationValueBoard(
                         }
                     } finally {
                         pressed = false
+                        latestOnInteracting(false)
                     }
                 }
             },
@@ -433,9 +469,11 @@ private fun HueSliderTrack(
     hue: Float,
     animationsEnabled: Boolean,
     onHueChange: (Float) -> Unit,
+    onInteractingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val latestOnChange by rememberUpdatedState(onHueChange)
+    val latestOnInteracting by rememberUpdatedState(onInteractingChange)
     var pressed by remember { mutableStateOf(false) }
     val handleRadiusState = animateDpAsState(
         targetValue = if (pressed) 13.dp else 11.dp,
@@ -458,6 +496,7 @@ private fun HueSliderTrack(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     pressed = true
+                    latestOnInteracting(true)
                     fun emitAt(x: Float) {
                         val edgePad = (size.height / 2f).coerceAtLeast(1f)
                         val usable = (size.width - edgePad * 2f).coerceAtLeast(1f)
@@ -481,6 +520,7 @@ private fun HueSliderTrack(
                         }
                     } finally {
                         pressed = false
+                        latestOnInteracting(false)
                     }
                 }
             },
