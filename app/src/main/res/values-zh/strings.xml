@@ -381,6 +381,7 @@
     <string name="wallpaper_preview_title">预览</string>
     <string name="wallpaper_effects">特效</string>
     <string name="wallpaper_effects_collapse">收起</string>
+    <string name="wallpaper_scrim">显示遮罩</string>
     <string name="wallpaper_blur">模糊</string>
     <string name="wallpaper_blur_amount">模糊程度</string>
     <string name="wallpaper_blur_amount_value">%1$d dp</string>

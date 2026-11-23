@@ -149,7 +149,9 @@ private fun WallpaperState.matches(recent: RecentWallpaper): Boolean = when (rec
     is RecentWallpaper.Generated ->
         (this as? WallpaperState.Generated)?.design == recent.design
     is RecentWallpaper.Image ->
-        (this as? WallpaperState.Ready)?.contentHash == recent.contentHash
+        (this as? WallpaperState.Ready)?.let {
+            it.contentHash == recent.contentHash && it.scrimEnabled == recent.scrimEnabled
+        } == true
 }
 
 class TimetableSettingsViewModelFactory(

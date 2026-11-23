@@ -59,6 +59,7 @@ fun WallpaperPreviewRoute(
             state = state,
             onBack = onBack,
             onApplied = onApplied,
+            onScrimEnabledChange = viewModel::setScrimEnabled,
             onBlurEnabledChange = viewModel::setBlurEnabled,
             onBlurRadiusChange = viewModel::setBlurRadius,
             onApply = viewModel::apply,
@@ -68,8 +69,8 @@ fun WallpaperPreviewRoute(
 }
 
 /**
- * 壁纸预览页：照片铺满整个窗口（含系统栏），上面盖与主页相同的 46% 遮罩，
- * 再叠真实课表；底部是特效岛。
+ * 壁纸预览页：照片铺满整个窗口（含系统栏），按开关决定是否盖与主页相同的 46% 遮罩，
+ * 再叠真实课表；底部是特效岛或调色盘岛。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -77,6 +78,7 @@ private fun WallpaperPreviewScreen(
     state: WallpaperPreviewUiState,
     onBack: () -> Unit,
     onApplied: () -> Unit,
+    onScrimEnabledChange: (Boolean) -> Unit,
     onBlurEnabledChange: (Boolean) -> Unit,
     onBlurRadiusChange: (Float) -> Unit,
     onApply: (WallpaperBlurSpec?) -> Unit,
@@ -118,8 +120,8 @@ private fun WallpaperPreviewScreen(
             } else {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer))
             }
-            // 与主页一致：壁纸上盖一层 surface 46% 遮罩，前景内容才读得清。
-            if (ready.design != null || ready.stagedPath != null) Box(
+            // 与主页一致：非「无壁纸」且开启遮罩时盖一层 surface 46% 遮罩，前景内容更易读。
+            if ((ready.design != null || ready.stagedPath != null) && ready.scrimEnabled) Box(
                 Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f)),
@@ -210,6 +212,8 @@ private fun WallpaperPreviewScreen(
             WallpaperEffectsIsland(
                 expanded = effectsExpanded,
                 onExpandedChange = { effectsExpanded = it },
+                scrimEnabled = ready.scrimEnabled,
+                onScrimEnabledChange = onScrimEnabledChange,
                 blurEnabled = ready.blurEnabled,
                 onBlurEnabledChange = onBlurEnabledChange,
                 blurRadius = ready.blurRadius,
@@ -220,6 +224,8 @@ private fun WallpaperPreviewScreen(
         if (ready?.design?.solidArgb != null) {
             SolidWallpaperColorIsland(
                 selectedArgb = ready.design.solidArgb,
+                scrimEnabled = ready.scrimEnabled,
+                onScrimEnabledChange = onScrimEnabledChange,
                 expanded = colorPaletteExpanded,
                 onExpandedChange = { colorPaletteExpanded = it },
                 onSelectColor = onSelectSolidColor,

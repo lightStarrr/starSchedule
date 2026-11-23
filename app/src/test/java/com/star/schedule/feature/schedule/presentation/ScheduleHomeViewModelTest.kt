@@ -225,6 +225,7 @@ private class FakeWallpaperRepository : WallpaperRepository {
         timetableId: Long,
         stagedPath: String,
         blur: WallpaperBlurSpec?,
+        scrimEnabled: Boolean,
     ): Result<Unit> = Result.success(Unit)
 
     override suspend fun applyRecent(timetableId: Long, recent: RecentWallpaper): Result<Unit> =

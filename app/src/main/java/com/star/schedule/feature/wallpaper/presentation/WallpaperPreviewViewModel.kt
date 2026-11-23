@@ -31,6 +31,7 @@ sealed interface WallpaperPreviewUiState {
         val stagedPath: String?,
         val seedArgb: Int?,
         val design: WallpaperDesign?,
+        val scrimEnabled: Boolean,
         val blurEnabled: Boolean,
         // 单位 dp；开关没打开时保留上次滑到的值，写库时按 0 处理。
         val blurRadius: Float,
@@ -66,6 +67,7 @@ class WallpaperPreviewViewModel(
     }
 
     private data class EditState(
+        val scrimEnabled: Boolean = true,
         val blurEnabled: Boolean = false,
         val blurRadius: Float = DEFAULT_BLUR_RADIUS,
         val isApplying: Boolean = false,
@@ -75,7 +77,9 @@ class WallpaperPreviewViewModel(
     )
 
     private val staged = MutableStateFlow<StageResult>(StageResult.Loading)
-    private val edit = MutableStateFlow(EditState())
+    private val edit = MutableStateFlow(
+        EditState(scrimEnabled = initialDesign?.scrimEnabled ?: true),
+    )
 
     // onCleared 里要同步删暂存文件，不能只靠状态流取路径（作用域已取消）。
     private var stagedPath: String? = null
@@ -132,6 +136,7 @@ class WallpaperPreviewViewModel(
                     } else {
                         initialDesign
                     },
+                    scrimEnabled = edit.scrimEnabled,
                     blurEnabled = edit.blurEnabled,
                     blurRadius = edit.blurRadius,
                     isApplying = edit.isApplying,
@@ -151,6 +156,10 @@ class WallpaperPreviewViewModel(
         SharingStarted.WhileSubscribed(5_000),
         WallpaperPreviewUiState.Loading,
     )
+
+    fun setScrimEnabled(enabled: Boolean) {
+        edit.update { it.copy(scrimEnabled = enabled) }
+    }
 
     fun setBlurEnabled(enabled: Boolean) {
         edit.update { it.copy(blurEnabled = enabled) }
@@ -176,11 +185,18 @@ class WallpaperPreviewViewModel(
         edit.update { it.copy(isApplying = true, applyFailed = false) }
         viewModelScope.launch {
             val result = when {
-                state.stagedPath != null ->
-                    wallpaperRepository.applyStaged(timetableId, state.stagedPath, blur)
+                state.stagedPath != null -> wallpaperRepository.applyStaged(
+                    timetableId = timetableId,
+                    stagedPath = state.stagedPath,
+                    blur = blur,
+                    scrimEnabled = state.scrimEnabled,
+                )
                 state.design != null -> wallpaperRepository.applyDesign(
                     timetableId,
-                    state.design.copy(blurRadius = if (state.blurEnabled) state.blurRadius else 0f),
+                    state.design.copy(
+                        blurRadius = if (state.blurEnabled) state.blurRadius else 0f,
+                        scrimEnabled = state.scrimEnabled,
+                    ),
                 )
                 else -> wallpaperRepository.applyRecent(timetableId, RecentWallpaper.Default)
             }

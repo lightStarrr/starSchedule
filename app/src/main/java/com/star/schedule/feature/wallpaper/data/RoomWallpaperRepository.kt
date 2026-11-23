@@ -97,6 +97,7 @@ class RoomWallpaperRepository(
                             localPath = file.absolutePath,
                             contentHash = preference.contentHash,
                             seedArgb = seedArgb,
+                            scrimEnabled = preference.scrimEnabled,
                         )
                     }
                 }
@@ -142,7 +143,11 @@ class RoomWallpaperRepository(
                             val hash = entry.contentHash ?: return@mapNotNull null
                             val file = cacheStore.recentFile(hash)
                             if (WallpaperFileHash.matches(file, hash)) {
-                                RecentWallpaper.Image(file.absolutePath, hash)
+                                RecentWallpaper.Image(
+                                    path = file.absolutePath,
+                                    contentHash = hash,
+                                    scrimEnabled = entry.scrimEnabled,
+                                )
                             } else {
                                 null
                             }
@@ -234,6 +239,7 @@ class RoomWallpaperRepository(
         timetableId: Long,
         stagedPath: String,
         blur: WallpaperBlurSpec?,
+        scrimEnabled: Boolean,
     ): Result<Unit> =
         withContext(ioDispatcher) {
             runCatching {
@@ -251,7 +257,12 @@ class RoomWallpaperRepository(
                 }
                 val source = baked ?: staged
                 try {
-                    commitWallpaper(timetableId, source, WallpaperFileHash.sha256(source))
+                    commitWallpaper(
+                        timetableId = timetableId,
+                        source = source,
+                        contentHash = WallpaperFileHash.sha256(source),
+                        scrimEnabled = scrimEnabled,
+                    )
                     Unit
                 } finally {
                     baked?.delete()
@@ -280,7 +291,12 @@ class RoomWallpaperRepository(
                         check(source.isFile) { "Recent wallpaper file is missing" }
                         // commitWallpaper 会负责复制进课表目录、写偏好并把该图提到
                         // 最近列表最前（共享文件已存在，storeRecent 会去重）。
-                        commitWallpaper(timetableId, source, recent.contentHash)
+                        commitWallpaper(
+                            timetableId = timetableId,
+                            source = source,
+                            contentHash = recent.contentHash,
+                            scrimEnabled = recent.scrimEnabled,
+                        )
                     }
                 }
             }.onFailure { error ->
@@ -303,6 +319,7 @@ class RoomWallpaperRepository(
         timetableId: Long,
         source: File,
         contentHash: String,
+        scrimEnabled: Boolean = true,
     ) {
         val fileName = "wallpaper-$contentHash"
         val targetFile = cacheStore.file(timetableId, fileName)
@@ -340,6 +357,7 @@ class RoomWallpaperRepository(
                         contentHash = contentHash,
                         seedArgb = seedArgb,
                         extractorVersion = WallpaperSeedColorExtractor.VERSION,
+                        scrimEnabled = scrimEnabled,
                     ),
                 ),
             )
@@ -352,6 +370,7 @@ class RoomWallpaperRepository(
                     fileName = fileName,
                     contentHash = contentHash,
                     seedArgb = seedArgb,
+                    scrimEnabled = scrimEnabled,
                 ),
                 sourceFile = targetFile,
             )

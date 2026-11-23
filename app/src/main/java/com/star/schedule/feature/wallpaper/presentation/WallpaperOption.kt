@@ -12,7 +12,11 @@ import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
 internal sealed interface WallpaperOption {
     data object Default : WallpaperOption
     data class Generated(val design: WallpaperDesign) : WallpaperOption
-    data class Image(val path: String, val contentHash: String) : WallpaperOption
+    data class Image(
+        val path: String,
+        val contentHash: String,
+        val scrimEnabled: Boolean = true,
+    ) : WallpaperOption
 }
 
 /**

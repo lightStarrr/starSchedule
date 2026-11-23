@@ -119,6 +119,7 @@ import com.star.schedule.feature.timetable.presentation.components.WallpaperSett
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.domain.seedArgb
+import com.star.schedule.feature.wallpaper.domain.showsScrim
 import com.star.schedule.feature.wallpaper.presentation.GeneratedWallpaperBackground
 import com.star.schedule.feature.wallpaper.presentation.WallpaperOption
 import com.star.schedule.feature.wallpaper.presentation.WallpaperThumbnail
@@ -163,13 +164,13 @@ fun TimetableSettingsRoute(
 private fun RecentWallpaper.toWallpaperOption(): WallpaperOption = when (this) {
     RecentWallpaper.Default -> WallpaperOption.Default
     is RecentWallpaper.Generated -> WallpaperOption.Generated(design)
-    is RecentWallpaper.Image -> WallpaperOption.Image(path, contentHash)
+    is RecentWallpaper.Image -> WallpaperOption.Image(path, contentHash, scrimEnabled)
 }
 
 private fun WallpaperOption.toRecentWallpaper(): RecentWallpaper = when (this) {
     WallpaperOption.Default -> RecentWallpaper.Default
     is WallpaperOption.Generated -> RecentWallpaper.Generated(design)
-    is WallpaperOption.Image -> RecentWallpaper.Image(path, contentHash)
+    is WallpaperOption.Image -> RecentWallpaper.Image(path, contentHash, scrimEnabled)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -433,8 +434,11 @@ private fun TimetableSettingsDetails(
     val previewed = state.previews.getOrNull(settledPage) ?: return
     val wallpaperReady = previewed.id in state.wallpapers && state.recents.isNotEmpty()
     val currentWallpaper = when (val wallpaper = state.wallpapers[previewed.id]) {
-        is WallpaperState.Ready ->
-            WallpaperOption.Image(wallpaper.localPath, wallpaper.contentHash)
+        is WallpaperState.Ready -> WallpaperOption.Image(
+            path = wallpaper.localPath,
+            contentHash = wallpaper.contentHash,
+            scrimEnabled = wallpaper.scrimEnabled,
+        )
         is WallpaperState.Generated -> WallpaperOption.Generated(wallpaper.design)
         else -> WallpaperOption.Default
     }
@@ -865,8 +869,8 @@ private fun TimetablePreviewCard(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                if (wallpaper !is WallpaperState.None) {
-                    // 与课表主页一致：壁纸上叠 46% surface 遮罩，让课程格子色彩与对比度还原主页观感。
+                if (wallpaper.showsScrim) {
+                    // 与课表主页一致：按壁纸遮罩设置决定是否叠 46% surface 遮罩。
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -898,6 +902,7 @@ private fun resolvePreviewWallpaper(
         seedArgb = (persisted as? WallpaperState.Ready)
             ?.takeIf { it.contentHash == pending.contentHash }
             ?.seedArgb,
+        scrimEnabled = pending.scrimEnabled,
     )
 }
 

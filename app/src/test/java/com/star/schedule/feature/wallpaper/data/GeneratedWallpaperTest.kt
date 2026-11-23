@@ -37,6 +37,20 @@ class GeneratedWallpaperTest {
                 WallpaperPreferenceFormat.encodeGenerated(WallpaperDesign(solidArgb = 0xff112233.toInt())),
             ),
         )
+        val noScrimSolid = WallpaperDesign(solidArgb = 0xff112233.toInt(), scrimEnabled = false)
+        assertEquals(
+            WallpaperState.Generated(noScrimSolid),
+            WallpaperPreferenceFormat.decodeGenerated(
+                WallpaperPreferenceFormat.encodeGenerated(noScrimSolid),
+            ),
+        )
+        val noScrimEmoji = design.copy(scrimEnabled = false)
+        assertEquals(
+            WallpaperState.Generated(noScrimEmoji),
+            WallpaperPreferenceFormat.decodeGenerated(
+                WallpaperPreferenceFormat.encodeGenerated(noScrimEmoji),
+            ),
+        )
     }
 
     @Test

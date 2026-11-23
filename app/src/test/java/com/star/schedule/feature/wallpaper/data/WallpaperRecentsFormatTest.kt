@@ -25,6 +25,7 @@ class WallpaperRecentsFormatTest {
                 fileName = "wallpaper-$hash",
                 contentHash = hash,
                 seedArgb = 0xff336699.toInt(),
+                scrimEnabled = false,
             ),
             RecentWallpaperEntry(kind = KIND_DEFAULT),
         )

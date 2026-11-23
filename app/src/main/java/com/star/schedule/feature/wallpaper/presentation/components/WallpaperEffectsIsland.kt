@@ -65,6 +65,8 @@ private val PillCornerRadius = 64.dp
 internal fun WallpaperEffectsIsland(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
+    scrimEnabled: Boolean,
+    onScrimEnabledChange: (Boolean) -> Unit,
     blurEnabled: Boolean,
     onBlurEnabledChange: (Boolean) -> Unit,
     blurRadius: Float,
@@ -129,6 +131,8 @@ internal fun WallpaperEffectsIsland(
             ) { isExpanded ->
                 if (isExpanded) {
                     EffectsIslandContent(
+                        scrimEnabled = scrimEnabled,
+                        onScrimEnabledChange = onScrimEnabledChange,
                         blurEnabled = blurEnabled,
                         onBlurEnabledChange = onBlurEnabledChange,
                         blurRadius = blurRadius,
@@ -167,6 +171,8 @@ private fun EffectsPillContent() {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun EffectsIslandContent(
+    scrimEnabled: Boolean,
+    onScrimEnabledChange: (Boolean) -> Unit,
     blurEnabled: Boolean,
     onBlurEnabledChange: (Boolean) -> Unit,
     blurRadius: Float,
@@ -194,6 +200,20 @@ private fun EffectsIslandContent(
                     contentDescription = stringResource(R.string.wallpaper_effects_collapse),
                 )
             }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.wallpaper_scrim),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Spacer(Modifier.weight(1f))
+            Switch(
+                checked = scrimEnabled,
+                onCheckedChange = onScrimEnabledChange,
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

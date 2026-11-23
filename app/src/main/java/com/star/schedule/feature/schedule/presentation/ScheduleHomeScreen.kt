@@ -64,6 +64,7 @@ import com.star.schedule.core.designsystem.component.AppMenu
 import com.star.schedule.core.designsystem.component.MenuEntry
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
+import com.star.schedule.feature.wallpaper.domain.showsScrim
 import com.star.schedule.feature.wallpaper.presentation.WallpaperBackground
 import java.time.LocalDate
 
@@ -139,7 +140,7 @@ fun ScheduleHomeScreen(
             state = wallpaperState,
             modifier = Modifier.fillMaxSize(),
         )
-        if (wallpaperState !is WallpaperState.None) {
+        if (wallpaperState.showsScrim) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

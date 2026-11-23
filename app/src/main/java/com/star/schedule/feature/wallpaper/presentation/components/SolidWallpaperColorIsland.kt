@@ -39,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -98,6 +99,8 @@ private val HueSpectrumColors = listOf(
 @Composable
 internal fun SolidWallpaperColorIsland(
     selectedArgb: Int,
+    scrimEnabled: Boolean,
+    onScrimEnabledChange: (Boolean) -> Unit,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSelectColor: (Int) -> Unit,
@@ -220,6 +223,8 @@ internal fun SolidWallpaperColorIsland(
                     SolidColorPaletteCardContent(
                         selectedArgb = displayArgb,
                         hsv = hsv,
+                        scrimEnabled = scrimEnabled,
+                        onScrimEnabledChange = onScrimEnabledChange,
                         animationsEnabled = animationsEnabled,
                         onSaturationValueChange = { s, v ->
                             applyHsv(hsv.copy(saturation = s, value = v))
@@ -266,6 +271,8 @@ private fun SolidColorPillContent(selectedArgb: Int) {
 private fun SolidColorPaletteCardContent(
     selectedArgb: Int,
     hsv: SolidColorHsv,
+    scrimEnabled: Boolean,
+    onScrimEnabledChange: (Boolean) -> Unit,
     animationsEnabled: Boolean,
     onSaturationValueChange: (Float, Float) -> Unit,
     onHueChange: (Float) -> Unit,
@@ -341,6 +348,21 @@ private fun SolidColorPaletteCardContent(
                 .fillMaxWidth()
                 .height(PaletteHueHeight),
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.wallpaper_scrim),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Spacer(Modifier.weight(1f))
+            Switch(
+                checked = scrimEnabled,
+                onCheckedChange = onScrimEnabledChange,
+            )
+        }
     }
 }
 

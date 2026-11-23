@@ -51,6 +51,7 @@ import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.schedule.presentation.TimetableGrid
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.domain.seedArgb
+import com.star.schedule.feature.wallpaper.domain.showsScrim
 import com.star.schedule.feature.wallpaper.presentation.WallpaperBackground
 import kotlin.math.roundToInt
 
@@ -106,8 +107,8 @@ private fun RowHeightScreen(
             state = state.wallpaperState,
             modifier = Modifier.fillMaxSize(),
         )
-        if (state.wallpaperState !is WallpaperState.None) {
-            // 与课表主页、壁纸预览页保持一致的 46% surface 遮罩，确保课表内容清晰可读。
+        if (state.wallpaperState.showsScrim) {
+            // 与课表主页、壁纸预览页保持一致的 46% surface 遮罩，按壁纸遮罩开关决定是否叠加。
             Box(
                 modifier = Modifier
                     .fillMaxSize()

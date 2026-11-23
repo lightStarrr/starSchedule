@@ -12,6 +12,7 @@ sealed interface WallpaperState {
         val localPath: String,
         val contentHash: String,
         val seedArgb: Int?,
+        val scrimEnabled: Boolean = true,
     ) : WallpaperState
 }
 
@@ -47,6 +48,7 @@ sealed interface RecentWallpaper {
     data class Image(
         val path: String,
         val contentHash: String,
+        val scrimEnabled: Boolean = true,
     ) : RecentWallpaper
 }
 
@@ -56,6 +58,7 @@ data class WallpaperPreference(
     val contentHash: String,
     val seedArgb: Int?,
     val extractorVersion: Int,
+    val scrimEnabled: Boolean = true,
 )
 
 /**
@@ -69,6 +72,7 @@ data class RecentWallpaperEntry(
     val contentHash: String? = null,
     val seedArgb: Int? = null,
     val design: WallpaperDesign? = null,
+    val scrimEnabled: Boolean = true,
 ) {
     companion object {
         const val KIND_DEFAULT = "default"
@@ -83,6 +87,7 @@ data class WallpaperDesign(
     val emoji: EmojiWallpaperSpec? = null,
     val solidArgb: Int? = null,
     val blurRadius: Float = 0f,
+    val scrimEnabled: Boolean = true,
 ) {
     val seedArgb: Int get() = emoji?.colors?.seedArgb ?: requireNotNull(solidArgb)
 
@@ -104,4 +109,11 @@ val WallpaperState.seedArgb: Int?
         WallpaperState.None -> null
         is WallpaperState.Ready -> seedArgb
         is WallpaperState.Generated -> design.seedArgb
+    }
+
+val WallpaperState.showsScrim: Boolean
+    get() = when (this) {
+        WallpaperState.None -> false
+        is WallpaperState.Ready -> scrimEnabled
+        is WallpaperState.Generated -> design.scrimEnabled
     }

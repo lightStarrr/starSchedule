@@ -381,6 +381,7 @@
     <string name="wallpaper_preview_title">Preview</string>
     <string name="wallpaper_effects">Effects</string>
     <string name="wallpaper_effects_collapse">Collapse</string>
+    <string name="wallpaper_scrim">Background overlay</string>
     <string name="wallpaper_blur">Blur</string>
     <string name="wallpaper_blur_amount">Blur amount</string>
     <string name="wallpaper_blur_amount_value">%1$d dp</string>

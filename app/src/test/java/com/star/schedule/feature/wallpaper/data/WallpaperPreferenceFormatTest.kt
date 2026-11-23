@@ -40,4 +40,13 @@ class WallpaperPreferenceFormatTest {
         assertFalse(WallpaperPreferenceFormat.canReuseSeed(preference, hash, 2))
         assertFalse(WallpaperPreferenceFormat.canReuseSeed(preference.copy(seedArgb = null), hash, 1))
     }
+
+    @Test
+    fun `scrim preference round trips and defaults to true for legacy json`() {
+        val noScrim = preference.copy(scrimEnabled = false)
+        assertEquals(noScrim, WallpaperPreferenceFormat.decode(WallpaperPreferenceFormat.encode(noScrim)))
+        val legacyJson = """{"fileName":"wallpaper-$hash","contentHash":"$hash","seedArgb":-13408615,"extractorVersion":1}"""
+        val decoded = WallpaperPreferenceFormat.decode(legacyJson)
+        assertTrue(decoded?.scrimEnabled == true)
+    }
 }

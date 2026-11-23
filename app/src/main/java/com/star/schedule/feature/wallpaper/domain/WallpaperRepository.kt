@@ -35,6 +35,7 @@ interface WallpaperRepository {
         timetableId: Long,
         stagedPath: String,
         blur: WallpaperBlurSpec?,
+        scrimEnabled: Boolean = true,
     ): Result<Unit>
 
     /**
