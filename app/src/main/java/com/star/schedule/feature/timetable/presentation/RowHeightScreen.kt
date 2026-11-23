@@ -4,6 +4,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -45,7 +47,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.CompactPageTopBar
 import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.schedule.presentation.TimetableGrid
+import com.star.schedule.feature.wallpaper.domain.WallpaperState
+import com.star.schedule.feature.wallpaper.domain.seedArgb
+import com.star.schedule.feature.wallpaper.presentation.WallpaperBackground
 import kotlin.math.roundToInt
 
 /** 恢复默认按钮的直径，同时用作标题行里预留的槽位大小。 */
@@ -58,15 +64,22 @@ fun RowHeightRoute(
     onApplied: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    RowHeightScreen(
-        state = state,
-        onBack = onBack,
-        onRowHeightChange = viewModel::setRowHeight,
-        onApply = {
-            viewModel.apply()
-            onApplied()
-        },
-    )
+    val wallpaperState = state.wallpaperState
+    val seedColor = wallpaperState.seedArgb?.let(::Color)
+    StarScheduleTheme(
+        dynamicColor = wallpaperState is WallpaperState.None,
+        seedColor = seedColor,
+    ) {
+        RowHeightScreen(
+            state = state,
+            onBack = onBack,
+            onRowHeightChange = viewModel::setRowHeight,
+            onApply = {
+                viewModel.apply()
+                onApplied()
+            },
+        )
+    }
 }
 
 /**
@@ -84,55 +97,74 @@ private fun RowHeightScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            CompactPageTopBar(
-                title = stringResource(R.string.timetable_settings_row_height),
-                onBack = onBack,
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    Button(
-                        onClick = onApply,
-                        enabled = state.canApply,
-                        // 和左侧返回按钮同一套 expressive 形状，按下去都会收一下。
-                        shapes = ButtonDefaults.shapes(shape = RoundedCornerShape(50)),
-                    ) {
-                        Text(stringResource(R.string.timetable_settings_apply))
-                    }
-                },
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        WallpaperBackground(
+            state = state.wallpaperState,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (state.wallpaperState !is WallpaperState.None) {
+            // 与课表主页、壁纸预览页保持一致的 46% surface 遮罩，确保课表内容清晰可读。
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f)),
             )
-        },
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            if (!state.isLoading) {
-                TimetableGrid(
-                    lessonTimes = state.lessonTimes,
-                    courses = state.courses,
-                    currentWeek = state.week,
-                    weekStartDate = state.weekStartDate,
-                    showWeekend = state.showWeekend,
-                    rowHeight = state.rowHeight.dp,
-                    // 给底部悬浮卡片让出位置，最后一节课才不会被挡住。
-                    bottomContentPadding = 140.dp + navigationBarBottomInset(),
-                    modifier = Modifier.fillMaxSize(),
+        }
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            topBar = {
+                CompactPageTopBar(
+                    title = stringResource(R.string.timetable_settings_row_height),
+                    onBack = onBack,
+                    containerColor = Color.Transparent,
+                    scrollBehavior = scrollBehavior,
+                    actions = {
+                        Button(
+                            onClick = onApply,
+                            enabled = state.canApply,
+                            // 和左侧返回按钮同一套 expressive 形状，按下去都会收一下。
+                            shapes = ButtonDefaults.shapes(shape = RoundedCornerShape(50)),
+                        ) {
+                            Text(stringResource(R.string.timetable_settings_apply))
+                        }
+                    },
+                )
+            },
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                if (!state.isLoading) {
+                    TimetableGrid(
+                        lessonTimes = state.lessonTimes,
+                        courses = state.courses,
+                        currentWeek = state.week,
+                        weekStartDate = state.weekStartDate,
+                        showWeekend = state.showWeekend,
+                        rowHeight = state.rowHeight.dp,
+                        // 给底部悬浮卡片让出位置，最后一节课才不会被挡住。
+                        bottomContentPadding = 140.dp + navigationBarBottomInset(),
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                RowHeightPanel(
+                    rowHeight = state.rowHeight,
+                    onRowHeightChange = onRowHeightChange,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             }
-
-            RowHeightPanel(
-                rowHeight = state.rowHeight,
-                onRowHeightChange = onRowHeightChange,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
         }
     }
 }

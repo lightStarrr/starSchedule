@@ -7,12 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
-import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.schedule.data.RoomScheduleRepository
 import com.star.schedule.feature.settings.data.RoomSettingsRepository
 import com.star.schedule.feature.timetable.presentation.RowHeightRoute
 import com.star.schedule.feature.timetable.presentation.RowHeightViewModel
 import com.star.schedule.feature.timetable.presentation.RowHeightViewModelFactory
+import com.star.schedule.feature.wallpaper.data.RoomWallpaperRepository
 import com.star.schedule.platform.notification.UnifiedNotificationManager
 import com.star.schedule.platform.systembar.installEdgeToEdge
 
@@ -39,19 +39,23 @@ class RowHeightActivity : ComponentActivity() {
             database = DatabaseProvider.db,
             notificationManager = UnifiedNotificationManager(this),
         )
+        val wallpaperRepository = RoomWallpaperRepository(this, DatabaseProvider.preferenceDao())
         val viewModel = ViewModelProvider(
             this,
-            RowHeightViewModelFactory(scheduleRepository, settingsRepository, timetableId),
+            RowHeightViewModelFactory(
+                scheduleRepository = scheduleRepository,
+                settingsRepository = settingsRepository,
+                wallpaperRepository = wallpaperRepository,
+                timetableId = timetableId,
+            ),
         )[RowHeightViewModel::class.java]
 
         setContent {
-            StarScheduleTheme(dynamicColor = true) {
-                RowHeightRoute(
-                    viewModel = viewModel,
-                    onBack = ::finish,
-                    onApplied = ::finish,
-                )
-            }
+            RowHeightRoute(
+                viewModel = viewModel,
+                onBack = ::finish,
+                onApplied = ::finish,
+            )
         }
     }
 

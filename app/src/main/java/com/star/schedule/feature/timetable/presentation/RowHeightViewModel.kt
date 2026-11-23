@@ -10,6 +10,8 @@ import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.feature.timetable.domain.RowHeightPreviewSample
 import com.star.schedule.feature.timetable.domain.timetablePreviewGrid
+import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
+import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -33,6 +36,7 @@ data class RowHeightUiState(
     val lessonTimes: List<LessonTimeEntity> = emptyList(),
     val courses: List<CourseEntity> = emptyList(),
     val showWeekend: Boolean = false,
+    val wallpaperState: WallpaperState = WallpaperState.None,
 ) {
     val canApply: Boolean
         get() = timetableId != null && rowHeight != savedRowHeight
@@ -48,6 +52,7 @@ data class RowHeightUiState(
 class RowHeightViewModel(
     scheduleRepository: ScheduleRepository,
     private val settingsRepository: SettingsRepository,
+    wallpaperRepository: WallpaperRepository,
     timetableId: Long,
 ) : ViewModel() {
     private val draftRowHeight = MutableStateFlow<Int?>(null)
@@ -73,12 +78,16 @@ class RowHeightViewModel(
         if (id == null) flowOf(emptyList()) else scheduleRepository.observeLessonTimes(id)
     }
 
+    private val wallpaperState: Flow<WallpaperState> = wallpaperRepository.observe(timetableId)
+        .onStart { emit(WallpaperState.None) }
+
     val uiState: StateFlow<RowHeightUiState> = combine(
         timetable,
         courses,
         lessonTimes,
         draftRowHeight,
-    ) { timetable, courses, lessonTimes, draft ->
+        wallpaperState,
+    ) { timetable, courses, lessonTimes, draft, wallpaper ->
         // 示例在这里生成一次、存在属性上：拖动滑杆会让 combine 重新跑，不能在函数里重新随机。
         val grid = timetablePreviewGrid(
             timetable = timetable,
@@ -97,6 +106,7 @@ class RowHeightViewModel(
             lessonTimes = grid.lessonTimes,
             courses = grid.courses,
             showWeekend = grid.showWeekend,
+            wallpaperState = wallpaper,
         )
     }.stateIn(
         viewModelScope,
@@ -130,12 +140,18 @@ class RowHeightViewModel(
 class RowHeightViewModelFactory(
     private val scheduleRepository: ScheduleRepository,
     private val settingsRepository: SettingsRepository,
+    private val wallpaperRepository: WallpaperRepository,
     private val timetableId: Long,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(RowHeightViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return RowHeightViewModel(scheduleRepository, settingsRepository, timetableId) as T
+            return RowHeightViewModel(
+                scheduleRepository = scheduleRepository,
+                settingsRepository = settingsRepository,
+                wallpaperRepository = wallpaperRepository,
+                timetableId = timetableId,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
