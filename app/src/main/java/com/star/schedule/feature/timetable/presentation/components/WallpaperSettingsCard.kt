@@ -203,12 +203,12 @@ private fun WallpaperStripSlot(
                     placeable.placeRelative(0, 0)
                 }
             }
-            // clip 必须在 clickable 之前，波纹才贴圆角。
+            // clip 必须在 clickable 之前，波纹才贴圆角；无条件裁剪也避免切空槽淡出时露方角，
+            // 同时免去子项内部重复裁剪产生的多余离屏层。
+            .clip(shape)
             .then(
                 if (option != null) {
-                    Modifier
-                        .clip(shape)
-                        .clickable { if (!isSelected) onSelect() }
+                    Modifier.clickable { if (!isSelected) onSelect() }
                 } else {
                     Modifier
                 },
@@ -231,8 +231,9 @@ private fun WallpaperStripSlot(
             },
             label = "wallpaperSlotContent",
         ) { current ->
+            // 6dp 模糊在缩略图尺寸下已具备柔和的交叉过渡，同时大幅降低多槽位同时切换的 GPU 采样开销。
             val contentBlur by transition.animateDp(label = "wallpaperSlotBlur") {
-                if (it == EnterExitState.Visible) 0.dp else 16.dp
+                if (it == EnterExitState.Visible) 0.dp else 6.dp
             }
             Box(
                 Modifier
@@ -248,7 +249,6 @@ private fun WallpaperStripSlot(
                 if (current != null) {
                     WallpaperOptionTile(
                         option = current,
-                        shape = shape,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -291,12 +291,10 @@ private fun WallpaperStripSlot(
 @Composable
 private fun WallpaperOptionTile(
     option: WallpaperOption,
-    shape: Shape,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier
-            .clip(shape)
             .background(
                 when (option) {
                     WallpaperOption.Default -> MaterialTheme.colorScheme.surfaceContainer

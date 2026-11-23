@@ -53,6 +53,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -191,8 +192,8 @@ private fun TimetableSettingsScreen(
     // 而顶栏收起后再把回弹交回系统，滚动到底和折叠结束的时机仍会打架，
     // 所以这里一律不启用系统回弹（显式传 null，不传时会退回系统默认实现）。
     // pager 状态提到这一层：下面的设置列表要跟着「居中那张」走，而不是已经应用的那张。
+    // 不在这一层直接读 currentPage / settledPage，避免左右滑卡过半时触发整页（含 Scaffold 与 Pager）重组。
     val pagerState = rememberPagerState(pageCount = { state.previews.size + 1 })
-    val previewed = state.previews.getOrNull(pagerState.currentPage)
     // 长按卡片弹出的操作菜单：只记 id + 卡片在屏幕上的中心，按钮画在根布局上，
     // 这样点卡片外面任何地方都能关掉。
     var actionMenu by remember { mutableStateOf<TimetableActionMenu?>(null) }
@@ -201,8 +202,10 @@ private fun TimetableSettingsScreen(
     var renaming by remember { mutableStateOf<TimetablePreview?>(null) }
     var deleting by remember { mutableStateOf<TimetablePreview?>(null) }
 
-    // 翻页、点卡片外面都要能把菜单收起来，所以菜单画在整个页面之上。
-    LaunchedEffect(pagerState.currentPage) { actionMenuOpen = false }
+    // 翻页、点卡片外面都要能把菜单收起来；用 snapshotFlow 监听页码，不触发外层重组。
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { actionMenuOpen = false }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
@@ -322,72 +325,15 @@ private fun TimetableSettingsScreen(
                             actionMenuOpen = true
                         },
                     )
-                if (previewed != null) {
-                    Spacer(Modifier.height(24.dp))
-                    SettingsGroup {
-                        val currentWallpaper = when (val wallpaper = state.wallpapers[previewed.id]) {
-                            is WallpaperState.Ready ->
-                                WallpaperOption.Image(wallpaper.localPath, wallpaper.contentHash)
-                            is WallpaperState.Generated -> WallpaperOption.Generated(wallpaper.design)
-                            else -> WallpaperOption.Default
-                        }
-                        WallpaperSettingsCard(
-                            timetableId = previewed.id,
-                            available = listOf(currentWallpaper) + recentWallpaperOptions(
-                                currentWallpaper,
-                                state.recents.map { it.toWallpaperOption() },
-                            ),
-                            // 乐观选中优先：点下去的项原地展开，不等仓库写完。
-                            selected = state.pendingWallpapers[previewed.id]
-                                ?.toWallpaperOption()
-                                ?: currentWallpaper,
-                            onOpenWallpaper = { onWallpaperClick(previewed.id) },
-                            onSelect = { option ->
-                                onSelectRecent(previewed.id, option.toRecentWallpaper())
-                            },
-                            shapeIndex = 0,
-                            shapeCount = 4,
-                        )
-                        SettingsListItem(
-                            title = stringResource(R.string.timetable_settings_row_height),
-                            supporting = stringResource(R.string.timetable_settings_row_height_support),
-                            onClick = { onRowHeightClick(previewed.id) },
-                            shapeIndex = 1,
-                            shapeCount = 4,
-                            trailing = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = stringResource(
-                                            R.string.row_height_value,
-                                            previewed.rowHeight
-                                        ),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    SettingChevron()
-                                }
-                            },
-                        )
-                        SettingsListItem(
-                            title = stringResource(R.string.timetable_settings_courses),
-                            supporting = stringResource(R.string.timetable_settings_courses_support),
-                            onClick = { onCoursesClick(previewed.id) },
-                            shapeIndex = 2,
-                            shapeCount = 4,
-                            trailing = { SettingChevron() },
-                        )
-                        SettingsListItem(
-                            title = stringResource(R.string.timetable_settings_lesson_times),
-                            supporting = stringResource(
-                                R.string.timetable_settings_lesson_times_support,
-                            ),
-                            onClick = { onLessonTimesClick(previewed.id) },
-                            shapeIndex = 3,
-                            shapeCount = 4,
-                            trailing = { SettingChevron() },
-                        )
-                    }
-                }
+                    TimetableSettingsDetails(
+                        pagerState = pagerState,
+                        state = state,
+                        onWallpaperClick = onWallpaperClick,
+                        onSelectRecent = onSelectRecent,
+                        onRowHeightClick = onRowHeightClick,
+                        onCoursesClick = onCoursesClick,
+                        onLessonTimesClick = onLessonTimesClick,
+                    )
                     Spacer(Modifier.height(24.dp + navigationBarInset))
                 }
             }
@@ -455,6 +401,96 @@ private fun TimetableSettingsScreen(
                     Text(stringResource(R.string.action_cancel))
                 }
             },
+        )
+    }
+}
+
+/**
+ * 底部设置项独立订阅 [PagerState.settledPage]：
+ * - 左右滑卡/惯性滑动期间不触发壁纸条与设置列表重建，避免打断 Pager 帧率；
+ * - 卡片停稳后立刻同步切换到目标课表的壁纸条与设置项。
+ */
+@Composable
+private fun TimetableSettingsDetails(
+    pagerState: PagerState,
+    state: TimetableSettingsUiState,
+    onWallpaperClick: (Long) -> Unit,
+    onSelectRecent: (Long, RecentWallpaper) -> Unit,
+    onRowHeightClick: (Long) -> Unit,
+    onCoursesClick: (Long) -> Unit,
+    onLessonTimesClick: (Long) -> Unit,
+) {
+    val settledPage by remember(pagerState) {
+        derivedStateOf { pagerState.settledPage }
+    }
+    val previewed = state.previews.getOrNull(settledPage) ?: return
+    val currentWallpaper = when (val wallpaper = state.wallpapers[previewed.id]) {
+        is WallpaperState.Ready ->
+            WallpaperOption.Image(wallpaper.localPath, wallpaper.contentHash)
+        is WallpaperState.Generated -> WallpaperOption.Generated(wallpaper.design)
+        else -> WallpaperOption.Default
+    }
+    val available = remember(currentWallpaper, state.recents) {
+        listOf(currentWallpaper) + recentWallpaperOptions(
+            currentWallpaper,
+            state.recents.map { it.toWallpaperOption() },
+        )
+    }
+    val selected = state.pendingWallpapers[previewed.id]
+        ?.toWallpaperOption()
+        ?: currentWallpaper
+
+    Spacer(Modifier.height(24.dp))
+    SettingsGroup {
+        WallpaperSettingsCard(
+            timetableId = previewed.id,
+            available = available,
+            // 乐观选中优先：点下去的项原地展开，不等仓库写完。
+            selected = selected,
+            onOpenWallpaper = { onWallpaperClick(previewed.id) },
+            onSelect = { option ->
+                onSelectRecent(previewed.id, option.toRecentWallpaper())
+            },
+            shapeIndex = 0,
+            shapeCount = 4,
+        )
+        SettingsListItem(
+            title = stringResource(R.string.timetable_settings_row_height),
+            supporting = stringResource(R.string.timetable_settings_row_height_support),
+            onClick = { onRowHeightClick(previewed.id) },
+            shapeIndex = 1,
+            shapeCount = 4,
+            trailing = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(
+                            R.string.row_height_value,
+                            previewed.rowHeight,
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    SettingChevron()
+                }
+            },
+        )
+        SettingsListItem(
+            title = stringResource(R.string.timetable_settings_courses),
+            supporting = stringResource(R.string.timetable_settings_courses_support),
+            onClick = { onCoursesClick(previewed.id) },
+            shapeIndex = 2,
+            shapeCount = 4,
+            trailing = { SettingChevron() },
+        )
+        SettingsListItem(
+            title = stringResource(R.string.timetable_settings_lesson_times),
+            supporting = stringResource(
+                R.string.timetable_settings_lesson_times_support,
+            ),
+            onClick = { onLessonTimesClick(previewed.id) },
+            shapeIndex = 3,
+            shapeCount = 4,
+            trailing = { SettingChevron() },
         )
     }
 }
@@ -566,6 +602,8 @@ private fun TimetablePreviewPager(
                 contentPadding = contentPadding,
                 pageSpacing = 12.dp,
                 pageSize = pageSize,
+                // 预组合并预热视口外相邻一页，避免滑卡中途才新建卡片、主题和壁纸位图造成掉帧。
+                beyondViewportPageCount = 1,
                 // 横向翻到头同样不显示超出回弹，理由同页面纵向滚动。
                 overscrollEffect = null,
             ) { page ->
@@ -593,23 +631,45 @@ private fun TimetablePreviewPager(
             }
         }
 
-        // 用 currentPage 而不是 settledPage：滑动过半按钮就该跟着变，settledPage 要等动画完全停下。
-        val previewed = previews.getOrNull(pagerState.currentPage)
         Spacer(Modifier.height(16.dp))
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Button(
-                onClick = { previewed?.let { onApply(it.id) } },
-                shapes = ButtonDefaults.shapes(),
-                enabled = previewed != null && previewed.id != currentId,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.timetable_settings_apply))
-            }
+        ApplyTimetableButton(
+            pagerState = pagerState,
+            previews = previews,
+            currentId = currentId,
+            onApply = onApply,
+        )
+    }
+}
+
+/**
+ * 应用按钮独立订阅 [PagerState.currentPage]：
+ * 滑动过半立即切换可用态，同时不触发上层 [HorizontalPager] 重组。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ApplyTimetableButton(
+    pagerState: PagerState,
+    previews: List<TimetablePreview>,
+    currentId: Long?,
+    onApply: (Long) -> Unit,
+) {
+    val currentPage by remember(pagerState) {
+        derivedStateOf { pagerState.currentPage }
+    }
+    val previewed = previews.getOrNull(currentPage)
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Button(
+            onClick = { previewed?.let { onApply(it.id) } },
+            shapes = ButtonDefaults.shapes(),
+            enabled = previewed != null && previewed.id != currentId,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.timetable_settings_apply))
         }
     }
 }
@@ -723,8 +783,10 @@ private fun TimetablePreviewCard(
     onLongPress: (Rect) -> Unit,
 ) {
     // 长按要知道卡片在屏幕上的位置，菜单按钮才好画在卡片正中。
-    var boundsInRoot by remember { mutableStateOf(Rect.Zero) }
+    // 用非 State 引用保存边界，避免左右滑卡每帧 onGloballyPositioned 都触发 Compose Snapshot 写入。
+    val boundsRef = remember { arrayOf(Rect.Zero) }
     val seedColor = wallpaper.seedArgb?.let(::Color)
+    val cardShape = remember(corner) { RoundedCornerShape(corner) }
 
     // 每张预览卡独立按自身壁纸取色，与课表主页的 StarScheduleTheme 保持一致。
     StarScheduleTheme(
@@ -740,16 +802,16 @@ private fun TimetablePreviewCard(
         Card(
             modifier = Modifier
                 .previewCardSize(progress, maxWidth, maxHeight)
-                .onGloballyPositioned { boundsInRoot = it.boundsInRoot() }
+                .onGloballyPositioned { boundsRef[0] = it.boundsInRoot() }
                 // clip 必须排在 clickable 前面：水波纹画在 clickable 那一层，
                 // 顺序反了就是矩形的按压反馈盖在圆角卡片上。
-                .clip(RoundedCornerShape(corner))
+                .clip(cardShape)
                 .combinedClickable(
                     role = Role.Button,
                     onClick = onClick,
-                    onLongClick = { onLongPress(boundsInRoot) },
+                    onLongClick = { onLongPress(boundsRef[0]) },
                 ),
-            shape = RoundedCornerShape(corner),
+            shape = cardShape,
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
