@@ -84,6 +84,7 @@ import com.star.schedule.feature.wallpaper.presentation.wallpaperThumbnailCorner
 @Composable
 internal fun WallpaperSettingsCard(
     timetableId: Long,
+    wallpaperReady: Boolean,
     available: List<WallpaperOption>,
     selected: WallpaperOption,
     onOpenWallpaper: () -> Unit,
@@ -114,8 +115,9 @@ internal fun WallpaperSettingsCard(
         ).dp,
     )
     // 跨重组记上一次的显示顺序（不用 mutableState：组合期不写状态）。
-    // timetableId 变化即重置，新课表的当前壁纸排第一。
-    val orderRef = remember(timetableId) { arrayOf(emptyList<WallpaperOption>()) }
+    // timetableId 变化或壁纸状态首次就绪时重置，确保新课表的当前壁纸排在第一格，
+    // 不会被初始空映射兜底出来的「默认」占掉第 0 位。
+    val orderRef = remember(timetableId, wallpaperReady) { arrayOf(emptyList<WallpaperOption>()) }
     SegmentedListItem(
         onClick = onOpenWallpaper,
         shapes = shapes,
@@ -126,13 +128,21 @@ internal fun WallpaperSettingsCard(
                 BoxWithConstraints {
                     val strip = wallpaperStripLayout(maxWidth.value)
                     val slotCount = 1 + strip.recentCount
-                    val order = reconcileWallpaperOrder(
-                        orderRef[0],
-                        available,
-                        selected,
-                        slotCount,
-                    )
-                    SideEffect { orderRef[0] = order }
+                    val order = if (wallpaperReady) {
+                        reconcileWallpaperOrder(
+                            orderRef[0],
+                            available,
+                            selected,
+                            slotCount,
+                        )
+                    } else {
+                        emptyList()
+                    }
+                    SideEffect {
+                        if (wallpaperReady) {
+                            orderRef[0] = order
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // 按位置渲染：换选中只是各格宽度与内容变化，项不跳位置。
                         repeat(slotCount) { index ->

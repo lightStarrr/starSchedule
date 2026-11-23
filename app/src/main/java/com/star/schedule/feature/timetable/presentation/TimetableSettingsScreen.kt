@@ -431,6 +431,7 @@ private fun TimetableSettingsDetails(
         derivedStateOf { pagerState.settledPage }
     }
     val previewed = state.previews.getOrNull(settledPage) ?: return
+    val wallpaperReady = previewed.id in state.wallpapers && state.recents.isNotEmpty()
     val currentWallpaper = when (val wallpaper = state.wallpapers[previewed.id]) {
         is WallpaperState.Ready ->
             WallpaperOption.Image(wallpaper.localPath, wallpaper.contentHash)
@@ -451,6 +452,7 @@ private fun TimetableSettingsDetails(
     SettingsGroup {
         WallpaperSettingsCard(
             timetableId = previewed.id,
+            wallpaperReady = wallpaperReady,
             available = available,
             // 乐观选中优先：点下去的项原地展开，不等仓库写完。
             selected = selected,
