@@ -96,6 +96,7 @@ private fun WallpaperPreviewScreen(
         design = ready?.design,
         photoPath = ready?.stagedPath,
         photoCacheKey = ready?.stagedPath,
+        seedArgb = ready?.seedArgb,
         scrimEnabled = ready?.scrimEnabled ?: true,
     )
 

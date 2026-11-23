@@ -3,22 +3,31 @@ package com.star.schedule.feature.wallpaper.presentation
 import android.util.LruCache
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.snap
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.expressiveLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
 import com.star.schedule.core.designsystem.rememberAnimationsEnabled
+import com.star.schedule.core.designsystem.theme.seedColorScheme
 import com.star.schedule.feature.wallpaper.domain.WallpaperDesign
 import com.star.schedule.feature.wallpaper.domain.WallpaperLuminanceProfile
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.domain.computeLuminanceProfile
 import com.star.schedule.feature.wallpaper.domain.designLuminanceProfile
 import com.star.schedule.feature.wallpaper.domain.isWallpaperRegionDark
+import com.star.schedule.feature.wallpaper.domain.seedArgb
 import com.star.schedule.feature.wallpaper.domain.showsScrim
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,16 +49,6 @@ data class WallpaperForegroundColors(
 // 照片壁纸分区亮度缓存：每条仅存 3 个 Float，进程内跨主页/预览/行高页零成本复用。
 private val wallpaperLuminanceCache = LruCache<String, WallpaperLuminanceProfile>(64)
 
-private val LightTextOnDarkWallpaper = WallpaperTextColors(
-    primary = Color(0xFFF5F5F7),
-    secondary = Color(0xFFDCE0E8),
-)
-
-private val DarkTextOnLightWallpaper = WallpaperTextColors(
-    primary = Color(0xFF14161A),
-    secondary = Color(0xFF3A3F47),
-)
-
 private const val PHOTO_SAMPLE_LONG_EDGE = 96
 
 @Composable
@@ -60,18 +59,21 @@ fun rememberWallpaperForegroundColors(
         design = null,
         photoPath = null,
         photoCacheKey = null,
+        seedArgb = null,
         scrimEnabled = true,
     )
     is WallpaperState.Generated -> rememberWallpaperForegroundColors(
         design = wallpaperState.design,
         photoPath = null,
         photoCacheKey = null,
+        seedArgb = wallpaperState.seedArgb,
         scrimEnabled = wallpaperState.showsScrim,
     )
     is WallpaperState.Ready -> rememberWallpaperForegroundColors(
         design = null,
         photoPath = wallpaperState.localPath,
         photoCacheKey = wallpaperState.contentHash,
+        seedArgb = wallpaperState.seedArgb,
         scrimEnabled = wallpaperState.showsScrim,
     )
 }
@@ -82,9 +84,11 @@ internal fun rememberWallpaperForegroundColors(
     design: WallpaperDesign?,
     photoPath: String?,
     photoCacheKey: String?,
+    seedArgb: Int?,
     scrimEnabled: Boolean,
 ): WallpaperForegroundColors {
-    val defaultColors = defaultWallpaperForegroundColors()
+    val currentScheme = MaterialTheme.colorScheme
+    val defaultColors = defaultWallpaperForegroundColors(currentScheme)
     val hasWallpaper = design != null || photoPath != null
     val needsAdaptive = hasWallpaper && !scrimEnabled
 
@@ -166,10 +170,59 @@ internal fun rememberWallpaperForegroundColors(
         else -> cachedPhotoProfile ?: sampledPhotoProfile
     }
 
-    val targetTop = activeProfile?.let { colorsForLuminance(it.top) } ?: defaultColors.top
-    val targetLeft = activeProfile?.let { colorsForLuminance(it.leftColumn) } ?: defaultColors.leftColumn
-    val targetCenter = activeProfile?.let { colorsForLuminance(it.center) } ?: defaultColors.center
-    val targetTopBarTitle = activeProfile?.let { colorsForLuminance(it.top).primary }
+    // 用同一套壁纸种子色对应的明/暗 Material 3 ColorScheme（onSurface / onSurfaceVariant / onBackground），
+    // 让无遮罩时的浅色/深色字自带主题色调，且在背景与系统主题同明暗时与常规主题字色完全一致。
+    val context = LocalContext.current
+    val isCurrentSchemeDark = currentScheme.surface.luminance() < 0.5f
+    val needsDarkScheme = activeProfile != null && (
+        isWallpaperRegionDark(activeProfile.top) ||
+            isWallpaperRegionDark(activeProfile.leftColumn) ||
+            isWallpaperRegionDark(activeProfile.center)
+        )
+    val needsLightScheme = activeProfile != null && (
+        !isWallpaperRegionDark(activeProfile.top) ||
+            !isWallpaperRegionDark(activeProfile.leftColumn) ||
+            !isWallpaperRegionDark(activeProfile.center)
+        )
+    val resolvedSeedArgb = seedArgb ?: design?.seedArgb
+
+    val darkTextScheme: ColorScheme = remember(
+        needsDarkScheme,
+        isCurrentSchemeDark,
+        currentScheme,
+        resolvedSeedArgb,
+        context,
+    ) {
+        when {
+            !needsDarkScheme || isCurrentSchemeDark -> currentScheme
+            resolvedSeedArgb != null -> seedColorScheme(resolvedSeedArgb, isDark = true)
+            else -> runCatching { dynamicDarkColorScheme(context) }.getOrElse { darkColorScheme() }
+        }
+    }
+    val lightTextScheme: ColorScheme = remember(
+        needsLightScheme,
+        isCurrentSchemeDark,
+        currentScheme,
+        resolvedSeedArgb,
+        context,
+    ) {
+        when {
+            !needsLightScheme || !isCurrentSchemeDark -> currentScheme
+            resolvedSeedArgb != null -> seedColorScheme(resolvedSeedArgb, isDark = false)
+            else -> runCatching { dynamicLightColorScheme(context) }
+                .getOrElse { expressiveLightColorScheme() }
+        }
+    }
+
+    fun schemeFor(luminance: Float): ColorScheme =
+        if (isWallpaperRegionDark(luminance)) darkTextScheme else lightTextScheme
+
+    val targetTop = activeProfile?.let { textColorsFrom(schemeFor(it.top)) } ?: defaultColors.top
+    val targetLeft = activeProfile?.let { textColorsFrom(schemeFor(it.leftColumn)) }
+        ?: defaultColors.leftColumn
+    val targetCenter = activeProfile?.let { textColorsFrom(schemeFor(it.center)) }
+        ?: defaultColors.center
+    val targetTopBarTitle = activeProfile?.let { schemeFor(it.top).onBackground }
         ?: defaultColors.topBarTitle
 
     val animationsEnabled = rememberAnimationsEnabled()
@@ -195,23 +248,18 @@ internal fun rememberWallpaperForegroundColors(
     )
 }
 
-@Composable
-private fun defaultWallpaperForegroundColors(): WallpaperForegroundColors {
-    val defaultPair = WallpaperTextColors(
-        primary = MaterialTheme.colorScheme.onSurface,
-        secondary = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+private fun defaultWallpaperForegroundColors(scheme: ColorScheme): WallpaperForegroundColors {
+    val defaultPair = textColorsFrom(scheme)
     return WallpaperForegroundColors(
-        topBarTitle = MaterialTheme.colorScheme.onBackground,
+        topBarTitle = scheme.onBackground,
         top = defaultPair,
         leftColumn = defaultPair,
         center = defaultPair,
     )
 }
 
-private fun colorsForLuminance(luminance: Float): WallpaperTextColors =
-    if (isWallpaperRegionDark(luminance)) {
-        LightTextOnDarkWallpaper
-    } else {
-        DarkTextOnLightWallpaper
-    }
+private fun textColorsFrom(scheme: ColorScheme): WallpaperTextColors =
+    WallpaperTextColors(
+        primary = scheme.onSurface,
+        secondary = scheme.onSurfaceVariant,
+    )
