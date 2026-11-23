@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -67,6 +68,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -100,6 +102,7 @@ import com.star.schedule.core.designsystem.component.PageTopBar
 import com.star.schedule.core.designsystem.component.SettingChevron
 import com.star.schedule.core.designsystem.CourseBlockCornerRadius
 import com.star.schedule.core.designsystem.navigationBarBottomInset
+import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.platform.display.rememberScreenCornerRadius
 import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.presentation.SettingsGroup
@@ -113,7 +116,10 @@ import com.star.schedule.feature.timetable.presentation.components.TimetableCard
 import com.star.schedule.feature.timetable.presentation.components.WallpaperSettingsCard
 import com.star.schedule.feature.wallpaper.domain.RecentWallpaper
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
+import com.star.schedule.feature.wallpaper.domain.seedArgb
+import com.star.schedule.feature.wallpaper.presentation.GeneratedWallpaperBackground
 import com.star.schedule.feature.wallpaper.presentation.WallpaperOption
+import com.star.schedule.feature.wallpaper.presentation.WallpaperThumbnail
 import com.star.schedule.feature.wallpaper.presentation.recentWallpaperOptions
 
 @Composable
@@ -302,6 +308,8 @@ private fun TimetableSettingsScreen(
                         pagerState = pagerState,
                         previews = state.previews,
                         currentId = state.currentId,
+                        wallpapers = state.wallpapers,
+                        pendingWallpapers = state.pendingWallpapers,
                         // 直接传 Animatable：折叠进度在 layout / draw 阶段读，避免每帧重组卡片内容。
                         progress = progress,
                         maxCardWidth = cardMaxWidth,
@@ -503,6 +511,8 @@ private fun TimetablePreviewPager(
     pagerState: PagerState,
     previews: List<TimetablePreview>,
     currentId: Long?,
+    wallpapers: Map<Long, WallpaperState>,
+    pendingWallpapers: Map<Long, RecentWallpaper>,
     progress: Animatable<Float, AnimationVector1D>,
     maxCardWidth: Dp,
     maxCardHeight: Dp,
@@ -560,9 +570,16 @@ private fun TimetablePreviewPager(
                 overscrollEffect = null,
             ) { page ->
                 val preview = previews.getOrNull(page)
+                val wallpaper = preview?.let {
+                    resolvePreviewWallpaper(
+                        persisted = wallpapers[it.id],
+                        pending = pendingWallpapers[it.id],
+                    )
+                } ?: WallpaperState.None
                 TimetablePreviewPage(
                     page = page,
                     preview = preview,
+                    wallpaper = wallpaper,
                     applied = preview != null && preview.id == currentId,
                     progress = progress,
                     maxCardWidth = maxCardWidth,
@@ -605,6 +622,7 @@ private fun TimetablePreviewPager(
 private fun TimetablePreviewPage(
     page: Int,
     preview: TimetablePreview?,
+    wallpaper: WallpaperState,
     applied: Boolean,
     progress: Animatable<Float, AnimationVector1D>,
     maxCardWidth: Dp,
@@ -646,6 +664,7 @@ private fun TimetablePreviewPage(
         } else {
             TimetablePreviewCard(
                 preview = preview,
+                wallpaper = wallpaper,
                 applied = applied,
                 progress = progress,
                 maxWidth = maxCardWidth,
@@ -693,6 +712,7 @@ private fun Modifier.previewCardSize(
 @Composable
 private fun TimetablePreviewCard(
     preview: TimetablePreview,
+    wallpaper: WallpaperState,
     applied: Boolean,
     progress: Animatable<Float, AnimationVector1D>,
     maxWidth: Dp,
@@ -704,68 +724,116 @@ private fun TimetablePreviewCard(
 ) {
     // 长按要知道卡片在屏幕上的位置，菜单按钮才好画在卡片正中。
     var boundsInRoot by remember { mutableStateOf(Rect.Zero) }
-    Card(
-        modifier = Modifier
-            .previewCardSize(progress, maxWidth, maxHeight)
-            .onGloballyPositioned { boundsInRoot = it.boundsInRoot() }
-            // clip 必须排在 clickable 前面：水波纹画在 clickable 那一层，
-            // 顺序反了就是矩形的按压反馈盖在圆角卡片上。
-            .clip(RoundedCornerShape(corner))
-            .combinedClickable(
-                role = Role.Button,
-                onClick = onClick,
-                onLongClick = { onLongPress(boundsInRoot) },
-            ),
-        shape = RoundedCornerShape(corner),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceBright,
-        ),
-        // 当前课表用 primary 描边；卡片本身用 Card，点击、水波纹、语义都由组件自带。
-        border = if (applied) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
-        },
+    val seedColor = wallpaper.seedArgb?.let(::Color)
+    val previewViewport = LocalWindowInfo.current.containerSize
+
+    // 每张预览卡独立按自身壁纸取色，与课表主页的 StarScheduleTheme 保持一致。
+    StarScheduleTheme(
+        dynamicColor = wallpaper is WallpaperState.None,
+        seedColor = seedColor,
     ) {
-        // 长按菜单的遮罩就画在卡片里，圆角和裁剪由 Card 的 shape 负责。
-        // 延迟到绘制阶段读取透明值，避免淡入淡出期间每帧重组整个预览卡片。
-        val scrimColor = MaterialTheme.colorScheme.scrim
-        val scrimAlpha = animateFloatAsState(
-            targetValue = if (scrimmed) TimetableActionScrimAlpha else 0f,
-            animationSpec = tween(
-                if (scrimmed) TimetableActionMenuFadeInMillis else TimetableActionMenuFadeOutMillis,
-            ),
-            label = "timetableCardScrim",
-        )
-        Box(
+        val border = when {
+            applied -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            wallpaper is WallpaperState.None ->
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            else -> null
+        }
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .drawWithContent {
-                    drawContent()
-                    val alpha = scrimAlpha.value
-                    if (alpha > 0f) {
-                        drawRect(color = scrimColor.copy(alpha = alpha))
-                    }
-                },
+                .previewCardSize(progress, maxWidth, maxHeight)
+                .onGloballyPositioned { boundsInRoot = it.boundsInRoot() }
+                // clip 必须排在 clickable 前面：水波纹画在 clickable 那一层，
+                // 顺序反了就是矩形的按压反馈盖在圆角卡片上。
+                .clip(RoundedCornerShape(corner))
+                .combinedClickable(
+                    role = Role.Button,
+                    onClick = onClick,
+                    onLongClick = { onLongPress(boundsInRoot) },
+                ),
+            shape = RoundedCornerShape(corner),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+            border = border,
         ) {
-            TimetableThumbnail(
-                preview = preview,
+            // 长按菜单的遮罩就画在卡片里，圆角和裁剪由 Card 的 shape 负责。
+            // 延迟到绘制阶段读取透明值，避免淡入淡出期间每帧重组整个预览卡片。
+            val scrimColor = MaterialTheme.colorScheme.scrim
+            val scrimAlpha = animateFloatAsState(
+                targetValue = if (scrimmed) TimetableActionScrimAlpha else 0f,
+                animationSpec = tween(
+                    if (scrimmed) TimetableActionMenuFadeInMillis else TimetableActionMenuFadeOutMillis,
+                ),
+                label = "timetableCardScrim",
+            )
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(PreviewCardContentInset),
-            )
+                    .drawWithContent {
+                        drawContent()
+                        val alpha = scrimAlpha.value
+                        if (alpha > 0f) {
+                            drawRect(color = scrimColor.copy(alpha = alpha))
+                        }
+                    },
+            ) {
+                when (wallpaper) {
+                    WallpaperState.None -> Unit
+                    is WallpaperState.Ready -> WallpaperThumbnail(
+                        path = wallpaper.localPath,
+                        cacheKey = wallpaper.contentHash,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    is WallpaperState.Generated -> GeneratedWallpaperBackground(
+                        design = wallpaper.design,
+                        previewViewport = previewViewport,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                if (wallpaper !is WallpaperState.None) {
+                    // 与课表主页一致：壁纸上叠 46% surface 遮罩，让课程格子色彩与对比度还原主页观感。
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f)),
+                    )
+                }
+                TimetableThumbnail(
+                    preview = preview,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(PreviewCardContentInset),
+                )
+            }
         }
     }
 }
 
-/** 缩略网格：只画课程块，不放文字，和系统「壁纸与风格」里的预览卡同一路数。 */
+/** 结合持久化的壁纸与尚未写完的乐观切换，让顶部预览卡点击最近壁纸时立即跟随变色。 */
+private fun resolvePreviewWallpaper(
+    persisted: WallpaperState?,
+    pending: RecentWallpaper?,
+): WallpaperState = when (pending) {
+    null -> persisted ?: WallpaperState.None
+    RecentWallpaper.Default -> WallpaperState.None
+    is RecentWallpaper.Generated -> WallpaperState.Generated(pending.design)
+    is RecentWallpaper.Image -> WallpaperState.Ready(
+        localPath = pending.path,
+        contentHash = pending.contentHash,
+        seedArgb = (persisted as? WallpaperState.Ready)
+            ?.takeIf { it.contentHash == pending.contentHash }
+            ?.seedArgb,
+    )
+}
+
+/** 缩略网格：只画课程块，不放文字，课程块颜色与课表主页格子（primaryContainer）保持一致。 */
 @Composable
 private fun TimetableThumbnail(
     preview: TimetablePreview,
     modifier: Modifier = Modifier,
 ) {
     val columns = if (preview.hasWeekendCourses) 7 else 5
-    val blockColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    val blockColor = MaterialTheme.colorScheme.primaryContainer
 
     Canvas(modifier = modifier) {
         val cellWidth = size.width / columns
