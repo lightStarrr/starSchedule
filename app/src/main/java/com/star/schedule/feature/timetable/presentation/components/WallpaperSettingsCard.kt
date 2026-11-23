@@ -41,10 +41,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -52,6 +53,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
 import com.star.schedule.core.designsystem.component.SettingChevron
@@ -191,6 +193,9 @@ private fun WallpaperStripSlot(
     // motionScheme 的规格要提前读出来。
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val checkSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val density = LocalDensity.current
+    val squareSizePx = with(density) { squareSize.roundToPx() }
+    val previewViewport = LocalWindowInfo.current.containerSize
     Box(
         Modifier
             .layout { measurable, constraints ->
@@ -231,24 +236,28 @@ private fun WallpaperStripSlot(
             },
             label = "wallpaperSlotContent",
         ) { current ->
-            // 6dp 模糊在缩略图尺寸下已具备柔和的交叉过渡，同时大幅降低多槽位同时切换的 GPU 采样开销。
-            val contentBlur by transition.animateDp(label = "wallpaperSlotBlur") {
+            // 将模糊半径延迟到 graphicsLayer 绘制阶段读取，避免过渡动画期间每帧重组全部槽位与壁纸子树；
+            // 静止态 radiusPx <= 0.5f 时 renderEffect = null，不产生额外离屏模糊层。
+            val contentBlurState = transition.animateDp(label = "wallpaperSlotBlur") {
                 if (it == EnterExitState.Visible) 0.dp else 6.dp
             }
             Box(
                 Modifier
                     .fillMaxSize()
-                    .then(
-                        if (contentBlur > 0.dp) {
-                            Modifier.blur(contentBlur, BlurredEdgeTreatment.Rectangle)
+                    .graphicsLayer {
+                        val radiusPx = with(density) { contentBlurState.value.toPx() }
+                        renderEffect = if (radiusPx > 0.5f) {
+                            BlurEffect(radiusPx, radiusPx, TileMode.Clamp)
                         } else {
-                            Modifier
-                        },
-                    ),
+                            null
+                        }
+                    },
             ) {
                 if (current != null) {
                     WallpaperOptionTile(
                         option = current,
+                        squareSizePx = squareSizePx,
+                        previewViewport = previewViewport,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -291,6 +300,8 @@ private fun WallpaperStripSlot(
 @Composable
 private fun WallpaperOptionTile(
     option: WallpaperOption,
+    squareSizePx: Int,
+    previewViewport: IntSize,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -307,13 +318,15 @@ private fun WallpaperOptionTile(
             WallpaperThumbnail(
                 path = option.path,
                 cacheKey = option.contentHash,
+                preferredTargetPx = squareSizePx,
                 modifier = Modifier.fillMaxSize(),
             )
         }
         if (option is WallpaperOption.Generated) {
             GeneratedWallpaperBackground(
                 design = option.design,
-                previewViewport = LocalWindowInfo.current.containerSize,
+                previewViewport = previewViewport,
+                preferredSizePx = IntSize(squareSizePx, squareSizePx),
                 modifier = Modifier.fillMaxSize(),
             )
         }

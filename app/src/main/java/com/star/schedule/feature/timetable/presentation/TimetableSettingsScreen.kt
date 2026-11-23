@@ -87,6 +87,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -793,6 +794,10 @@ private fun TimetablePreviewCard(
     val boundsRef = remember { arrayOf(Rect.Zero) }
     val seedColor = wallpaper.seedArgb?.let(::Color)
     val cardShape = remember(corner) { RoundedCornerShape(corner) }
+    val density = LocalDensity.current
+    val cardSizePx = remember(maxWidth, maxHeight, density) {
+        with(density) { IntSize(maxWidth.roundToPx(), maxHeight.roundToPx()) }
+    }
 
     // 每张预览卡独立按自身壁纸取色，与课表主页的 StarScheduleTheme 保持一致。
     StarScheduleTheme(
@@ -849,10 +854,12 @@ private fun TimetablePreviewCard(
                     is WallpaperState.Ready -> WallpaperThumbnail(
                         path = wallpaper.localPath,
                         cacheKey = wallpaper.contentHash,
+                        preferredTargetPx = maxOf(cardSizePx.width, cardSizePx.height),
                         modifier = Modifier.fillMaxSize(),
                     )
                     is WallpaperState.Generated -> GeneratedWallpaperBackground(
                         design = wallpaper.design,
+                        preferredSizePx = cardSizePx,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

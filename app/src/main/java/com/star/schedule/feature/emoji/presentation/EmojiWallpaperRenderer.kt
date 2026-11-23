@@ -35,28 +35,42 @@ private val rendererScratch = ThreadLocal.withInitial { RendererScratch() }
 
 internal data class EmojiWallpaperBitmapKey(
     val spec: EmojiWallpaperSpec,
-    val width: Int,
-    val height: Int,
+    val bitmapWidth: Int,
+    val bitmapHeight: Int,
+    val layoutWidth: Int,
+    val layoutHeight: Int,
     val typeface: Typeface,
 )
 
-// 进程级离屏位图缓存：编辑器、预览页、主页、行高页与壁纸条缩略图共享，
-// 避免在页面切换、宽度动画或实时模糊拖动时于主线程重复绘制数百个表情图元。
+// 缩略图（<= 512px）独立缓存在 16MB 池中，防止 10MB 级全屏壁纸或大图预览卡把历史壁纸条缩略图挤出缓存；
+// 大尺寸画布独立占用 64MB 池，容纳主页、编辑页与多张课表预览卡而不发生频繁淘汰抖动。
 // 位图交由 Compose Image 后由 RenderThread 异步读取，不主动 recycle，交由 LRU 与 GC 回收。
-private val emojiWallpaperCache =
-    object : LruCache<EmojiWallpaperBitmapKey, Bitmap>(36 * 1024 * 1024) {
+private val emojiThumbnailCache =
+    object : LruCache<EmojiWallpaperBitmapKey, Bitmap>(16 * 1024 * 1024) {
         override fun sizeOf(key: EmojiWallpaperBitmapKey, value: Bitmap): Int =
             value.allocationByteCount
     }
+
+private val emojiWallpaperCache =
+    object : LruCache<EmojiWallpaperBitmapKey, Bitmap>(64 * 1024 * 1024) {
+        override fun sizeOf(key: EmojiWallpaperBitmapKey, value: Bitmap): Int =
+            value.allocationByteCount
+    }
+
+private fun bitmapCacheFor(width: Int, height: Int): LruCache<EmojiWallpaperBitmapKey, Bitmap> =
+    if (width <= 512 && height <= 512) emojiThumbnailCache else emojiWallpaperCache
 
 internal fun peekCachedEmojiWallpaper(
     spec: EmojiWallpaperSpec,
     width: Int,
     height: Int,
     typeface: Typeface,
+    layoutWidth: Int = width,
+    layoutHeight: Int = height,
 ): Bitmap? {
-    if (width <= 0 || height <= 0) return null
-    return emojiWallpaperCache.get(EmojiWallpaperBitmapKey(spec, width, height, typeface))
+    if (width <= 0 || height <= 0 || layoutWidth <= 0 || layoutHeight <= 0) return null
+    val key = EmojiWallpaperBitmapKey(spec, width, height, layoutWidth, layoutHeight, typeface)
+    return bitmapCacheFor(width, height).get(key)
 }
 
 internal fun renderOrGetEmojiWallpaper(
@@ -64,28 +78,36 @@ internal fun renderOrGetEmojiWallpaper(
     width: Int,
     height: Int,
     typeface: Typeface,
+    layoutWidth: Int = width,
+    layoutHeight: Int = height,
 ): Bitmap? {
-    if (width <= 0 || height <= 0) return null
-    val key = EmojiWallpaperBitmapKey(spec, width, height, typeface)
-    emojiWallpaperCache.get(key)?.let { return it }
+    if (width <= 0 || height <= 0 || layoutWidth <= 0 || layoutHeight <= 0) return null
+    val key = EmojiWallpaperBitmapKey(spec, width, height, layoutWidth, layoutHeight, typeface)
+    val cache = bitmapCacheFor(width, height)
+    cache.get(key)?.let { return it }
     val layout = emojiWallpaperLayout(
         pattern = spec.pattern,
         emojiCount = spec.emojis.size,
         scale = spec.scale,
         seed = spec.seed,
-        width = width.toFloat(),
-        height = height.toFloat(),
+        width = layoutWidth.toFloat(),
+        height = layoutHeight.toFloat(),
     )
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    if (width != layoutWidth || height != layoutHeight) {
+        // 居中裁切视口：按完整窗口比例算布局，但只分配可见区域像素，大幅降低缩略图内存与绘制开销。
+        canvas.translate((width - layoutWidth) / 2f, (height - layoutHeight) / 2f)
+    }
     drawEmojiWallpaper(
-        canvas = Canvas(bitmap),
-        width = width,
-        height = height,
+        canvas = canvas,
+        width = layoutWidth,
+        height = layoutHeight,
         spec = spec,
         layout = layout,
         typeface = typeface,
     )
-    emojiWallpaperCache.put(key, bitmap)
+    cache.put(key, bitmap)
     return bitmap
 }
 
@@ -120,11 +142,15 @@ fun drawEmojiWallpaper(
         // 沿三角形裁剪后画同一份内容；镜像块由矩阵自然翻转。
         val side = tiling.triangleSide
         val unit = side / 100f
+        val clipLeft = -.5f * unit
+        val clipTop = -.25f * unit
+        val clipRight = side + .5f * unit
+        val clipBottom = tiling.triangleHeight + .75f * unit
         val clip = scratch.clipPath
         clip.rewind()
-        clip.moveTo(-.5f * unit, -.25f * unit)
-        clip.lineTo(side + .5f * unit, -.25f * unit)
-        clip.lineTo(side / 2f, tiling.triangleHeight + .75f * unit)
+        clip.moveTo(clipLeft, clipTop)
+        clip.lineTo(clipRight, clipTop)
+        clip.lineTo(side / 2f, clipBottom)
         clip.close()
 
         val matrix = scratch.matrix
@@ -142,6 +168,8 @@ fun drawEmojiWallpaper(
             values[8] = 1f
             matrix.setValues(values)
             canvas.withMatrix(matrix) {
+                // 跳过完全落在当前可见画布（如裁切缩略图）之外的三角形，避免无效 clipPath 与逐图元绘制。
+                if (quickReject(clipLeft, clipTop, clipRight, clipBottom)) return@withMatrix
                 clipPath(clip)
                 layout.placements.forEach { placement ->
                     drawEmojiSprite(
@@ -158,8 +186,20 @@ fun drawEmojiWallpaper(
         }
     } else {
         val destRect = scratch.destRect
-        layout.placements.forEach {
-            drawEmojiSprite(canvas, paint, it, glyphs, destRect)
+        val clipBounds = scratch.bounds
+        val hasClip = canvas.getClipBounds(clipBounds)
+        layout.placements.forEach { placement ->
+            if (hasClip) {
+                val margin = placement.size
+                if (placement.centerX + margin < clipBounds.left ||
+                    placement.centerX - margin > clipBounds.right ||
+                    placement.centerY + margin < clipBounds.top ||
+                    placement.centerY - margin > clipBounds.bottom
+                ) {
+                    return@forEach
+                }
+            }
+            drawEmojiSprite(canvas, paint, placement, glyphs, destRect)
         }
     }
 }

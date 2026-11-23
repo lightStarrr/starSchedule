@@ -42,9 +42,11 @@ internal fun WallpaperThumbnail(
     path: String,
     modifier: Modifier = Modifier,
     cacheKey: String = path,
+    preferredTargetPx: Int? = null,
 ) {
+    val fixedTarget = preferredTargetPx?.takeIf { it > 0 }
     var size by remember { mutableStateOf(IntSize.Zero) }
-    val target = max(size.width, size.height)
+    val target = fixedTarget ?: max(size.width, size.height)
     val key = "$cacheKey@$target"
     val cached = remember(key, target) { if (target > 0) thumbnailCache[key] else null }
     // produceState 的 value 跨 key 变化保留，新 key 先同步查缓存，切换不会闪空白。
@@ -60,7 +62,11 @@ internal fun WallpaperThumbnail(
         }
     }
     val displayBitmap = cached ?: bitmap
-    Box(modifier.onSizeChanged { size = it }) {
+    Box(
+        modifier.then(
+            if (fixedTarget == null) Modifier.onSizeChanged { size = it } else Modifier,
+        ),
+    ) {
         displayBitmap?.let { image ->
             val imageBitmap = remember(image) { image.asImageBitmap() }
             Image(
