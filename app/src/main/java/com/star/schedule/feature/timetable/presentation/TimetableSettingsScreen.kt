@@ -191,9 +191,6 @@ private fun TimetableSettingsScreen(
     // 这个页面整页和预览卡都在按折叠进度缩放，系统拉伸回弹会把卡片一起拉变形；
     // 而顶栏收起后再把回弹交回系统，滚动到底和折叠结束的时机仍会打架，
     // 所以这里一律不启用系统回弹（显式传 null，不传时会退回系统默认实现）。
-    // pager 状态提到这一层：下面的设置列表要跟着「居中那张」走，而不是已经应用的那张。
-    // 不在这一层直接读 currentPage / settledPage，避免左右滑卡过半时触发整页（含 Scaffold 与 Pager）重组。
-    val pagerState = rememberPagerState(pageCount = { state.previews.size + 1 })
     // 长按卡片弹出的操作菜单：只记 id + 卡片在屏幕上的中心，按钮画在根布局上，
     // 这样点卡片外面任何地方都能关掉。
     var actionMenu by remember { mutableStateOf<TimetableActionMenu?>(null) }
@@ -201,11 +198,6 @@ private fun TimetableSettingsScreen(
     var actionMenuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<TimetablePreview?>(null) }
     var deleting by remember { mutableStateOf<TimetablePreview?>(null) }
-
-    // 翻页、点卡片外面都要能把菜单收起来；用 snapshotFlow 监听页码，不触发外层重组。
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { actionMenuOpen = false }
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
@@ -231,6 +223,20 @@ private fun TimetableSettingsScreen(
                 LoadingIndicator()
             }
         } else {
+            // 数据就绪后才创建 PagerState，initialPage 直接落在当前已应用课表，
+            // 避免加载前先停在 0 号页再从最左侧动画滚到目标位置。
+            // 不在这一层直接读 currentPage / settledPage，避免左右滑卡过半时触发整页重组。
+            val initialPage = state.previews
+                .indexOfFirst { it.id == state.currentId }
+                .coerceAtLeast(0)
+            val pagerState = rememberPagerState(
+                initialPage = initialPage,
+                pageCount = { state.previews.size + 1 },
+            )
+            // 翻页、点卡片外面都要能把菜单收起来；用 snapshotFlow 监听页码，不触发外层重组。
+            LaunchedEffect(pagerState) {
+                snapshotFlow { pagerState.currentPage }.collect { actionMenuOpen = false }
+            }
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
@@ -563,7 +569,7 @@ private fun TimetablePreviewPager(
         { page -> scope.launch { pagerState.animateScrollToPage(page) } }
     }
 
-    // 当前课表变化（首次加载、点应用之后）时把预览滚到对应位置。
+    // 首次进入已由 rememberPagerState(initialPage) 直接定位；后续若当前课表或列表变化再滚动对齐。
     LaunchedEffect(currentId, previews.size) {
         val index = previews.indexOfFirst { it.id == currentId }
         if (index >= 0 && pagerState.currentPage != index) {
