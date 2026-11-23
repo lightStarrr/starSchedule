@@ -15,9 +15,11 @@ import com.star.schedule.feature.emoji.data.EmojiTypefaceLoader
 import com.star.schedule.feature.emoji.domain.EmojiPlacement
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperLayout
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperSpec
+import com.star.schedule.feature.emoji.domain.emojiWallpaperLayout
+import kotlin.math.roundToInt
 
 private class RendererScratch {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         textAlign = Paint.Align.CENTER
         // 与官方表情轮廓使用相同的粗体字重。
         fontVariationSettings = EmojiTypefaceLoader.ARG_WEIGHT
@@ -30,6 +32,62 @@ private class RendererScratch {
 }
 
 private val rendererScratch = ThreadLocal.withInitial { RendererScratch() }
+
+internal data class EmojiWallpaperBitmapKey(
+    val spec: EmojiWallpaperSpec,
+    val width: Int,
+    val height: Int,
+    val typeface: Typeface,
+)
+
+// 进程级离屏位图缓存：编辑器、预览页、主页、行高页与壁纸条缩略图共享，
+// 避免在页面切换、宽度动画或实时模糊拖动时于主线程重复绘制数百个表情图元。
+// 位图交由 Compose Image 后由 RenderThread 异步读取，不主动 recycle，交由 LRU 与 GC 回收。
+private val emojiWallpaperCache =
+    object : LruCache<EmojiWallpaperBitmapKey, Bitmap>(36 * 1024 * 1024) {
+        override fun sizeOf(key: EmojiWallpaperBitmapKey, value: Bitmap): Int =
+            value.allocationByteCount
+    }
+
+internal fun peekCachedEmojiWallpaper(
+    spec: EmojiWallpaperSpec,
+    width: Int,
+    height: Int,
+    typeface: Typeface,
+): Bitmap? {
+    if (width <= 0 || height <= 0) return null
+    return emojiWallpaperCache.get(EmojiWallpaperBitmapKey(spec, width, height, typeface))
+}
+
+internal fun renderOrGetEmojiWallpaper(
+    spec: EmojiWallpaperSpec,
+    width: Int,
+    height: Int,
+    typeface: Typeface,
+): Bitmap? {
+    if (width <= 0 || height <= 0) return null
+    val key = EmojiWallpaperBitmapKey(spec, width, height, typeface)
+    emojiWallpaperCache.get(key)?.let { return it }
+    val layout = emojiWallpaperLayout(
+        pattern = spec.pattern,
+        emojiCount = spec.emojis.size,
+        scale = spec.scale,
+        seed = spec.seed,
+        width = width.toFloat(),
+        height = height.toFloat(),
+    )
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    drawEmojiWallpaper(
+        canvas = Canvas(bitmap),
+        width = width,
+        height = height,
+        spec = spec,
+        layout = layout,
+        typeface = typeface,
+    )
+    emojiWallpaperCache.put(key, bitmap)
+    return bitmap
+}
 
 /**
  * 把表情壁纸画到 [Canvas]：先铺背景色，再按布局逐点画表情。
@@ -51,11 +109,11 @@ fun drawEmojiWallpaper(
     paint.typeface = typeface
 
     val tiling = layout.tiling
-    val atlas = wallpaperGlyphs(
+    val glyphs = wallpaperGlyphs(
         spec = spec,
         paint = paint,
         bounds = scratch.bounds,
-        size = layout.placements.maxOfOrNull { it.size } ?: 1f,
+        maxSize = layout.placements.maxOfOrNull { it.size } ?: 1f,
     )
     if (tiling != null) {
         // 万花筒：每个变换把基本三角形 F 映射到画布，
@@ -71,7 +129,6 @@ fun drawEmojiWallpaper(
 
         val matrix = scratch.matrix
         val values = scratch.matrixValues
-        val bounds = scratch.bounds
         val destRect = scratch.destRect
         tiling.transforms.forEach { t ->
             values[0] = t.a
@@ -90,10 +147,8 @@ fun drawEmojiWallpaper(
                     drawEmojiSprite(
                         canvas = this,
                         paint = paint,
-                        spec = spec,
                         placement = placement,
-                        atlas = atlas,
-                        bounds = bounds,
+                        glyphs = glyphs,
                         destRect = destRect,
                         unit = unit,
                         offset = 1,
@@ -102,43 +157,76 @@ fun drawEmojiWallpaper(
             }
         }
     } else {
-        val bounds = scratch.bounds
         val destRect = scratch.destRect
         layout.placements.forEach {
-            drawEmojiSprite(canvas, paint, spec, it, atlas, bounds, destRect)
+            drawEmojiSprite(canvas, paint, it, glyphs, destRect)
         }
     }
 }
 
-private data class GlyphKey(val typeface: Typeface?, val size: Float, val emoji: String, val color: Int)
+private data class GlyphKey(
+    val typeface: Typeface?,
+    val textureSize: Int,
+    val emoji: String,
+    val color: Int,
+)
 
-// 共用字形纹理可稳定各档位的轮廓；棱镜还需在基础域整数网格中定位后放大。
-private val glyphCache = object : LruCache<GlyphKey, Bitmap>(16 * 1024 * 1024) {
-    override fun sizeOf(key: GlyphKey, value: Bitmap): Int = value.allocationByteCount
+private class GlyphEntry(
+    val bitmap: Bitmap,
+    val widthRatio: Float,
+    val heightRatio: Float,
+)
+
+// 字形纹理按 2 的幂分桶（64..512）缓存，同时缓存字形宽高比，
+// 避免缩放档位变化时频繁重建大图，并彻底消除每个图元的 getTextBounds JNI 开销。
+private val glyphCache = object : LruCache<GlyphKey, GlyphEntry>(16 * 1024 * 1024) {
+    override fun sizeOf(key: GlyphKey, value: GlyphEntry): Int = value.bitmap.allocationByteCount
+}
+
+private fun textureSizeFor(size: Float): Int {
+    val raw = size.roundToInt().coerceAtLeast(1)
+    val powerOfTwo = Integer.highestOneBit(raw - 1).coerceAtLeast(1).times(2)
+    return powerOfTwo.coerceIn(64, 512)
 }
 
 private fun wallpaperGlyphs(
     spec: EmojiWallpaperSpec,
     paint: Paint,
     bounds: Rect,
-    size: Float,
-): Map<String, Bitmap> {
-    return spec.emojis.distinct().associateWith { emoji ->
-        val key = GlyphKey(paint.typeface, size, emoji, spec.colors.emojiArgb)
-        glyphCache.get(key)?.let { return@associateWith it }
-        paint.textSize = size
-        paint.getTextBounds(emoji, 0, emoji.length, bounds)
-        val source = Bitmap.createBitmap(
-            (bounds.width() + 1).coerceAtLeast(1),
-            (bounds.height() + 1).coerceAtLeast(1),
-            Bitmap.Config.ARGB_8888,
-        )
-        Canvas(source).drawText(emoji, source.width / 2f, source.height / 2f - bounds.centerY(), paint)
-        val largest = maxOf(bounds.width(), bounds.height(), 1)
-        val textureSize = Integer.highestOneBit(largest - 1).coerceAtLeast(1).times(2).coerceAtMost(1024)
-        Bitmap.createScaledBitmap(source, textureSize, textureSize, true).also {
-            if (it !== source) source.recycle()
-            glyphCache.put(key, it)
+    maxSize: Float,
+): Array<GlyphEntry> {
+    val textureSize = textureSizeFor(maxSize)
+    val color = spec.colors.emojiArgb
+    val typeface = paint.typeface
+    return Array(spec.emojis.size) { index ->
+        val emoji = spec.emojis[index]
+        val key = GlyphKey(typeface, textureSize, emoji, color)
+        glyphCache.get(key) ?: run {
+            paint.textSize = textureSize.toFloat()
+            paint.getTextBounds(emoji, 0, emoji.length, bounds)
+            val source = Bitmap.createBitmap(
+                (bounds.width() + 1).coerceAtLeast(1),
+                (bounds.height() + 1).coerceAtLeast(1),
+                Bitmap.Config.ARGB_8888,
+            )
+            Canvas(source).drawText(
+                emoji,
+                source.width / 2f,
+                source.height / 2f - bounds.centerY(),
+                paint,
+            )
+            val bitmap = if (source.width == textureSize && source.height == textureSize) {
+                source
+            } else {
+                Bitmap.createScaledBitmap(source, textureSize, textureSize, true).also {
+                    if (it !== source) source.recycle()
+                }
+            }
+            GlyphEntry(
+                bitmap = bitmap,
+                widthRatio = bounds.width().toFloat() / textureSize.toFloat(),
+                heightRatio = bounds.height().toFloat() / textureSize.toFloat(),
+            ).also { glyphCache.put(key, it) }
         }
     }
 }
@@ -146,24 +234,23 @@ private fun wallpaperGlyphs(
 private fun drawEmojiSprite(
     canvas: Canvas,
     paint: Paint,
-    spec: EmojiWallpaperSpec,
     placement: EmojiPlacement,
-    atlas: Map<String, Bitmap>,
-    bounds: Rect,
+    glyphs: Array<GlyphEntry>,
     destRect: RectF,
     unit: Float = 1f,
     offset: Int = 0,
 ) {
-    val emoji = spec.emojis[placement.emojiIndex % spec.emojis.size]
-    paint.textSize = placement.size / unit
-    paint.getTextBounds(emoji, 0, emoji.length, bounds)
+    val glyph = glyphs[placement.emojiIndex % glyphs.size]
+    val textSize = placement.size / unit
+    val bw = (glyph.widthRatio * textSize).roundToInt()
+    val bh = (glyph.heightRatio * textSize).roundToInt()
     canvas.withSave {
         translate(placement.centerX, placement.centerY)
         rotate(placement.rotationDegrees)
         if (placement.mirrored) scale(-1f, 1f)
-        val left = -(((bounds.width() + 1) / 2) + offset) * unit
-        val top = -(((bounds.height() + 1) / 2) + offset) * unit
-        destRect.set(left, top, left + bounds.width() * unit, top + bounds.height() * unit)
-        drawBitmap(atlas.getValue(emoji), null, destRect, paint)
+        val left = -(((bw + 1) / 2) + offset) * unit
+        val top = -(((bh + 1) / 2) + offset) * unit
+        destRect.set(left, top, left + bw * unit, top + bh * unit)
+        drawBitmap(glyph.bitmap, null, destRect, paint)
     }
 }

@@ -237,7 +237,13 @@ private fun WallpaperStripSlot(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .blur(contentBlur, BlurredEdgeTreatment.Rectangle),
+                    .then(
+                        if (contentBlur > 0.dp) {
+                            Modifier.blur(contentBlur, BlurredEdgeTreatment.Rectangle)
+                        } else {
+                            Modifier
+                        },
+                    ),
             ) {
                 if (current != null) {
                     WallpaperOptionTile(

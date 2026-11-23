@@ -12,6 +12,18 @@ import com.google.android.material.color.utilities.Hct
 import com.google.android.material.color.utilities.MaterialDynamicColors
 import com.google.android.material.color.utilities.SchemeTonalSpot
 
+private const val SEED_SCHEME_CACHE_CAPACITY = 64
+
+private val seedSchemeCache = object : LinkedHashMap<Long, ColorScheme>(
+    SEED_SCHEME_CACHE_CAPACITY,
+    0.75f,
+    true,
+) {
+    override fun removeEldestEntry(
+        eldest: MutableMap.MutableEntry<Long, ColorScheme>?,
+    ): Boolean = size > SEED_SCHEME_CACHE_CAPACITY
+}
+
 /**
  * 用官方 Material Color Utilities 从壁纸种子色生成完整的 Compose [ColorScheme]。
  *
@@ -20,13 +32,17 @@ import com.google.android.material.color.utilities.SchemeTonalSpot
  * 升级 com.google.android.material:material 时只需要检查这里的 API 是否变动。
  */
 internal fun seedColorScheme(seedArgb: Int, isDark: Boolean): ColorScheme {
+    val cacheKey = (seedArgb.toLong() shl 1) or if (isDark) 1L else 0L
+    synchronized(seedSchemeCache) {
+        seedSchemeCache[cacheKey]?.let { return it }
+    }
     // TonalSpot 与系统「壁纸与风格」的默认取色一致；contrast 0 为标准对比度。
     val scheme = SchemeTonalSpot(Hct.fromInt(seedArgb), isDark, 0.0)
     val colors = MaterialDynamicColors()
 
     fun argb(color: DynamicColor) = Color(color.getArgb(scheme))
 
-    return if (isDark) {
+    val result = if (isDark) {
         darkColorScheme(
             primary = argb(colors.primary()),
             onPrimary = argb(colors.onPrimary()),
@@ -129,4 +145,8 @@ internal fun seedColorScheme(seedArgb: Int, isDark: Boolean): ColorScheme {
             onTertiaryFixedVariant = argb(colors.onTertiaryFixedVariant()),
         )
     }
+    synchronized(seedSchemeCache) {
+        seedSchemeCache[cacheKey] = result
+    }
+    return result
 }

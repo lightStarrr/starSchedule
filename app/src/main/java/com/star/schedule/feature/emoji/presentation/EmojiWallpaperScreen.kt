@@ -1,12 +1,13 @@
 package com.star.schedule.feature.emoji.presentation
 
+import android.graphics.Bitmap
 import android.graphics.Typeface
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,10 +73,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -95,7 +97,8 @@ import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.emoji.domain.EmojiPattern
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperColors
 import com.star.schedule.feature.emoji.domain.EmojiWallpaperSpec
-import com.star.schedule.feature.emoji.domain.emojiWallpaperLayout
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private enum class EmojiEditorTab { EMOJI, PATTERN, COLOR }
 
@@ -184,29 +187,13 @@ private fun EmojiWallpaperScreen(
 
     Box(Modifier.fillMaxSize()) {
         if (ready != null) {
-            val spec = ready.spec
-            val layout = remember(spec, windowSize) {
-                emojiWallpaperLayout(
-                    pattern = spec.pattern,
-                    emojiCount = spec.emojis.size,
-                    scale = spec.scale,
-                    seed = spec.seed,
-                    width = windowSize.width.toFloat(),
-                    height = windowSize.height.toFloat(),
-                )
-            }
-            Canvas(Modifier.fillMaxSize()) {
-                drawIntoCanvas {
-                    drawEmojiWallpaper(
-                        canvas = it.nativeCanvas,
-                        width = windowSize.width,
-                        height = windowSize.height,
-                        spec = spec,
-                        layout = layout,
-                        typeface = ready.typeface,
-                    )
-                }
-            }
+            EmojiWallpaperPreviewCanvas(
+                spec = ready.spec,
+                typeface = ready.typeface,
+                width = windowSize.width,
+                height = windowSize.height,
+                modifier = Modifier.fillMaxSize(),
+            )
         } else {
             Box(
                 Modifier
@@ -578,7 +565,7 @@ internal fun PatternTabContent(
     }
 }
 
-/** 图案缩略图：用当前表情 + 中性色实时画，跟实际壁纸同构只是缩小。 */
+/** 图案缩略图：用当前表情 + 中性色离屏绘制并缓存，避免滑动缩放条或重绘时阻塞主线程。 */
 @Composable
 private fun PatternThumbnail(
     pattern: EmojiPattern,
@@ -591,25 +578,21 @@ private fun PatternThumbnail(
     val background = MaterialTheme.colorScheme.surfaceContainerHighest
     val emojiColor = MaterialTheme.colorScheme.onSurface
     val label = stringResource(pattern.nameRes)
-    val spec = EmojiWallpaperSpec(
-        emojis = ready.emojis,
-        pattern = pattern,
-        scale = ready.scale,
-        colors = EmojiWallpaperColors(background.toArgb(), emojiColor.toArgb(), 0),
-        seed = ready.seed,
-    )
-    val layout = remember(spec, thumbPx) {
-        emojiWallpaperLayout(
+    val spec = remember(ready.emojis, pattern, ready.scale, background, emojiColor, ready.seed) {
+        EmojiWallpaperSpec(
+            emojis = ready.emojis,
             pattern = pattern,
-            emojiCount = spec.emojis.size,
-            scale = spec.scale,
-            seed = spec.seed,
-            width = thumbPx.toFloat(),
-            height = thumbPx.toFloat(),
+            scale = ready.scale,
+            colors = EmojiWallpaperColors(background.toArgb(), emojiColor.toArgb(), 0),
+            seed = ready.seed,
         )
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Canvas(
+        EmojiWallpaperPreviewCanvas(
+            spec = spec,
+            typeface = ready.typeface,
+            width = thumbPx,
+            height = thumbPx,
             modifier = Modifier
                 .size(thumbSize)
                 .clip(RoundedCornerShape(12.dp))
@@ -626,18 +609,7 @@ private fun PatternThumbnail(
                         Modifier
                     },
                 ),
-        ) {
-            drawIntoCanvas {
-                drawEmojiWallpaper(
-                    canvas = it.nativeCanvas,
-                    width = thumbPx,
-                    height = thumbPx,
-                    spec = spec,
-                    layout = layout,
-                    typeface = ready.typeface,
-                )
-            }
-        }
+        )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
@@ -647,6 +619,54 @@ private fun PatternThumbnail(
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
+    }
+}
+
+/**
+ * 编辑页实时预览与图案缩略图共用的离屏画布：
+ * 后台线程绘制并写入进程级 LRU 缓存；拖动滑杆或切换参数期间保留上一帧直至新位图就绪，
+ * 既不阻塞主线程，也不会出现白屏闪烁。
+ */
+@Composable
+private fun EmojiWallpaperPreviewCanvas(
+    spec: EmojiWallpaperSpec,
+    typeface: Typeface,
+    width: Int,
+    height: Int,
+    modifier: Modifier = Modifier,
+) {
+    val cached = remember(spec, width, height, typeface) {
+        peekCachedEmojiWallpaper(spec, width, height, typeface)
+    }
+    val bitmap by produceState<Bitmap?>(
+        initialValue = cached,
+        key1 = spec,
+        key2 = width,
+        key3 = height,
+    ) {
+        val hit = peekCachedEmojiWallpaper(spec, width, height, typeface)
+        if (hit != null) {
+            value = hit
+            return@produceState
+        }
+        val rendered = withContext(Dispatchers.Default) {
+            renderOrGetEmojiWallpaper(spec, width, height, typeface)
+        }
+        if (rendered != null) {
+            value = rendered
+        }
+    }
+    val displayBitmap = cached ?: bitmap
+    Box(modifier.background(Color(spec.colors.backgroundArgb))) {
+        if (displayBitmap != null) {
+            val imageBitmap = remember(displayBitmap) { displayBitmap.asImageBitmap() }
+            Image(
+                bitmap = imageBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

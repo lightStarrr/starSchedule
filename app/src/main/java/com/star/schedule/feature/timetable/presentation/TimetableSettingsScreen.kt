@@ -725,7 +725,6 @@ private fun TimetablePreviewCard(
     // 长按要知道卡片在屏幕上的位置，菜单按钮才好画在卡片正中。
     var boundsInRoot by remember { mutableStateOf(Rect.Zero) }
     val seedColor = wallpaper.seedArgb?.let(::Color)
-    val previewViewport = LocalWindowInfo.current.containerSize
 
     // 每张预览卡独立按自身壁纸取色，与课表主页的 StarScheduleTheme 保持一致。
     StarScheduleTheme(
@@ -786,7 +785,6 @@ private fun TimetablePreviewCard(
                     )
                     is WallpaperState.Generated -> GeneratedWallpaperBackground(
                         design = wallpaper.design,
-                        previewViewport = previewViewport,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

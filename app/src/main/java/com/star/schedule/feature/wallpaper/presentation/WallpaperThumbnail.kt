@@ -46,8 +46,9 @@ internal fun WallpaperThumbnail(
     var size by remember { mutableStateOf(IntSize.Zero) }
     val target = max(size.width, size.height)
     val key = "$cacheKey@$target"
-    // produceState 的 value 跨 key 变化保留，新 key 先查缓存，切换不会闪空白。
-    val bitmap by produceState<Bitmap?>(initialValue = null, key) {
+    val cached = remember(key, target) { if (target > 0) thumbnailCache[key] else null }
+    // produceState 的 value 跨 key 变化保留，新 key 先同步查缓存，切换不会闪空白。
+    val bitmap by produceState<Bitmap?>(initialValue = cached, key) {
         value = if (target <= 0) {
             null
         } else {
@@ -58,10 +59,12 @@ internal fun WallpaperThumbnail(
                 }
         }
     }
+    val displayBitmap = cached ?: bitmap
     Box(modifier.onSizeChanged { size = it }) {
-        bitmap?.let { image ->
+        displayBitmap?.let { image ->
+            val imageBitmap = remember(image) { image.asImageBitmap() }
             Image(
-                bitmap = image.asImageBitmap(),
+                bitmap = imageBitmap,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

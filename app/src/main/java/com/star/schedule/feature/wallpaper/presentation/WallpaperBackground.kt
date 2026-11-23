@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -21,6 +22,12 @@ import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+// 进程级全屏照片壁纸缓存：在主页、行高预览、设置页之间切换时直接命中，
+// 避免每次进入页面都重新走磁盘 BitmapRegionDecoder 解码。按实际像素字节计容，上限约 32MB。
+private val wallpaperBitmapCache = object : LruCache<String, Bitmap>(32 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
+}
+
 @Composable
 fun WallpaperBackground(
     state: WallpaperState,
@@ -32,6 +39,7 @@ fun WallpaperBackground(
             path = state.localPath,
             blurRadius = 0f,
             modifier = modifier,
+            cacheKey = state.contentHash,
         )
         is WallpaperState.Generated -> GeneratedWallpaperBackground(state.design, modifier)
     }
@@ -47,26 +55,40 @@ fun WallpaperBackground(
     path: String?,
     blurRadius: Float,
     modifier: Modifier = Modifier,
+    cacheKey: String? = null,
 ) {
     // 首次布局前尺寸可能为 0，等待真实窗口尺寸后再解码，避免估算尺寸造成重复裁切。
     val targetSize = LocalWindowInfo.current.containerSize
+    val key = if (path != null && targetSize.width > 0 && targetSize.height > 0) {
+        "${cacheKey ?: path}@${targetSize.width}x${targetSize.height}"
+    } else {
+        null
+    }
+    val cached = remember(key) { key?.let(wallpaperBitmapCache::get) }
     val bitmap by produceState<Bitmap?>(
-        initialValue = null,
-        path,
-        targetSize,
+        initialValue = cached,
+        key1 = key,
+        key2 = path,
     ) {
-        value = if (path == null || targetSize.width <= 0 || targetSize.height <= 0) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                decodeWallpaper(path, targetSize.width, targetSize.height)
-            }
+        if (key == null || path == null) {
+            value = null
+            return@produceState
+        }
+        val hit = wallpaperBitmapCache[key]
+        if (hit != null) {
+            value = hit
+            return@produceState
+        }
+        value = withContext(Dispatchers.IO) {
+            decodeWallpaper(path, targetSize.width, targetSize.height)
+                ?.also { wallpaperBitmapCache.put(key, it) }
         }
     }
     // 位图交给 Image 后会由渲染线程在后续帧继续读取，销毁时机与最后一次绘制
     // 没有先后保证。主动 recycle 会让渲染线程访问已释放的像素内存并 abort，
-    // 因此这里不回收，改由 GC 释放。
-    bitmap?.let { image ->
+    // 因此这里不回收，改由 LRU 与 GC 释放。
+    val displayBitmap = cached ?: bitmap
+    displayBitmap?.let { image ->
         val imageBitmap = remember(image) { image.asImageBitmap() }
         Image(
             bitmap = imageBitmap,

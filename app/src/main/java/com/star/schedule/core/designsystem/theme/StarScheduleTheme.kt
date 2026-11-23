@@ -9,9 +9,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.expressiveLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -22,12 +24,15 @@ fun StarScheduleTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val colorScheme = when {
-        dynamicColor && darkTheme -> dynamicDarkColorScheme(context)
-        dynamicColor -> dynamicLightColorScheme(context)
-        seedColor != null -> seedColorScheme(seedColor.toArgb(), darkTheme)
-        darkTheme -> darkColorScheme()
-        else -> expressiveLightColorScheme()
+    val configuration = LocalConfiguration.current
+    val colorScheme = remember(context, configuration, darkTheme, dynamicColor, seedColor) {
+        when {
+            dynamicColor && darkTheme -> dynamicDarkColorScheme(context)
+            dynamicColor -> dynamicLightColorScheme(context)
+            seedColor != null -> seedColorScheme(seedColor.toArgb(), darkTheme)
+            darkTheme -> darkColorScheme()
+            else -> expressiveLightColorScheme()
+        }
     }
 
     MaterialExpressiveTheme(
