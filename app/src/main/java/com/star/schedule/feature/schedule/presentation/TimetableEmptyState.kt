@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +65,7 @@ internal fun EmptyTimetableState(
     state: TimetableEmptyState,
     modifier: Modifier = Modifier,
     titleResId: Int? = null,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
     action: (@Composable () -> Unit)? = null,
 ) {
     val shape = when (state) {
@@ -107,7 +109,7 @@ internal fun EmptyTimetableState(
             text = stringResource(title),
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = titleColor,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
         )

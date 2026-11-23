@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.onSizeChanged
@@ -66,6 +67,7 @@ import com.star.schedule.core.designsystem.theme.StarScheduleTheme
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.domain.showsScrim
 import com.star.schedule.feature.wallpaper.presentation.WallpaperBackground
+import com.star.schedule.feature.wallpaper.presentation.rememberWallpaperForegroundColors
 import java.time.LocalDate
 
 @Composable
@@ -129,6 +131,7 @@ fun ScheduleHomeScreen(
 ) {
     var weekNavigationHeightPx by remember { mutableIntStateOf(0) }
     val weekNavigationHeight = with(LocalDensity.current) { weekNavigationHeightPx.toDp() }
+    val foregroundColors = rememberWallpaperForegroundColors(wallpaperState)
 
     Box(
         modifier = modifier
@@ -158,6 +161,8 @@ fun ScheduleHomeScreen(
             ScheduleHomeHeader(
                 currentWeek = currentWeek,
                 dateRange = dateRange,
+                primaryTextColor = foregroundColors.top.primary,
+                secondaryTextColor = foregroundColors.top.secondary,
                 onTimetableSettingsClick = onTimetableSettingsClick,
                 onSettingsClick = onSettingsClick,
                 modifier = Modifier
@@ -175,6 +180,10 @@ fun ScheduleHomeScreen(
                     showWeekend = showWeekend,
                     rowHeight = rowHeight,
                     bottomContentPadding = weekNavigationHeight + 8.dp,
+                    headerPrimaryColor = foregroundColors.top.primary,
+                    headerSecondaryColor = foregroundColors.top.secondary,
+                    timePrimaryColor = foregroundColors.leftColumn.primary,
+                    timeSecondaryColor = foregroundColors.leftColumn.secondary,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -194,6 +203,7 @@ fun ScheduleHomeScreen(
         if (emptyState != null) {
             EmptyTimetableState(
                 state = emptyState,
+                titleColor = foregroundColors.center.primary,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = weekNavigationHeight),
@@ -217,6 +227,8 @@ fun ScheduleHomeScreen(
 private fun ScheduleHomeHeader(
     currentWeek: Int,
     dateRange: String,
+    primaryTextColor: Color,
+    secondaryTextColor: Color,
     onTimetableSettingsClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -230,6 +242,8 @@ private fun ScheduleHomeHeader(
             ScheduleHomeHeaderInfo(
                 currentWeek = currentWeek,
                 dateRange = dateRange,
+                primaryTextColor = primaryTextColor,
+                secondaryTextColor = secondaryTextColor,
             )
         }.single().measure(childConstraints)
 
@@ -284,18 +298,20 @@ private fun ScheduleHomeHeader(
 private fun ScheduleHomeHeaderInfo(
     currentWeek: Int,
     dateRange: String,
+    primaryTextColor: Color,
+    secondaryTextColor: Color,
 ) {
     Column {
         Text(
             text = stringResource(R.string.week_label_template, currentWeek),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = primaryTextColor,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
         )
         Text(
             text = dateRange,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = secondaryTextColor,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
         )

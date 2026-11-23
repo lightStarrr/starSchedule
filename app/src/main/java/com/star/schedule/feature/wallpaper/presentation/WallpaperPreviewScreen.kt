@@ -92,6 +92,12 @@ private fun WallpaperPreviewScreen(
     // 烘焙模糊需要窗口尺寸与 density：1 屏幕像素 = 烘焙后 1 像素。
     val windowSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
+    val foregroundColors = rememberWallpaperForegroundColors(
+        design = ready?.design,
+        photoPath = ready?.stagedPath,
+        photoCacheKey = ready?.stagedPath,
+        scrimEnabled = ready?.scrimEnabled ?: true,
+    )
 
     LaunchedEffect(ready?.applied) {
         if (ready?.applied == true) onApplied()
@@ -148,6 +154,7 @@ private fun WallpaperPreviewScreen(
                     title = stringResource(R.string.wallpaper_preview_title),
                     onBack = onBack,
                     containerColor = Color.Transparent,
+                    titleContentColor = foregroundColors.topBarTitle,
                     actions = {
                         if (ready != null) {
                             Button(
@@ -193,6 +200,10 @@ private fun WallpaperPreviewScreen(
                         rowHeight = state.rowHeight.dp,
                         // 给特效岛（展开后约 200dp）让出位置，最后的课才不会被挡住。
                         bottomContentPadding = 200.dp + navigationBarBottomInset(),
+                        headerPrimaryColor = foregroundColors.top.primary,
+                        headerSecondaryColor = foregroundColors.top.secondary,
+                        timePrimaryColor = foregroundColors.leftColumn.primary,
+                        timeSecondaryColor = foregroundColors.leftColumn.secondary,
                         modifier = Modifier.fillMaxSize(),
                     )
                     WallpaperPreviewUiState.Loading -> CircularProgressIndicator(

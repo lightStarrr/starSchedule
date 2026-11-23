@@ -28,6 +28,28 @@ private val wallpaperBitmapCache = object : LruCache<String, Bitmap>(32 * 1024 *
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
 }
 
+internal fun wallpaperBitmapCacheKey(
+    cacheKey: String,
+    targetWidth: Int,
+    targetHeight: Int,
+): String = "$cacheKey@${targetWidth}x$targetHeight"
+
+internal fun peekCachedWallpaperBitmap(
+    cacheKey: String,
+    targetWidth: Int,
+    targetHeight: Int,
+): Bitmap? {
+    if (targetWidth <= 0 || targetHeight <= 0) return null
+    return wallpaperBitmapCache[wallpaperBitmapCacheKey(cacheKey, targetWidth, targetHeight)]
+}
+
+/** 供无遮罩文字明暗采样复用的低分辨率区域解码（仅在主图尚未进入缓存时触发）。 */
+internal fun decodeWallpaperBitmapForSampling(
+    path: String,
+    targetWidth: Int,
+    targetHeight: Int,
+): Bitmap? = decodeWallpaper(path, targetWidth, targetHeight)
+
 @Composable
 fun WallpaperBackground(
     state: WallpaperState,
@@ -60,7 +82,7 @@ fun WallpaperBackground(
     // 首次布局前尺寸可能为 0，等待真实窗口尺寸后再解码，避免估算尺寸造成重复裁切。
     val targetSize = LocalWindowInfo.current.containerSize
     val key = if (path != null && targetSize.width > 0 && targetSize.height > 0) {
-        "${cacheKey ?: path}@${targetSize.width}x${targetSize.height}"
+        wallpaperBitmapCacheKey(cacheKey ?: path, targetSize.width, targetSize.height)
     } else {
         null
     }

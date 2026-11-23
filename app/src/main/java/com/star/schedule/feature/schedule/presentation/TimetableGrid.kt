@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -65,6 +66,10 @@ fun TimetableGrid(
     rowHeight: Dp,
     modifier: Modifier = Modifier,
     bottomContentPadding: Dp = 8.dp,
+    headerPrimaryColor: Color = MaterialTheme.colorScheme.onSurface,
+    headerSecondaryColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    timePrimaryColor: Color = MaterialTheme.colorScheme.onSurface,
+    timeSecondaryColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     val visibleDays = remember(showWeekend) {
         if (showWeekend) (1..7).toList() else (1..5).toList()
@@ -152,6 +157,8 @@ fun TimetableGrid(
                         dayLabel = dayLabels[day - 1],
                         date = date,
                         fontScale = fontScale,
+                        primaryColor = headerPrimaryColor,
+                        secondaryColor = headerSecondaryColor,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -169,6 +176,8 @@ fun TimetableGrid(
                         GridTimeCell(
                             lessonTime = lessonTime,
                             fontScale = fontScale,
+                            primaryColor = timePrimaryColor,
+                            secondaryColor = timeSecondaryColor,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(effectiveRowHeight),
@@ -242,6 +251,8 @@ private fun GridDayHeader(
     dayLabel: String,
     date: LocalDate,
     fontScale: Float,
+    primaryColor: Color,
+    secondaryColor: Color,
     modifier: Modifier = Modifier,
 ) {
     val labelStyle = MaterialTheme.typography.titleSmall.scaledFont(fontScale)
@@ -258,13 +269,13 @@ private fun GridDayHeader(
         Text(
             text = stringResource(R.string.weekday_column_label, dayLabel),
             style = labelStyle,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = primaryColor,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )
         Text(
             text = "${date.monthValue}/${date.dayOfMonth}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = secondaryColor,
             style = dateStyle,
             maxLines = 1,
         )
@@ -275,6 +286,8 @@ private fun GridDayHeader(
 private fun GridTimeCell(
     lessonTime: LessonTimeEntity,
     fontScale: Float,
+    primaryColor: Color,
+    secondaryColor: Color,
     modifier: Modifier = Modifier,
 ) {
     val periodStyle = MaterialTheme.typography.titleSmall.scaledFont(fontScale)
@@ -288,18 +301,18 @@ private fun GridTimeCell(
         Text(
             text = lessonTime.period.toString(),
             style = periodStyle,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = primaryColor,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = lessonTime.startTime,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = secondaryColor,
             style = timeStyle,
             maxLines = 1,
         )
         Text(
             text = lessonTime.endTime,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = secondaryColor,
             style = timeStyle,
             maxLines = 1,
         )

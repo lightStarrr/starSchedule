@@ -53,6 +53,7 @@ import com.star.schedule.feature.wallpaper.domain.WallpaperState
 import com.star.schedule.feature.wallpaper.domain.seedArgb
 import com.star.schedule.feature.wallpaper.domain.showsScrim
 import com.star.schedule.feature.wallpaper.presentation.WallpaperBackground
+import com.star.schedule.feature.wallpaper.presentation.rememberWallpaperForegroundColors
 import kotlin.math.roundToInt
 
 /** 恢复默认按钮的直径，同时用作标题行里预留的槽位大小。 */
@@ -97,6 +98,7 @@ private fun RowHeightScreen(
     onApply: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val foregroundColors = rememberWallpaperForegroundColors(state.wallpaperState)
 
     Box(
         modifier = Modifier
@@ -124,6 +126,7 @@ private fun RowHeightScreen(
                     title = stringResource(R.string.timetable_settings_row_height),
                     onBack = onBack,
                     containerColor = Color.Transparent,
+                    titleContentColor = foregroundColors.topBarTitle,
                     scrollBehavior = scrollBehavior,
                     actions = {
                         Button(
@@ -153,6 +156,10 @@ private fun RowHeightScreen(
                         rowHeight = state.rowHeight.dp,
                         // 给底部悬浮卡片让出位置，最后一节课才不会被挡住。
                         bottomContentPadding = 140.dp + navigationBarBottomInset(),
+                        headerPrimaryColor = foregroundColors.top.primary,
+                        headerSecondaryColor = foregroundColors.top.secondary,
+                        timePrimaryColor = foregroundColors.leftColumn.primary,
+                        timeSecondaryColor = foregroundColors.leftColumn.secondary,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

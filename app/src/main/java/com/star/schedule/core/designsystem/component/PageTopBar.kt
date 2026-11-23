@@ -84,6 +84,7 @@ fun CompactPageTopBar(
     modifier: Modifier = Modifier,
     // 预览页要让顶栏透出底下的壁纸时传 Color.Transparent。
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    titleContentColor: Color = MaterialTheme.colorScheme.onBackground,
     scrollBehavior: TopAppBarScrollBehavior? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
@@ -103,7 +104,7 @@ fun CompactPageTopBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = containerColor,
             scrolledContainerColor = containerColor,
-            titleContentColor = MaterialTheme.colorScheme.onBackground,
+            titleContentColor = titleContentColor,
         ),
         scrollBehavior = scrollBehavior,
     )
