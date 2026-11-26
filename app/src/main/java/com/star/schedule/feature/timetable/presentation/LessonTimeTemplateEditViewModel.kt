@@ -41,7 +41,7 @@ data class LessonTimeTemplateEditUiState(
     val rename: RenameTemplateDialog? = null,
     val undo: LessonTimeUndo? = null,
     val isSaving: Boolean = false,
-    /** 和打开页面时的快照有差异：保存按钮的可用状态、返回时的放弃确认都看它。 */
+    /** 和打开页面时的快照有差异：「覆盖」按钮的可用状态、返回时的放弃确认都看它。 */
     val isDirty: Boolean = false,
     /** 返回时弹「放弃修改？」 */
     val discardConfirm: Boolean = false,
@@ -50,7 +50,11 @@ data class LessonTimeTemplateEditUiState(
     /** 页面可以关了（保存成功或确认放弃）。 */
     val finish: Boolean = false,
     val message: LessonTimeTemplateEditMessage? = null,
-)
+) {
+    /** 顶栏保存按钮是否可用：编辑已有模板即使未改动也允许点开另存为新模板，但名称与节次均不能为空。 */
+    val canSave: Boolean
+        get() = !isLoading && !isMissing && !isSaving && name.isNotBlank() && rows.isNotEmpty()
+}
 
 /**
  * 编辑单个节次时间模板。
@@ -306,9 +310,14 @@ class LessonTimeTemplateEditViewModel(
     /** 顶栏的勾：编辑模式先问覆盖还是另存；新建模式没有覆盖对象，直接存。 */
     fun requestSave() {
         val state = mutableState.value
+        if (state.isLoading || state.isMissing || state.isSaving || state.rows.isEmpty()) return
         if (state.isNewTemplate) {
             // 名字是写库的必填项，没填先把改名框弹出来。
             if (state.name.isBlank()) startRename() else saveAsNew()
+            return
+        }
+        if (state.name.isBlank()) {
+            startRename()
             return
         }
         mutableState.update { it.copy(saveChoice = true) }
@@ -323,7 +332,8 @@ class LessonTimeTemplateEditViewModel(
     fun save() {
         val state = mutableState.value
         val template = template ?: return
-        if (state.isSaving || !state.isDirty || state.isLoading) return
+        if (state.isSaving || !state.isDirty || state.isLoading || state.isMissing) return
+        if (state.name.isBlank() || state.rows.isEmpty()) return
         viewModelScope.launch {
             mutableState.update { it.copy(isSaving = true, saveChoice = false) }
             try {
@@ -367,7 +377,8 @@ class LessonTimeTemplateEditViewModel(
      */
     fun saveAsNew() {
         val state = mutableState.value
-        if (state.isSaving || state.isLoading) return
+        if (state.isSaving || state.isLoading || state.isMissing) return
+        if (state.name.isBlank() || state.rows.isEmpty()) return
         viewModelScope.launch {
             mutableState.update { it.copy(isSaving = true, saveChoice = false) }
             try {

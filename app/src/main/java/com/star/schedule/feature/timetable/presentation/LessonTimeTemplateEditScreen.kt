@@ -205,19 +205,23 @@ private fun LessonTimeTemplateEditScreen(
                 onBack = onBack,
                 scrollBehavior = scrollBehavior,
                 actions = {
-                    CircleIconButton(
-                        icon = Icons.Rounded.Add,
-                        contentDescription = stringResource(R.string.title_add_template_period),
-                        onClick = onAdd,
-                    )
-                    // 保存用 success 绿，和「已完成」的语义一致；点开还要选覆盖还是新建。
-                    CircleIconButton(
-                        icon = Icons.Rounded.Check,
-                        contentDescription = stringResource(R.string.action_save),
-                        onClick = onSave,
-                        containerColor = success.container,
-                        contentColor = success.content,
-                    )
+                    if (!state.isLoading && !state.isMissing) {
+                        CircleIconButton(
+                            icon = Icons.Rounded.Add,
+                            contentDescription = stringResource(R.string.title_add_template_period),
+                            onClick = onAdd,
+                            enabled = !state.isSaving,
+                        )
+                        // 保存用 success 绿，和「已完成」的语义一致；编辑旧模板未改动也允许点开另存为新模板。
+                        CircleIconButton(
+                            icon = Icons.Rounded.Check,
+                            contentDescription = stringResource(R.string.action_save),
+                            onClick = onSave,
+                            enabled = state.canSave,
+                            containerColor = success.container,
+                            contentColor = success.content,
+                        )
+                    }
                 },
             )
         },

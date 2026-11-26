@@ -1,12 +1,12 @@
 package com.star.schedule.feature.timetable.presentation
 
-import com.star.schedule.core.database.entity.CourseEntity
-import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeApplySnapshot
+import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -255,6 +255,37 @@ class LessonTimeTemplateEditViewModelTest {
         assertTrue(name.endsWith(" (1)"))
     }
 
+    @Test
+    fun `canSave allows unmodified existing template to save as new but blocks empty rows or new blank draft`() =
+        runTest(dispatcher) {
+            val editVm = createViewModel()
+            advanceUntilIdle()
+            assertTrue(editVm.uiState.value.canSave)
+
+            editVm.uiState.value.rows.toList().forEach { editVm.delete(it) }
+            assertFalse(editVm.uiState.value.canSave)
+
+            val newVm = LessonTimeTemplateEditViewModel(repository, templateId = 0L)
+            advanceUntilIdle()
+            assertFalse(newVm.uiState.value.canSave)
+
+            newVm.startRename()
+            newVm.updateRenameName("新模板")
+            newVm.confirmRename()
+            advanceUntilIdle()
+            assertFalse(newVm.uiState.value.canSave)
+
+            newVm.startAdd()
+            newVm.saveEditor()
+            advanceUntilIdle()
+            assertTrue(newVm.uiState.value.canSave)
+
+            repository.remove(7L)
+            val missingVm = createViewModel()
+            advanceUntilIdle()
+            assertFalse(missingVm.uiState.value.canSave)
+        }
+
     private fun createViewModel(): LessonTimeTemplateEditViewModel =
         LessonTimeTemplateEditViewModel(repository, templateId = 7L)
 }
@@ -352,7 +383,7 @@ private class FakeEditRepository : ScheduleRepository {
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = flowOf(null)
 
-    override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> = flowOf(emptyList())
+    override fun observeCourses(timetableId: Long): Flow<List<ScheduledCourse>> = flowOf(emptyList())
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =
         flowOf(emptyList())
