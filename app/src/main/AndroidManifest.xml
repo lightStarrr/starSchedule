@@ -141,6 +141,12 @@
         <activity
             android:name=".app.CourseSettingsActivity"
             android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.StarSchedule" />
+        <activity
+            android:name=".app.CourseEditActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.StarSchedule" />
         <activity
             android:name=".app.WallpaperActivity"

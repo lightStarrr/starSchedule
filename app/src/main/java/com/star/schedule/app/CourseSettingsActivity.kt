@@ -8,20 +8,20 @@ import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
-import com.star.schedule.feature.schedule.data.RoomScheduleRepository
+import com.star.schedule.feature.timetable.data.RoomTimetableRepository
 import com.star.schedule.feature.timetable.presentation.CourseSettingsRoute
 import com.star.schedule.feature.timetable.presentation.CourseSettingsViewModel
 import com.star.schedule.feature.timetable.presentation.CourseSettingsViewModelFactory
+import com.star.schedule.platform.notification.UnifiedNotificationManager
 import com.star.schedule.platform.systembar.installEdgeToEdge
 
 /**
- * 课程设置：课程增删改还没做；课表里没有节次时间时，页面会给出提示和跳转按钮。
+ * 课程设置：展示当前课表的课程主表及其各上课时段，支持课程重命名、删整门课、单时段左滑撤销删除以及跳转时段编辑页。
  */
 class CourseSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 页面作用的对象是「打开时指定的课表」，不是已应用的那张；没带 id 就没有目标。
         val timetableId = intent.getLongExtra(EXTRA_TIMETABLE_ID, -1L).takeIf { it > 0 }
         if (timetableId == null) {
             finish()
@@ -31,7 +31,10 @@ class CourseSettingsActivity : ComponentActivity() {
         DatabaseProvider.init(this)
         installEdgeToEdge()
 
-        val repository = RoomScheduleRepository(DatabaseProvider.db)
+        val repository = RoomTimetableRepository(
+            database = DatabaseProvider.db,
+            reminderScheduler = UnifiedNotificationManager(applicationContext),
+        )
         val viewModel = ViewModelProvider(
             this,
             CourseSettingsViewModelFactory(repository, timetableId),
@@ -44,6 +47,28 @@ class CourseSettingsActivity : ComponentActivity() {
                     onBack = ::finish,
                     onOpenLessonTimes = {
                         startActivity(LessonTimeSettingsActivity.intent(this, timetableId))
+                    },
+                    onAddCourse = {
+                        startActivity(CourseEditActivity.newCourseIntent(this, timetableId))
+                    },
+                    onAddSession = { group ->
+                        startActivity(
+                            CourseEditActivity.newSessionIntent(
+                                context = this,
+                                timetableId = timetableId,
+                                courseId = group.course.id,
+                            ),
+                        )
+                    },
+                    onEditSession = { courseId, sessionId ->
+                        startActivity(
+                            CourseEditActivity.editSessionIntent(
+                                context = this,
+                                timetableId = timetableId,
+                                courseId = courseId,
+                                sessionId = sessionId,
+                            ),
+                        )
                     },
                 )
             }
