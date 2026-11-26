@@ -10,12 +10,13 @@ import com.star.schedule.core.database.dao.LessonTimeDao
 import com.star.schedule.core.database.dao.LessonTimeTemplateDao
 import com.star.schedule.core.database.dao.PreferenceDao
 import com.star.schedule.core.database.dao.TimetableDao
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
+import com.star.schedule.core.model.toScheduledCourses
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.timetable.domain.LessonTimeTemplateApply
 import com.star.schedule.platform.notification.ReminderRefresher
@@ -54,8 +55,8 @@ class RoomScheduleRepository(
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> =
         timetableDao.getTimetableFlow(timetableId)
 
-    override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> =
-        courseDao.getCoursesFlow(timetableId)
+    override fun observeCourses(timetableId: Long): Flow<List<ScheduledCourse>> =
+        courseDao.getCoursesWithSessionsFlow(timetableId).map { it.toScheduledCourses() }
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =
         lessonTimeDao.getLessonTimesFlow(timetableId)

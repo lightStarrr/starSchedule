@@ -1,6 +1,6 @@
 package com.star.schedule.feature.schedule.domain
 
-import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.model.ScheduledCourse
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -39,7 +39,7 @@ class CourseBlockTest {
         )
     }
 
-    private fun course(periods: List<Int>) = CourseEntity(
+    private fun course(periods: List<Int>) = ScheduledCourse(
         timetableId = 1,
         name = "数学",
         teacher = "老师",

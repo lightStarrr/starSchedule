@@ -29,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.star.schedule.R
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.model.ScheduledCourse
 
 internal enum class TimetableEmptyState {
     NO_TIMETABLE,
@@ -42,7 +42,7 @@ internal fun determineTimetableEmptyState(
     isLoading: Boolean = false,
     hasTimetable: Boolean,
     lessonTimes: List<LessonTimeEntity>,
-    courses: List<CourseEntity>,
+    courses: List<ScheduledCourse>,
     currentWeek: Int,
 ): TimetableEmptyState? = when {
     isLoading -> null

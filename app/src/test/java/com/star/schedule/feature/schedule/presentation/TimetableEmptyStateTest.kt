@@ -1,7 +1,7 @@
 package com.star.schedule.feature.schedule.presentation
 
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.model.ScheduledCourse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -55,7 +55,7 @@ class TimetableEmptyStateTest {
 
     @Test
     fun `missing courses in current week shows course empty state`() {
-        val course = CourseEntity(
+        val course = ScheduledCourse(
             timetableId = 1,
             name = "数学",
             teacher = "老师",
@@ -78,7 +78,7 @@ class TimetableEmptyStateTest {
 
     @Test
     fun `course in current week renders timetable`() {
-        val course = CourseEntity(
+        val course = ScheduledCourse(
             timetableId = 1,
             name = "数学",
             teacher = "老师",

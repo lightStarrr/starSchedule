@@ -8,6 +8,7 @@ import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.dao.CourseDao
 import com.star.schedule.core.database.dao.PreferenceDao
 import com.star.schedule.core.database.dao.TimetableDao
+import com.star.schedule.core.model.toScheduledCourses
 import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.feature.settings.domain.TimetablePreview
 import com.star.schedule.feature.settings.domain.TimetablePreviewBlock
@@ -57,7 +58,10 @@ class RoomSettingsRepository(
         }
 
     override fun observeTimetablePreviews(): Flow<List<TimetablePreview>> =
-        combine(timetableDao.getAllTimetables(), courseDao.getAllCoursesFlow()) { timetables, courses ->
+        combine(
+            timetableDao.getAllTimetables(),
+            courseDao.getAllCoursesWithSessionsFlow().map { it.toScheduledCourses() },
+        ) { timetables, courses ->
             val byTimetable = courses.groupBy { it.timetableId }
             timetables.map { timetable ->
                 val timetableCourses = byTimetable[timetable.id].orEmpty()

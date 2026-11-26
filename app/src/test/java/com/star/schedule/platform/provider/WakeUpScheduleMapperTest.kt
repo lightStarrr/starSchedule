@@ -1,8 +1,8 @@
 package com.star.schedule.platform.provider
 
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -186,8 +186,9 @@ class WakeUpScheduleMapperTest {
         periods: List<Int> = listOf(1),
         weeks: List<Int> = listOf(1),
         dayOfWeek: Int = 3
-    ) = CourseEntity(
-        id = id,
+    ) = ScheduledCourse(
+        sessionId = id,
+        courseId = 1,
         timetableId = 1,
         name = name,
         teacher = "教师",

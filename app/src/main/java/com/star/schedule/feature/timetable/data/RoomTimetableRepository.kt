@@ -9,6 +9,8 @@ import com.star.schedule.core.database.dao.LessonTimeTemplateDao
 import com.star.schedule.core.database.dao.PreferenceDao
 import com.star.schedule.core.database.dao.TimetableDao
 import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.CourseSessionEntity
+import com.star.schedule.core.database.entity.CourseWithSessions
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
@@ -79,7 +81,7 @@ class RoomTimetableRepository(
 
     override suspend fun replaceCoursesForTimetable(
         timetableId: Long,
-        courses: List<CourseEntity>,
+        courses: List<Pair<CourseEntity, List<CourseSessionEntity>>>,
     ) {
         courseDao.replaceCoursesForTimetable(timetableId, courses)
         reminderRefresher.refreshIfCurrent(timetableId)
@@ -100,13 +102,8 @@ class RoomTimetableRepository(
         reminderRefresher.refreshIfCurrent(lessonTime.timetableId)
     }
 
-    override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> =
-        courseDao.getCoursesFlow(timetableId)
-
-    override suspend fun insertCourseWithReminders(course: CourseEntity): Long =
-        courseDao.insertCourse(course).also {
-            reminderRefresher.refreshIfCurrent(course.timetableId)
-        }
+    override fun observeCoursesWithSessions(timetableId: Long): Flow<List<CourseWithSessions>> =
+        courseDao.getCoursesWithSessionsFlow(timetableId)
 
     override suspend fun updateCourseWithReminders(course: CourseEntity) {
         courseDao.updateCourse(course)
@@ -116,6 +113,48 @@ class RoomTimetableRepository(
     override suspend fun deleteCourseWithReminders(course: CourseEntity) {
         courseDao.deleteCourse(course)
         reminderRefresher.refreshIfCurrent(course.timetableId)
+    }
+
+    override suspend fun restoreCourseWithSessionsWithReminders(
+        course: CourseEntity,
+        sessions: List<CourseSessionEntity>,
+    ): Long = courseDao.insertCourseWithSessions(course, sessions).also {
+        reminderRefresher.refreshIfCurrent(course.timetableId)
+    }
+
+    override suspend fun insertCourseSessionWithReminders(
+        timetableId: Long,
+        session: CourseSessionEntity,
+    ): Long = courseDao.insertSession(session).also {
+        reminderRefresher.refreshIfCurrent(timetableId)
+    }
+
+    override suspend fun updateCourseSessionWithReminders(
+        timetableId: Long,
+        session: CourseSessionEntity,
+    ) {
+        courseDao.updateSession(session)
+        reminderRefresher.refreshIfCurrent(timetableId)
+    }
+
+    override suspend fun deleteCourseSessionWithReminders(
+        timetableId: Long,
+        session: CourseSessionEntity,
+    ) {
+        courseDao.deleteSession(session)
+        reminderRefresher.refreshIfCurrent(timetableId)
+    }
+
+    override suspend fun upsertCourseAndInsertSessionWithReminders(
+        timetableId: Long,
+        courseName: String,
+        session: CourseSessionEntity,
+    ): Pair<Long, Long> = courseDao.upsertCourseAndInsertSession(
+        timetableId = timetableId,
+        courseName = courseName,
+        session = session,
+    ).also {
+        reminderRefresher.refreshIfCurrent(timetableId)
     }
 
     override fun observeLessonTimeTemplates(): Flow<List<LessonTimeTemplateEntity>> =

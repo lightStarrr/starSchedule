@@ -40,6 +40,7 @@ import androidx.glance.text.TextStyle
 import com.star.schedule.R
 import com.star.schedule.core.common.Constants
 import com.star.schedule.core.database.DatabaseProvider
+import com.star.schedule.core.model.toScheduledCourses
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -418,7 +419,8 @@ class TwoDaysWidget : GlanceAppWidget() {
                         .getOrElse { today }
                     val currentWeekNumber = today.getWeekOfSemester(startDate)
 
-                    val courses = courseDao.getCoursesFlow(currentTimetableId).firstOrNull() ?: emptyList()
+                    val courses = courseDao.getCoursesWithSessionsFlow(currentTimetableId)
+                        .firstOrNull()?.toScheduledCourses().orEmpty()
                     val lessonTimes =
                         lessonTimeDao.getLessonTimesFlow(currentTimetableId).firstOrNull() ?: emptyList()
 

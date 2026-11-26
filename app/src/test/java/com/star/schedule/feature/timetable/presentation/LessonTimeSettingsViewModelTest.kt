@@ -1,12 +1,12 @@
 package com.star.schedule.feature.timetable.presentation
 
-import com.star.schedule.core.database.entity.CourseEntity
-import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeApplySnapshot
+import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -318,7 +318,7 @@ private class FakeScheduleRepository : ScheduleRepository {
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = flowOf(null)
 
-    override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> = flowOf(emptyList())
+    override fun observeCourses(timetableId: Long): Flow<List<ScheduledCourse>> = flowOf(emptyList())
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> = lessonTimes
 

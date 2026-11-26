@@ -1,9 +1,11 @@
 package com.star.schedule.core.database.entity
 
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.Relation
 import androidx.room.TypeConverters
 import com.star.schedule.core.database.converter.Converters
 
@@ -96,16 +98,44 @@ data class LessonTimeTemplateItemEntity(
     ],
     indices = [Index(value = ["timetableId"])],
 )
-@TypeConverters(Converters::class)
 data class CourseEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val timetableId: Long,        // 属于哪个课程表
     val name: String,             // 课程名称
-    val teacher: String,          // 教师名称（可选）
-    val location: String,         // 上课地点
+)
+
+// 课程的单条上课时间安排（依赖课程）
+@Entity(
+    tableName = "course_session",
+    foreignKeys = [
+        ForeignKey(
+            entity = CourseEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["courseId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["courseId"])],
+)
+@TypeConverters(Converters::class)
+data class CourseSessionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val courseId: Long,           // 属于哪门课程
+    val teacher: String = "",     // 教师名称（可选）
+    val location: String = "",    // 上课地点
     val dayOfWeek: Int,           // 星期几（1=周一, 7=周日）
     val periods: List<Int>,       // 上课节次，例如 [1,2]
     val weeks: List<Int>,         // 上课周数，例如 [1,2,3,4,5,6,7]
+)
+
+// 课程及其全部上课时间安排
+data class CourseWithSessions(
+    @Embedded val course: CourseEntity,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "courseId",
+    )
+    val sessions: List<CourseSessionEntity>,
 )
 
 @Entity(tableName = "reminder")

@@ -3,9 +3,9 @@ package com.star.schedule.feature.schedule.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperRepository
 import com.star.schedule.feature.wallpaper.domain.WallpaperState
@@ -32,7 +32,7 @@ data class ScheduleHomeUiState(
     val currentWeek: Int = 1,
     val weekStartDate: LocalDate = LocalDate.now().with(DayOfWeek.MONDAY),
     val lessonTimes: List<LessonTimeEntity> = emptyList(),
-    val courses: List<CourseEntity> = emptyList(),
+    val courses: List<ScheduledCourse> = emptyList(),
     val showWeekend: Boolean = false,
     val rowHeightDp: Int = 60,
     val wallpaperState: WallpaperState = WallpaperState.None,
@@ -42,7 +42,7 @@ private data class HomeTimetableBundle(
     val isLoading: Boolean,
     val timetableId: Long?,
     val timetable: TimetableEntity?,
-    val courses: List<CourseEntity>,
+    val courses: List<ScheduledCourse>,
     val lessonTimes: List<LessonTimeEntity>,
     val wallpaperState: WallpaperState,
 )

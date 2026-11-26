@@ -1,7 +1,7 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.model.ScheduledCourse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -23,8 +23,9 @@ class LessonTimeTemplateApplyTest {
         endTime = end,
     )
 
-    private fun course(name: String, periods: List<Int>) = CourseEntity(
-        id = 0,
+    private fun course(name: String, periods: List<Int>) = ScheduledCourse(
+        sessionId = 0,
+        courseId = 0,
         timetableId = 1,
         name = name,
         teacher = "",

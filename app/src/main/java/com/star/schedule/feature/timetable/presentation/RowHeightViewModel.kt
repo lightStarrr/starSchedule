@@ -3,9 +3,9 @@ package com.star.schedule.feature.timetable.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.settings.domain.SettingsRepository
 import com.star.schedule.feature.timetable.domain.RowHeightPreviewSample
@@ -34,7 +34,7 @@ data class RowHeightUiState(
     val week: Int = 1,
     val weekStartDate: LocalDate = LocalDate.now().with(DayOfWeek.MONDAY),
     val lessonTimes: List<LessonTimeEntity> = emptyList(),
-    val courses: List<CourseEntity> = emptyList(),
+    val courses: List<ScheduledCourse> = emptyList(),
     val showWeekend: Boolean = false,
     val wallpaperState: WallpaperState = WallpaperState.None,
 ) {
@@ -69,7 +69,7 @@ class RowHeightViewModel(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val courses: Flow<List<CourseEntity>> = currentTimetableId.flatMapLatest { id ->
+    private val courses: Flow<List<ScheduledCourse>> = currentTimetableId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else scheduleRepository.observeCourses(id)
     }
 

@@ -1,14 +1,14 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.model.ScheduledCourse
 import java.util.Locale
 import kotlin.random.Random
 
 /** 行高页在课表还没排课时代替真实数据的示例课表。 */
 data class RowHeightPreviewTimetable(
     val lessonTimes: List<LessonTimeEntity>,
-    val courses: List<CourseEntity>,
+    val courses: List<ScheduledCourse>,
 )
 
 /**
@@ -60,13 +60,13 @@ object RowHeightPreviewSample {
      * 每天从第一节往后走：随机决定这一节要不要放一块两节的课，放了就跳过这块，
      * 再随机空出 0~1 节，保证同一天内不会重叠。
      */
-    fun courses(random: Random): List<CourseEntity> = buildList {
+    fun courses(random: Random): List<ScheduledCourse> = buildList {
         for (day in 1..DAYS) {
             var period = 1
             while (period + BLOCK_PERIODS - 1 <= PERIOD_COUNT) {
                 if (random.nextInt(100) < PLACE_CHANCE_PERCENT) {
                     add(
-                        CourseEntity(
+                        ScheduledCourse(
                             timetableId = SAMPLE_TIMETABLE_ID,
                             name = BLANK_TEXT,
                             teacher = "",
@@ -85,7 +85,7 @@ object RowHeightPreviewSample {
     }.ifEmpty {
         // 概率上几乎不会发生，但真出现「一块都没有」时页面又变成空白了，兜一块在周一。
         listOf(
-            CourseEntity(
+            ScheduledCourse(
                 timetableId = SAMPLE_TIMETABLE_ID,
                 name = BLANK_TEXT,
                 teacher = "",

@@ -15,6 +15,7 @@ import com.star.schedule.core.database.dao.PreferenceDao
 import com.star.schedule.core.database.dao.ReminderDao
 import com.star.schedule.core.database.dao.TimetableDao
 import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.CourseSessionEntity
 import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.entity.HolidayEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
@@ -32,11 +33,12 @@ import com.star.schedule.core.database.entity.TimetableEntity
         LessonTimeTemplateEntity::class,
         LessonTimeTemplateItemEntity::class,
         CourseEntity::class,
+        CourseSessionEntity::class,
         ReminderEntity::class,
         DayNoteEntity::class,
         HolidayEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -174,6 +176,59 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL("DROP TABLE `timetable`")
                 db.execSQL("ALTER TABLE `_new_timetable` RENAME TO `timetable`")
+            }
+        }
+
+        // 从版本12迁移到版本13：将课程本体数据与上课时间安排拆分为 course + course_session 两张表。
+        // 按 (timetableId, TRIM(name)) 归并主表记录，并保留原 course.id 作为 course_session.id 以兼容提醒 requestCode。
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `course` RENAME TO `_legacy_course`")
+                db.execSQL("DROP INDEX IF EXISTS `index_course_timetableId`")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `course` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `timetableId` INTEGER NOT NULL,
+                        `name` TEXT NOT NULL,
+                        FOREIGN KEY(`timetableId`) REFERENCES `timetable`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_course_timetableId` ON `course` (`timetableId`)")
+                db.execSQL(
+                    """
+                    INSERT INTO `course` (`id`, `timetableId`, `name`)
+                    SELECT MIN(`id`), `timetableId`, TRIM(`name`)
+                    FROM `_legacy_course`
+                    GROUP BY `timetableId`, TRIM(`name`)
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `course_session` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `courseId` INTEGER NOT NULL,
+                        `teacher` TEXT NOT NULL,
+                        `location` TEXT NOT NULL,
+                        `dayOfWeek` INTEGER NOT NULL,
+                        `periods` TEXT NOT NULL,
+                        `weeks` TEXT NOT NULL,
+                        FOREIGN KEY(`courseId`) REFERENCES `course`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_course_session_courseId` ON `course_session` (`courseId`)")
+                db.execSQL(
+                    """
+                    INSERT INTO `course_session` (`id`, `courseId`, `teacher`, `location`, `dayOfWeek`, `periods`, `weeks`)
+                    SELECT lc.`id`, c.`id`, lc.`teacher`, lc.`location`, lc.`dayOfWeek`, lc.`periods`, lc.`weeks`
+                    FROM `_legacy_course` AS lc
+                    INNER JOIN `course` AS c
+                        ON c.`timetableId` = lc.`timetableId` AND c.`name` = TRIM(lc.`name`)
+                    """.trimIndent(),
+                )
+                db.execSQL("DROP TABLE `_legacy_course`")
             }
         }
     }

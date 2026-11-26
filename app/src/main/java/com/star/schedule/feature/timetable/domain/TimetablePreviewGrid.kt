@@ -1,8 +1,8 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.feature.schedule.domain.buildCourseBlocksByWeek
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -13,7 +13,7 @@ data class TimetablePreviewGrid(
     val week: Int,
     val weekStartDate: LocalDate,
     val lessonTimes: List<LessonTimeEntity>,
-    val courses: List<CourseEntity>,
+    val courses: List<ScheduledCourse>,
     val showWeekend: Boolean,
     val rowHeight: Int,
 )
@@ -27,7 +27,7 @@ data class TimetablePreviewGrid(
  */
 fun timetablePreviewGrid(
     timetable: TimetableEntity?,
-    courses: List<CourseEntity>,
+    courses: List<ScheduledCourse>,
     lessonTimes: List<LessonTimeEntity>,
     sample: RowHeightPreviewTimetable,
     fallbackRowHeight: Int,

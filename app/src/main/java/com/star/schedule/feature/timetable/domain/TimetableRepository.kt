@@ -1,6 +1,8 @@
 package com.star.schedule.feature.timetable.domain
 
 import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.CourseSessionEntity
+import com.star.schedule.core.database.entity.CourseWithSessions
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
@@ -20,7 +22,10 @@ interface TimetableRepository {
 
     suspend fun deleteTimetableWithReminders(timetable: TimetableEntity)
 
-    suspend fun replaceCoursesForTimetable(timetableId: Long, courses: List<CourseEntity>)
+    suspend fun replaceCoursesForTimetable(
+        timetableId: Long,
+        courses: List<Pair<CourseEntity, List<CourseSessionEntity>>>,
+    )
 
     fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>>
 
@@ -31,13 +36,37 @@ interface TimetableRepository {
 
     suspend fun deleteLessonTimeAutoSort(lessonTime: LessonTimeEntity)
 
-    fun observeCourses(timetableId: Long): Flow<List<CourseEntity>>
-
-    suspend fun insertCourseWithReminders(course: CourseEntity): Long
+    fun observeCoursesWithSessions(timetableId: Long): Flow<List<CourseWithSessions>>
 
     suspend fun updateCourseWithReminders(course: CourseEntity)
 
     suspend fun deleteCourseWithReminders(course: CourseEntity)
+
+    suspend fun restoreCourseWithSessionsWithReminders(
+        course: CourseEntity,
+        sessions: List<CourseSessionEntity>,
+    ): Long
+
+    suspend fun insertCourseSessionWithReminders(
+        timetableId: Long,
+        session: CourseSessionEntity,
+    ): Long
+
+    suspend fun updateCourseSessionWithReminders(
+        timetableId: Long,
+        session: CourseSessionEntity,
+    )
+
+    suspend fun deleteCourseSessionWithReminders(
+        timetableId: Long,
+        session: CourseSessionEntity,
+    )
+
+    suspend fun upsertCourseAndInsertSessionWithReminders(
+        timetableId: Long,
+        courseName: String,
+        session: CourseSessionEntity,
+    ): Pair<Long, Long>
 
     fun observeLessonTimeTemplates(): Flow<List<LessonTimeTemplateEntity>>
 

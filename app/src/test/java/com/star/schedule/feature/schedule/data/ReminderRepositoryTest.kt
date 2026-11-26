@@ -8,6 +8,8 @@ import com.star.schedule.core.database.dao.LessonTimeTemplateDao
 import com.star.schedule.core.database.dao.PreferenceDao
 import com.star.schedule.core.database.dao.TimetableDao
 import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.CourseSessionEntity
+import com.star.schedule.core.database.entity.CourseWithSessions
 import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
@@ -40,6 +42,7 @@ class ReminderRepositoryTest {
 
     private val preferenceDao = object : PreferenceDao() {
         override fun getPreferenceFlow(prefKey: String) = flowOf(preferences[prefKey])
+        override fun observeValuesForTimetables(prefix: String): Flow<List<String>> = error("Unexpected read")
         override suspend fun insertPreference(preference: PreferenceEntity) {
             preferences[preference.prefKey] = preference.value
         }
@@ -72,12 +75,16 @@ class ReminderRepositoryTest {
         }
     }
     private val courseDao = object : CourseDao() {
-        override fun getCoursesFlow(timetableId: Long): Flow<List<CourseEntity>> = error("Unexpected read")
-        override fun getAllCoursesFlow(): Flow<List<CourseEntity>> = error("Unexpected read")
+        override fun getCoursesWithSessionsFlow(timetableId: Long): Flow<List<CourseWithSessions>> = error("Unexpected read")
+        override fun getAllCoursesWithSessionsFlow(): Flow<List<CourseWithSessions>> = error("Unexpected read")
+        override suspend fun findCourseByNameOnce(timetableId: Long, name: String): CourseEntity? = error("Unexpected read")
         override suspend fun insertCourse(course: CourseEntity): Long = error("Unexpected insert")
         override suspend fun updateCourse(course: CourseEntity) = error("Unexpected update")
         override suspend fun deleteCourse(course: CourseEntity) = error("Unexpected delete")
         override suspend fun deleteCoursesByTimetableId(timetableId: Long) = error("Unexpected delete")
+        override suspend fun insertSession(session: CourseSessionEntity): Long = error("Unexpected insert")
+        override suspend fun updateSession(session: CourseSessionEntity) = error("Unexpected update")
+        override suspend fun deleteSession(session: CourseSessionEntity) = error("Unexpected delete")
     }
     private val templateDao = object : LessonTimeTemplateDao() {
         override fun getLessonTimeTemplatesFlow(): Flow<List<LessonTimeTemplateEntity>> = error("Unexpected read")

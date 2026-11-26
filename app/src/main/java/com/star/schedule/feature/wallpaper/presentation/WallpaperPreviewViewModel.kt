@@ -3,8 +3,8 @@ package com.star.schedule.feature.wallpaper.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import com.star.schedule.feature.timetable.domain.RowHeightPreviewSample
 import com.star.schedule.feature.timetable.domain.timetablePreviewGrid
@@ -41,7 +41,7 @@ sealed interface WallpaperPreviewUiState {
         val week: Int,
         val weekStartDate: LocalDate,
         val lessonTimes: List<LessonTimeEntity>,
-        val courses: List<CourseEntity>,
+        val courses: List<ScheduledCourse>,
         val showWeekend: Boolean,
         val rowHeight: Int,
     ) : WallpaperPreviewUiState

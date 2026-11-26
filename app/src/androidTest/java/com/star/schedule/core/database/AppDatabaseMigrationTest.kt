@@ -20,9 +20,9 @@ import org.junit.runner.RunWith
 class AppDatabaseMigrationTest {
 
     @Test
-    fun migrate11To12DropsAutoUpdateJsonAndPreservesTimetableAndChildRows() = runBlocking {
+    fun migrate11To13DropsAutoUpdateJsonSplitsCoursesAndPreservesTimetableAndChildRows() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val dbName = "migration-11-12-test.db"
+        val dbName = "migration-11-13-test.db"
         context.deleteDatabase(dbName)
 
         try {
@@ -96,7 +96,7 @@ class AppDatabaseMigrationTest {
             helper.close()
 
             val migratedDb = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-                .addMigrations(AppDatabase.MIGRATION_11_12)
+                .addMigrations(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
                 .build()
             try {
                 val timetableDao = migratedDb.timetableDao()
@@ -118,7 +118,11 @@ class AppDatabaseMigrationTest {
                     timetables.single(),
                 )
                 assertEquals(1, lessonTimeDao.getLessonTimesOnce(7L).size)
-                assertEquals(1, courseDao.getCoursesFlow(7L).first().size)
+                val courses = courseDao.getCoursesWithSessionsFlow(7L).first()
+                assertEquals(1, courses.size)
+                assertEquals("高等数学", courses.single().course.name)
+                assertEquals(1, courses.single().sessions.size)
+                assertEquals(21L, courses.single().sessions.single().id)
                 assertEquals(1, dayNoteDao.getDayNotesFlow(7L).first().size)
 
                 val columns = mutableSetOf<String>()
@@ -133,7 +137,7 @@ class AppDatabaseMigrationTest {
                 // 删除课表时外键级联仍应生效。
                 timetableDao.deleteTimetable(timetables.single())
                 assertTrue(lessonTimeDao.getLessonTimesOnce(7L).isEmpty())
-                assertTrue(courseDao.getCoursesFlow(7L).first().isEmpty())
+                assertTrue(courseDao.getCoursesWithSessionsFlow(7L).first().isEmpty())
                 assertTrue(dayNoteDao.getDayNotesFlow(7L).first().isEmpty())
             } finally {
                 migratedDb.close()
@@ -141,6 +145,100 @@ class AppDatabaseMigrationTest {
         } finally {
             context.deleteDatabase(dbName)
         }
+    }
+
+    @Test
+    fun migrate12To13MergesSameNameCoursesAndPreservesSessionIds() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val dbName = "migration-12-13-test.db"
+        context.deleteDatabase(dbName)
+
+        try {
+            val helper = FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration.builder(context)
+                    .name(dbName)
+                    .callback(object : SupportSQLiteOpenHelper.Callback(12) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            createV12Schema(db)
+                        }
+
+                        override fun onUpgrade(
+                            db: SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) = Unit
+                    })
+                    .build(),
+            )
+            helper.writableDatabase.use { db ->
+                db.insert(
+                    "timetable",
+                    0,
+                    ContentValues().apply {
+                        put("id", 1L)
+                        put("name", "2026 秋")
+                        put("showWeekend", 0)
+                        put("startDate", "2026-09-01")
+                        put("showFuture", 0)
+                        put("rowHeight", 60)
+                        put("reminderTime", 15)
+                    },
+                )
+                db.insert(
+                    "course",
+                    0,
+                    ContentValues().apply {
+                        put("id", 10L)
+                        put("timetableId", 1L)
+                        put("name", "高等数学")
+                        put("teacher", "张老师")
+                        put("location", "教一101")
+                        put("dayOfWeek", 1)
+                        put("periods", "1,2")
+                        put("weeks", "1,2,3")
+                    },
+                )
+                db.insert(
+                    "course",
+                    0,
+                    ContentValues().apply {
+                        put("id", 15L)
+                        put("timetableId", 1L)
+                        put("name", "高等数学 ")
+                        put("teacher", "张老师")
+                        put("location", "教二202")
+                        put("dayOfWeek", 3)
+                        put("periods", "3,4")
+                        put("weeks", "1,2,3")
+                    },
+                )
+            }
+            helper.close()
+
+            val migratedDb = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
+                .addMigrations(AppDatabase.MIGRATION_12_13)
+                .build()
+            try {
+                val courseDao = migratedDb.courseDao()
+                val courses = courseDao.getCoursesWithSessionsFlow(1L).first()
+                assertEquals(1, courses.size)
+                val merged = courses.single()
+                assertEquals(10L, merged.course.id)
+                assertEquals("高等数学", merged.course.name)
+                assertEquals(2, merged.sessions.size)
+                assertEquals(setOf(10L, 15L), merged.sessions.map { it.id }.toSet())
+                assertEquals(setOf("教一101", "教二202"), merged.sessions.map { it.location }.toSet())
+            } finally {
+                migratedDb.close()
+            }
+        } finally {
+            context.deleteDatabase(dbName)
+        }
+    }
+
+    private fun createV12Schema(db: SupportSQLiteDatabase) {
+        createV11Schema(db)
+        AppDatabase.MIGRATION_11_12.migrate(db)
     }
 
     private fun createV11Schema(db: SupportSQLiteDatabase) {

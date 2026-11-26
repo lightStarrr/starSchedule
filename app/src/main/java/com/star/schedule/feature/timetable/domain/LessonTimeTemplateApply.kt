@@ -1,7 +1,7 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
+import com.star.schedule.core.model.ScheduledCourse
 
 /** 应用模板时真正写进 `lesson_time` 的一节。 */
 data class AppliedPeriod(
@@ -65,7 +65,7 @@ object LessonTimeTemplateApply {
     /** 哪些课用到了模板之外的节次。课程只读，不做任何裁剪。 */
     fun missingLessonTimes(
         periods: List<AppliedPeriod>,
-        courses: List<CourseEntity>,
+        courses: List<ScheduledCourse>,
     ): List<CourseMissingPeriods> {
         val periodCount = periods.size
         return courses.mapNotNull { course ->
@@ -79,7 +79,7 @@ object LessonTimeTemplateApply {
         templateName: String,
         timetableName: String,
         items: List<LessonTimeTemplateItemEntity>,
-        courses: List<CourseEntity>,
+        courses: List<ScheduledCourse>,
     ): LessonTimeApplyPreview? {
         if (items.isEmpty()) return null
         val periods = normalize(items)

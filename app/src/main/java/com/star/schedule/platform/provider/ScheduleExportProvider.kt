@@ -11,10 +11,11 @@ import android.util.Log
 import androidx.core.net.toUri
 import androidx.room.InvalidationTracker
 import com.star.schedule.core.common.Constants
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
+import com.star.schedule.core.model.toScheduledCourses
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -48,6 +49,7 @@ class ScheduleExportProvider : ContentProvider() {
         DatabaseProvider.init(appContext)
         databaseObserver = object : InvalidationTracker.Observer(
             "course",
+            "course_session",
             "lesson_time",
             "timetable",
             "preference"
@@ -111,7 +113,7 @@ class ScheduleExportProvider : ContentProvider() {
     private suspend fun courseJson(uri: Uri, tomorrow: Boolean): String {
         val timetableId = currentTimetableId()
         val timetable = DatabaseProvider.timetableDao().getTimetableFlow(timetableId).first()
-        val courses = DatabaseProvider.courseDao().getCoursesFlow(timetableId).first()
+        val courses = DatabaseProvider.courseDao().getCoursesWithSessionsFlow(timetableId).first().toScheduledCourses()
         val lessonTimes = DatabaseProvider.lessonTimeDao().getLessonTimesFlow(timetableId).first()
         val zoneId = ZoneId.systemDefault()
         val now = LocalDateTime.now(zoneId)
@@ -235,7 +237,7 @@ internal object WakeUpScheduleMapper {
     fun toJson(
         date: LocalDate,
         timetable: TimetableEntity?,
-        courses: List<CourseEntity>,
+        courses: List<ScheduledCourse>,
         lessonTimes: List<LessonTimeEntity>,
         zoneId: ZoneId = ZoneId.systemDefault(),
         now: LocalDateTime = LocalDateTime.now(zoneId)
@@ -264,7 +266,7 @@ internal object WakeUpScheduleMapper {
     fun nextEndTime(
         date: LocalDate,
         timetable: TimetableEntity?,
-        courses: List<CourseEntity>,
+        courses: List<ScheduledCourse>,
         lessonTimes: List<LessonTimeEntity>,
         zoneId: ZoneId = ZoneId.systemDefault(),
         now: LocalDateTime = LocalDateTime.now(zoneId)
@@ -282,7 +284,7 @@ internal object WakeUpScheduleMapper {
     private fun exportedCourses(
         date: LocalDate,
         timetable: TimetableEntity?,
-        courses: List<CourseEntity>,
+        courses: List<ScheduledCourse>,
         lessonTimes: List<LessonTimeEntity>,
         now: LocalDateTime
     ): List<ExportedCourse> {
@@ -307,7 +309,7 @@ internal object WakeUpScheduleMapper {
     }
 
     private fun exportCourse(
-        course: CourseEntity,
+        course: ScheduledCourse,
         periods: List<Int>,
         timesByPeriod: Map<Int, LessonTimeEntity>
     ): ExportedCourse? {

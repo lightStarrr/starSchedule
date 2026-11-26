@@ -42,10 +42,11 @@ import androidx.core.net.toUri
 import com.star.schedule.core.common.Constants
 import com.star.schedule.app.MainActivity
 import com.star.schedule.R
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.DatabaseProvider
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.ReminderEntity
+import com.star.schedule.core.model.ScheduledCourse
+import com.star.schedule.core.model.toScheduledCourses
 import com.star.schedule.feature.schedule.domain.getWeekOfSemester
 import com.star.schedule.feature.timetable.domain.ReminderScheduler
 import kotlinx.coroutines.CancellationException
@@ -544,7 +545,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
 
     private suspend fun scheduleRemindersForTimetable(timetableId: Long) {
         val timetable = DatabaseProvider.timetableDao().getTimetableFlow(timetableId).first() ?: return
-        val courses = DatabaseProvider.courseDao().getCoursesFlow(timetableId).first()
+        val courses = DatabaseProvider.courseDao().getCoursesWithSessionsFlow(timetableId).first().toScheduledCourses()
         val lessonTimes = DatabaseProvider.lessonTimeDao().getLessonTimesFlow(timetableId).first()
 
         // 检查是否只在连续课程的第一节课前发送通知
@@ -608,7 +609,7 @@ class UnifiedNotificationManager(context: Context) : ReminderScheduler {
     }
 
     private suspend fun scheduleReminderForCourse(
-        course: CourseEntity,
+        course: ScheduledCourse,
         lessonTime: LessonTimeEntity,
         date: LocalDate,
         reminderTime: Int = 15

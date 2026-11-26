@@ -1,8 +1,8 @@
 package com.star.schedule.feature.timetable.domain
 
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,7 +24,7 @@ class TimetablePreviewGridTest {
     )
     private val sample = RowHeightPreviewSample.create()
 
-    private fun course(dayOfWeek: Int, weeks: List<Int>) = CourseEntity(
+    private fun course(dayOfWeek: Int, weeks: List<Int>) = ScheduledCourse(
         timetableId = 1,
         name = "课",
         teacher = "",

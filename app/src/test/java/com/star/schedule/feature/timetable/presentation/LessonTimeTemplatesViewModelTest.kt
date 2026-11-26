@@ -1,12 +1,12 @@
 package com.star.schedule.feature.timetable.presentation
 
-import com.star.schedule.core.database.entity.CourseEntity
-import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.LessonTimeApplySnapshot
+import com.star.schedule.core.database.entity.DayNoteEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateEntity
 import com.star.schedule.core.database.entity.LessonTimeTemplateItemEntity
 import com.star.schedule.core.database.entity.TimetableEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.feature.schedule.domain.ScheduleRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -307,8 +307,9 @@ class LessonTimeTemplatesViewModelTest {
         assertEquals(second, viewModel.uiState.value.undo)
     }
 
-    private fun course(name: String, periods: List<Int>) = CourseEntity(
-        id = 0,
+    private fun course(name: String, periods: List<Int>) = ScheduledCourse(
+        sessionId = 0,
+        courseId = 0,
         timetableId = 5,
         name = name,
         teacher = "",
@@ -336,7 +337,7 @@ private class FakeTemplateRepository : ScheduleRepository {
     private val timetable = MutableStateFlow<TimetableEntity?>(
         TimetableEntity(id = 5L, name = "2026 秋季学期", showWeekend = false, startDate = "2026-09-01"),
     )
-    private val courses = MutableStateFlow<List<CourseEntity>>(emptyList())
+    private val courses = MutableStateFlow<List<ScheduledCourse>>(emptyList())
 
     val restoredTemplateIds = mutableListOf<Long>()
 
@@ -355,7 +356,7 @@ private class FakeTemplateRepository : ScheduleRepository {
         timetable.value = null
     }
 
-    fun seedCourses(list: List<CourseEntity>) {
+    fun seedCourses(list: List<ScheduledCourse>) {
         courses.value = list
     }
 
@@ -423,7 +424,7 @@ private class FakeTemplateRepository : ScheduleRepository {
 
     override fun observeTimetable(timetableId: Long): Flow<TimetableEntity?> = timetable
 
-    override fun observeCourses(timetableId: Long): Flow<List<CourseEntity>> = courses
+    override fun observeCourses(timetableId: Long): Flow<List<ScheduledCourse>> = courses
 
     override fun observeLessonTimes(timetableId: Long): Flow<List<LessonTimeEntity>> =
         flowOf(emptyList())

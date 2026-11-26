@@ -1,6 +1,7 @@
 package com.star.schedule.feature.importing.sharecode.data
 
 import com.star.schedule.core.database.entity.CourseEntity
+import com.star.schedule.core.database.entity.CourseSessionEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
 import com.star.schedule.core.database.entity.TimetableEntity
 import com.star.schedule.feature.importing.sharecode.domain.ImportedTimetablePlan
@@ -33,18 +34,25 @@ class RoomImportedTimetableWriter(
             )
         }
 
-        plan.courses.forEach { course ->
-            repository.insertCourseWithReminders(
+        val groupedCourses = plan.courses
+            .groupBy { it.name.trim().ifEmpty { it.name } }
+            .map { (name, items) ->
                 CourseEntity(
                     timetableId = timetableId,
-                    name = course.name,
-                    location = course.location,
-                    dayOfWeek = course.dayOfWeek,
-                    periods = course.periods,
-                    weeks = course.weeks,
-                    teacher = course.teacher,
-                ),
-            )
+                    name = name,
+                ) to items.map { item ->
+                    CourseSessionEntity(
+                        courseId = 0L,
+                        teacher = item.teacher,
+                        location = item.location,
+                        dayOfWeek = item.dayOfWeek,
+                        periods = item.periods,
+                        weeks = item.weeks,
+                    )
+                }
+            }
+        if (groupedCourses.isNotEmpty()) {
+            repository.replaceCoursesForTimetable(timetableId, groupedCourses)
         }
 
         return timetableId

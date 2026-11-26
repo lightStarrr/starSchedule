@@ -59,8 +59,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.star.schedule.R
-import com.star.schedule.core.database.entity.CourseEntity
 import com.star.schedule.core.database.entity.LessonTimeEntity
+import com.star.schedule.core.model.ScheduledCourse
 import com.star.schedule.core.designsystem.component.AppMenu
 import com.star.schedule.core.designsystem.component.MenuEntry
 import com.star.schedule.core.designsystem.theme.StarScheduleTheme
@@ -121,7 +121,7 @@ fun ScheduleHomeScreen(
     onSelectWeekClick: () -> Unit,
     modifier: Modifier = Modifier,
     lessonTimes: List<LessonTimeEntity> = emptyList(),
-    courses: List<CourseEntity> = emptyList(),
+    courses: List<ScheduledCourse> = emptyList(),
     hasTimetable: Boolean = true,
     isLoading: Boolean = false,
     weekStartDate: LocalDate = LocalDate.now().with(java.time.DayOfWeek.MONDAY),
